@@ -142,9 +142,10 @@ function buildIndexHtml() {
   html = html.replace(/<base\s+target=["']_top["']\s*\/?>/i, '');
   // Drop the real Firebase SDK scripts — our firebase-shim replaces them.
   html = html.replace(/<script[^>]*gstatic\.com\/firebasejs\/[^>]*><\/script>\s*/gi, '');
-  // Inject our shims first: firebase-shim (gas calls firebase.auth()), then gas-shim.
+  // Inject our shims first: firebase-shim (gas calls firebase.auth()), gas-shim,
+  // and view-restore (keeps the user's place across a refresh).
   html = html.replace(/<head>/i,
-    '<head>\n  <script src="/firebase-shim.js"></script>\n  <script src="/gas-shim.js"></script>');
+    '<head>\n  <script src="/firebase-shim.js"></script>\n  <script src="/gas-shim.js"></script>\n  <script src="/view-restore.js"></script>');
 
   return html;
 }
@@ -161,6 +162,9 @@ app.get('/gas-shim.js', (_req, res) => {
 });
 app.get('/firebase-shim.js', (_req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'client', 'firebase-shim.js'));
+});
+app.get('/view-restore.js', (_req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'client', 'view-restore.js'));
 });
 
 // The split-out CSS/JS partials. The filename carries a content hash, so each

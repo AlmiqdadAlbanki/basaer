@@ -96,6 +96,8 @@
   };
   AuthInstance.prototype.signOut = function () {
     clearStored();
+    // Forget the remembered view so the next user doesn't land in it.
+    try { if (window.__basaerViewRestore) window.__basaerViewRestore.clear(); } catch (e) { /* ignore */ }
     this._user = null;
     this._emit();
     return Promise.resolve();
