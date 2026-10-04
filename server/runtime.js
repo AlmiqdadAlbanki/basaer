@@ -22,6 +22,11 @@ const { makeScriptApp } = require('./shims/scriptapp.js');
 const { makeMailShims } = require('./shims/mail.js');
 const { makeOAuth2 } = require('./shims/oauth2lib.js');
 const { makeDriveShims } = require('./shims/drive.js');
+const { makeDocShims } = require('./shims/docs.js');
+const { convertBlob } = require('./docgen/convert.js');
+
+// Blob.getAs converts docx/pptx -> pdf/png through LibreOffice + pdftoppm.
+Blob.setConverter(convertBlob);
 
 // Files loaded code.js first (it declares the base `var` ids used elsewhere),
 // then the rest alphabetically. Debug/test one-offs are excluded: they are
@@ -72,6 +77,10 @@ class Runtime {
     this.filesDir = opts.filesDir || path.join(__dirname, '..', 'data', 'files');
     // Drive shims are stateless wrappers over storage, so one instance serves every call.
     this.driveShims = makeDriveShims({ storage: this.storage, filesDir: this.filesDir, baseUrl: this.baseUrl });
+    // DocumentApp/SlidesApp edit .docx/.pptx bytes in the same file store.
+    this.docShims = makeDocShims({
+      storage: this.storage, filesDir: this.filesDir, baseUrl: this.baseUrl, driveInternals: this.driveShims.internals,
+    });
 
     const sources = gasSources(this.gasDir);
     const wrapped = sources
@@ -126,8 +135,8 @@ class Runtime {
       // Ported in phase 5; calling one before then throws a named error.
       DriveApp: this.driveShims.DriveApp,
       Drive: this.driveShims.Drive,
-      DocumentApp: notYetProxy('DocumentApp'),
-      SlidesApp: notYetProxy('SlidesApp'),
+      DocumentApp: this.docShims.DocumentApp,
+      SlidesApp: this.docShims.SlidesApp,
       CalendarApp: notYetProxy('CalendarApp'),
 
       // Standard globals the gas code assumes are present.

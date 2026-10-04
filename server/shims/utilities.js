@@ -77,7 +77,13 @@ function formatDate(date, tz, pattern) {
 
 const Charset = { UTF_8: 'UTF-8', US_ASCII: 'US-ASCII' };
 
+// Optional getAs converter, registered by the host (runtime.js -> docgen/convert.js)
+// so this module stays free of LibreOffice/poppler dependencies.
+let blobConverter = null;
+
 class Blob {
+  // converterFunction(blob, targetMime) returns a new Blob, or null to fall back to relabelling.
+  static setConverter(converterFunction) { blobConverter = converterFunction || null; }
   constructor(bytes, contentType, name) {
     this._bytes = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
     this._contentType = contentType || 'application/octet-stream';
@@ -90,7 +96,12 @@ class Blob {
   setContentType(t) { this._contentType = t; return this; }
   getName() { return this._name; }
   setName(n) { this._name = n; return this; }
-  getAs(type) { return new Blob(this._bytes, type, this._name); }
+  // Real conversion (docx/pptx -> pdf/png) when a converter is registered and
+  // handles the pair; otherwise the bytes are kept and only the mime changes.
+  getAs(type) {
+    const converted = blobConverter ? blobConverter(this, type) : null;
+    return converted || new Blob(this._bytes, type, this._name);
+  }
   copyBlob() { return new Blob(Buffer.from(this._bytes), this._contentType, this._name); }
   _buffer() { return this._bytes; }
 }

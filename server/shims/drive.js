@@ -221,7 +221,7 @@ function makeDriveShims({ storage, filesDir, baseUrl }) {
       if (!record || record.is_folder) {
         throw new Error(
           'File not found: ' + fileId +
-          ' (legacy Google Drive files and Docs templates do not exist locally; they are replaced in phase 5b)'
+          ' (legacy Google Drive files do not exist locally; register a .docx/.pptx stand-in for a template id with tools/register-template.js)'
         );
       }
       return new DriveFile(record.id);
@@ -408,7 +408,37 @@ function makeDriveShims({ storage, filesDir, baseUrl }) {
     },
   };
 
-  return { DriveApp, Drive };
+  // ---- Host-side internals ----------------------------------------------
+  // Shared with the DocumentApp/SlidesApp shims and tools/register-template.js
+  // so the file store has a single implementation.
+
+  const internals = {
+    getRecord(fileId) {
+      return selectById.get(String(fileId)) || null;
+    },
+    readContent(fileId) {
+      return readContent(String(fileId));
+    },
+    // Overwrite a file's bytes in place, keeping its id, name and mime.
+    replaceContent(fileId, buffer) {
+      const record = requireRecord(fileId);
+      writeContent(record.id, buffer);
+      database.prepare('UPDATE files SET size = ?, updated_at = ? WHERE id = ?').run(buffer.length, nowIso(), record.id);
+    },
+    renameFile(fileId, newName) {
+      database.prepare('UPDATE files SET name = ?, updated_at = ? WHERE id = ?').run(String(newName), nowIso(), String(fileId));
+    },
+    // Insert, or replace, a file record under an exact id (used to register
+    // local stand-ins for legacy Google Drive template ids).
+    registerFile({ id, name, mime, buffer, parentId }) {
+      database.prepare('DELETE FROM files WHERE id = ?').run(String(id));
+      const record = insertNewRecord({ id: String(id), name, mime, size: buffer.length, parent_id: parentId || null });
+      writeContent(record.id, buffer);
+      return record;
+    },
+  };
+
+  return { DriveApp, Drive, internals };
 }
 
 module.exports = { makeDriveShims, FOLDER_MIME };

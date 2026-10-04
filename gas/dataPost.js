@@ -2234,14 +2234,9 @@ async function exportNewCard(name, mail, phone, cpr) {
   presentation.saveAndClose();
 
   // 3. تحويل الشريحة إلى صورة PNG عالية الجودة برمجياً
-  var exportUrl = "https://docs.google.com/presentation/d/" + slideCopy.getId() + "/export/png";
-  var options = {
-    headers: {
-      Authorization: "Bearer " + ScriptApp.getOAuthToken()
-    }
-  };
-  var response = UrlFetchApp.fetch(exportUrl, options);
-  var imageBlob = response.getBlob().setName(newName + ".png");
+  // Local port: render the slide to PNG locally (LibreOffice) instead of the Google export URL, which needed ScriptApp.getOAuthToken().
+  var pngBlob = SlidesApp.openById(slideCopy.getId()).getBlob().getAs('image/png');
+  var imageBlob = pngBlob.setName(newName + ".png");
 
   // 4. حفظ الصورة في Google Drive للحصول على الرابط
   var imageFile = targetFolder.createFile(imageBlob);
