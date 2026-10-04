@@ -17,6 +17,7 @@ const {
   makePropertiesService, makeCacheService, makeLockService,
   makeSession, makeLogger, makeHtmlService, makeContentService,
 } = require('./shims/platform.js');
+const { makeUrlFetchApp } = require('./shims/urlfetch.js');
 
 // Files loaded code.js first (it declares the base `var` ids used elsewhere),
 // then the rest alphabetically. Debug/test one-offs are excluded: they are
@@ -66,6 +67,17 @@ class Runtime {
     this.script = new vm.Script(wrapped + trampoline, { filename: 'gas-bundle.js' });
 
     this.htmlService = makeHtmlService(this.gasDir);
+    // Auth services are attached after construction (they depend on this
+    // Runtime for role resolution), breaking the construction cycle.
+    this.identity = null;
+    this.identityService = null;
+  }
+
+  // Called by the host once the identity layer exists. Enables the auth-host
+  // interception in the UrlFetchApp shim.
+  setAuthServices(identity, identityService) {
+    this.identity = identity;
+    this.identityService = identityService;
   }
 
   // Build the global object exposed to the gas code for one invocation.
@@ -82,8 +94,11 @@ class Runtime {
       HtmlService: this.htmlService,
       ContentService: makeContentService(),
 
-      // Ported in later phases; calling one before then throws a named error.
-      UrlFetchApp: notYetProxy('UrlFetchApp'),
+      // Auth hosts are intercepted locally once setAuthServices has run; other
+      // hosts throw until phase 4.
+      UrlFetchApp: this.identityService
+        ? makeUrlFetchApp({ identityService: this.identityService, identity: this.identity })
+        : notYetProxy('UrlFetchApp'),
       GmailApp: notYetProxy('GmailApp'),
       MailApp: notYetProxy('MailApp'),
       Gmail: notYetProxy('Gmail'),

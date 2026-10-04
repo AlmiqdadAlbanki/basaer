@@ -11,6 +11,11 @@
 
 const path = require('path');
 const { Storage } = require('../server/storage.js');
+const { IdentityService } = require('../server/auth/identity-service.js');
+
+// Shared demo password for every seeded account that has one.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'Test@1234';
+const credEmail = (cpr) => 'u' + cpr + '@basaer-login.internal';
 
 const IDS = {
   mainData: '1Y3zNCw4i3VmNdj3BjhkerpzIV8VijOVfAwY9_ixN8ic',
@@ -121,8 +126,30 @@ function run() {
     [now, 'مرحبًا بكم في منصة بصائر', 'https://basaerbh.com'],
   ]);
 
+  // --- refID / rules (exam definitions) --------------------------------------
+  // Not auto-created by the readers; seed one example exam. The exam-management
+  // code backfills its own extra columns (exam_id, archived, retakeOpen, ...).
+  seedSheet(storage, IDS.refID, 'rules', ['exam', 'level', 'exam_id', 'questionsCount', 'duration', 'passMark'], [
+    ['اختبار الأربعين النووية', 0, 'exam_demo_1', 10, 30, 50],
+  ]);
+
+  // --- Empty data sheets student-path readers open (header row only) ---------
+  // These readers do not auto-create their sheet, so seed a header row to make
+  // them return [] instead of throwing on a missing sheet.
+  seedSheet(storage, IDS.attendanceData, 'attendance', ['date/time', 'id', 'cpr', 'name', 'by', 'level'], []);
+  seedSheet(storage, IDS.answersData, 'answers', ['time', 'cpr', 'exam', 'matn', 'level', 'result'], []);
+
+  // --- Local identity store: give the hasPassword accounts a login ---------
+  const ids = new IdentityService(storage);
+  const withPassword = ['001234567', '003456789', '100000001', '100000002', '100000003'];
+  for (const cpr of withPassword) {
+    ids.setPassword('u' + cpr, credEmail(cpr), cpr, DEMO_PASSWORD);
+  }
+
   console.log('Seeded database at', DB_PATH);
   console.log('Students: 3, Staff: 3 (admin/editor/teacher), refID: main/matns/announce');
+  console.log('Password login (demo password "' + DEMO_PASSWORD + '") for CPRs:', withPassword.join(', '));
+  console.log('  admin=100000001  editor=100000002  teacher=100000003  students=001234567,003456789');
   storage.close();
 }
 
