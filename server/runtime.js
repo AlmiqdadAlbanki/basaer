@@ -18,6 +18,9 @@ const {
   makeSession, makeLogger, makeHtmlService, makeContentService,
 } = require('./shims/platform.js');
 const { makeUrlFetchApp } = require('./shims/urlfetch.js');
+const { makeScriptApp } = require('./shims/scriptapp.js');
+const { makeMailShims } = require('./shims/mail.js');
+const { makeOAuth2 } = require('./shims/oauth2lib.js');
 
 // Files loaded code.js first (it declares the base `var` ids used elsewhere),
 // then the rest alphabetically. Debug/test one-offs are excluded: they are
@@ -57,6 +60,14 @@ class Runtime {
     this.ownerEmail = opts.ownerEmail || 'admin@basaerbh.com';
     this.tz = opts.tz || 'Asia/Qatar';
     this.logSink = opts.logSink || null;
+    // Outbound behaviour: 'dry-run' records and fakes every external call and
+    // email (the default — nothing reaches real people from a test box);
+    // 'live' sends for real.
+    this.outboundMode = opts.outboundMode || 'dry-run';
+    this.mailer = opts.mailer || null;      // shims/mail.js Mailer
+    this.baseUrl = opts.baseUrl || '';
+    this.localIssuer = opts.localIssuer || ''; // our local service-account email
+    this.outboundLog = opts.outboundLog || null;
 
     const sources = gasSources(this.gasDir);
     const wrapped = sources
@@ -98,20 +109,21 @@ class Runtime {
       HtmlService: this.htmlService,
       ContentService: makeContentService(),
 
-      // Auth hosts are intercepted locally once setAuthServices has run; other
-      // hosts throw until phase 4.
-      UrlFetchApp: this.identityService
-        ? makeUrlFetchApp({ identityService: this.identityService, identity: this.identity })
-        : notYetProxy('UrlFetchApp'),
-      GmailApp: notYetProxy('GmailApp'),
-      MailApp: notYetProxy('MailApp'),
-      Gmail: notYetProxy('Gmail'),
+      UrlFetchApp: this._makeUrlFetchApp(),
+      ScriptApp: makeScriptApp(this.storage, { baseUrl: this.baseUrl }),
+      // Email goes to the outbox (dry-run by default).
+      ...(this.mailer ? makeMailShims(this.mailer) : {
+        GmailApp: notYetProxy('GmailApp'), MailApp: notYetProxy('MailApp'), Gmail: notYetProxy('Gmail'),
+      }),
+      // OAuth2 library (FCM) resolves UrlFetchApp lazily so it always uses the
+      // current per-call instance.
+      OAuth2: makeOAuth2(() => this._sandbox.UrlFetchApp, this.outboundMode),
+
+      // Ported in phase 5; calling one before then throws a named error.
       DriveApp: notYetProxy('DriveApp'),
       Drive: notYetProxy('Drive'),
-      ScriptApp: notYetProxy('ScriptApp'),
       DocumentApp: notYetProxy('DocumentApp'),
       SlidesApp: notYetProxy('SlidesApp'),
-      OAuth2: notYetProxy('OAuth2'),
       CalendarApp: notYetProxy('CalendarApp'),
 
       // Standard globals the gas code assumes are present.
@@ -152,14 +164,23 @@ class Runtime {
     this._sandbox = sandbox;
   }
 
+  _makeUrlFetchApp() {
+    return makeUrlFetchApp({
+      identityService: this.identityService,
+      identity: this.identity,
+      localIssuer: this.localIssuer,
+      storage: this.storage,
+      mode: this.outboundMode,
+      log: this.outboundLog,
+    });
+  }
+
   // Swap in fresh instances of the stateful shims before each call so one
   // invocation never sees another's cached sheet grids or log buffer.
   _refreshPerCall() {
     this._sandbox.SpreadsheetApp = makeSpreadsheetApp(this.storage);
     this._sandbox.Logger = makeLogger(this.logSink);
-    this._sandbox.UrlFetchApp = this.identityService
-      ? makeUrlFetchApp({ identityService: this.identityService, identity: this.identity })
-      : this._sandbox.UrlFetchApp;
+    this._sandbox.UrlFetchApp = this._makeUrlFetchApp();
   }
 
   // Run a top-level gas function by name with the given argument array.

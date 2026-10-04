@@ -15,22 +15,57 @@ const path = require('path');
 
 const { Runtime, Storage } = require('./runtime.js');
 const { Identity } = require('./auth/identity.js');
-const { IdentityService, ensureServiceAccount } = require('./auth/identity-service.js');
+const { IdentityService, ensureServiceAccount, SA_CLIENT_EMAIL } = require('./auth/identity-service.js');
 const { enforce, scopeResult } = require('./policy.js');
+const { Mailer } = require('./shims/mail.js');
+const { Scheduler } = require('./scheduler.js');
 
 const ROOT = path.join(__dirname, '..');
 const GAS_DIR = path.join(ROOT, 'gas');
 const DB_PATH = process.env.BASAER_DB || path.join(ROOT, 'data', 'basaer.sqlite');
 const KEY_DIR = process.env.BASAER_KEYS || path.join(ROOT, 'data', 'keys');
 const PORT = process.env.PORT || 3000;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+// 'dry-run' (default): emails and external calls are recorded, never sent.
+// 'live': really send (needs SMTP_* and provider credentials).
+const OUTBOUND_MODE = process.env.OUTBOUND_MODE === 'live' ? 'live' : 'dry-run';
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const storage = new Storage(DB_PATH);
+
+// Email transport: nodemailer over SMTP in live mode when configured.
+let smtpTransport = null;
+if (OUTBOUND_MODE === 'live' && process.env.SMTP_HOST) {
+  try {
+    const nodemailer = require('nodemailer');
+    smtpTransport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: +(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    });
+  } catch (e) {
+    console.warn('[mail] nodemailer not installed; run `npm i nodemailer` for live email. Falling back to outbox only.');
+  }
+}
+const mailer = new Mailer({
+  storage,
+  mode: OUTBOUND_MODE,
+  transport: smtpTransport,
+  from: process.env.MAIL_FROM || 'بصائر للعلوم الشرعية <no-reply@basaerbh.com>',
+});
+
 const runtime = new Runtime({
   gasDir: GAS_DIR,
   storage,
   ownerEmail: process.env.OWNER_EMAIL || 'admin@basaerbh.com',
   tz: 'Asia/Qatar',
   logSink: process.env.BASAER_LOG ? (m) => console.log('[gas]', m) : null,
+  outboundMode: OUTBOUND_MODE,
+  mailer,
+  baseUrl: BASE_URL,
+  localIssuer: SA_CLIENT_EMAIL,
+  outboundLog: (m) => console.log('[outbound]', m),
 });
 
 // Identity layer. ensureServiceAccount seeds the local "service account" key
@@ -229,10 +264,37 @@ app.post('/exec', (req, res) => {
   }
 });
 
-app.get('/healthz', (_req, res) => res.json({ ok: true }));
+app.get('/healthz', (_req, res) => res.json({ ok: true, mode: OUTBOUND_MODE }));
+
+// --- Dev-only inspection (never in production): what would have been sent ---
+// Lets a tester read an OTP code or see a queued WhatsApp message without any
+// real delivery. Requires an admin session so students can't read others' mail.
+if (!IS_PROD) {
+  const requireAdmin = (req, res, next) => {
+    const c = callerFrom(req);
+    if (!c || !c.isAdmin) return res.status(403).json({ ok: false, error: 'admin only' });
+    next();
+  };
+  app.get('/dev/outbox', requireAdmin, (req, res) => {
+    const limit = Math.min(+req.query.limit || 50, 500);
+    res.json(storage.db.prepare('SELECT id, created_at, to_addr, subject, body_text, status, error FROM outbox ORDER BY id DESC LIMIT ?').all(limit));
+  });
+  app.get('/dev/outbound', requireAdmin, (req, res) => {
+    const limit = Math.min(+req.query.limit || 50, 500);
+    res.json(storage.db.prepare('SELECT id, created_at, mode, host, method, url, status, payload FROM outbound_log ORDER BY id DESC LIMIT ?').all(limit));
+  });
+  app.get('/dev/triggers', requireAdmin, (_req, res) => {
+    res.json(storage.db.prepare('SELECT * FROM triggers ORDER BY due_at').all());
+  });
+}
+
+// Time-based triggers (queues, exam monitors) run from here.
+const scheduler = new Scheduler({ storage, runtime });
+scheduler.start(1000);
 
 app.listen(PORT, () => {
-  console.log(`Basaer server listening on http://localhost:${PORT}`);
-  console.log(`  gas dir: ${GAS_DIR}`);
-  console.log(`  db:      ${DB_PATH}`);
+  console.log(`Basaer server listening on ${BASE_URL}`);
+  console.log(`  gas dir:  ${GAS_DIR}`);
+  console.log(`  db:       ${DB_PATH}`);
+  console.log(`  outbound: ${OUTBOUND_MODE}${OUTBOUND_MODE === 'dry-run' ? ' (emails/WhatsApp/push recorded, not sent)' : ''}`);
 });

@@ -49,6 +49,13 @@ class Storage {
     }
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
+    // Durable enough under WAL and noticeably faster for writes, especially on
+    // the WSL<->Windows filesystem boundary.
+    this.db.pragma('synchronous = NORMAL');
+    // In-memory copy of each sheet grid, keyed "ss\u0000sheet". Every write path
+    // below updates it, so reads never touch SQLite after the first load. Sheet
+    // objects receive a clone so an in-flight call never aliases the cache.
+    this._grids = new Map();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS ss_meta (
         ss TEXT PRIMARY KEY,
@@ -79,6 +86,39 @@ class Storage {
         value   TEXT NOT NULL,
         expires INTEGER NOT NULL,
         PRIMARY KEY (scope, key)
+      );
+      -- Time-based triggers (replaces ScriptApp triggers). kind: 'once' | 'every'
+      CREATE TABLE IF NOT EXISTS triggers (
+        id          TEXT PRIMARY KEY,
+        handler     TEXT NOT NULL,
+        kind        TEXT NOT NULL,
+        due_at      INTEGER NOT NULL,
+        interval_ms INTEGER,
+        created_at  INTEGER NOT NULL
+      );
+      -- Outgoing email (replaces GmailApp/MailApp). status: 'dry-run' | 'queued' | 'sent' | 'failed'
+      CREATE TABLE IF NOT EXISTS outbox (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL,
+        to_addr    TEXT,
+        subject    TEXT,
+        body_text  TEXT,
+        body_html  TEXT,
+        meta       TEXT,
+        status     TEXT NOT NULL,
+        error      TEXT
+      );
+      -- Record of outbound HTTP calls (WhatsApp, FCM, ...). mode: 'dry-run' | 'live'
+      CREATE TABLE IF NOT EXISTS outbound_log (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL,
+        mode       TEXT NOT NULL,
+        host       TEXT,
+        url        TEXT,
+        method     TEXT,
+        payload    TEXT,
+        status     INTEGER,
+        response   TEXT
       );
     `);
   }
@@ -153,19 +193,32 @@ class Storage {
     this.db.prepare('INSERT OR IGNORE INTO sheets (ss, name, idx) VALUES (?, ?, ?)').run(ss, name, idx);
   }
 
-  // Full grid as a 1-based-preserving 0-based 2D array (grid[0] is sheet row 1).
-  loadGrid(ss, name) {
+  _key(ss, name) { return ss + '\u0000' + name; }
+
+  // Read the master grid from SQLite (uncached).
+  _loadGridFromDb(ss, name) {
     const rows = this.db
       .prepare('SELECT rownum, cells FROM rows WHERE ss = ? AND sheet = ? ORDER BY rownum')
       .all(ss, name);
     const grid = [];
     for (const r of rows) {
-      const arr = JSON.parse(r.cells).map(decodeCell);
-      grid[r.rownum - 1] = arr;
+      grid[r.rownum - 1] = JSON.parse(r.cells).map(decodeCell);
     }
-    // Fill any gaps so the array is dense.
     for (let i = 0; i < grid.length; i++) if (!grid[i]) grid[i] = [];
     return grid;
+  }
+
+  _master(ss, name) {
+    const k = this._key(ss, name);
+    if (!this._grids.has(k)) this._grids.set(k, this._loadGridFromDb(ss, name));
+    return this._grids.get(k);
+  }
+
+  // Full grid as a 0-based 2D array (grid[0] is sheet row 1). Returns a clone of
+  // the cached master so the caller may mutate it freely; persistence goes
+  // through putRow/saveGrid/deleteRowShift, which also update the master.
+  loadGrid(ss, name) {
+    return this._master(ss, name).map((row) => row.slice());
   }
 
   // Replace the whole sheet contents with the given grid (0-based rows).
@@ -179,6 +232,7 @@ class Storage {
       }
     });
     tx();
+    this._grids.set(this._key(ss, name), grid.map((row) => (row || []).slice()));
   }
 
   // Write a single row (1-based), used by appendRow / setValues to avoid
@@ -187,6 +241,9 @@ class Storage {
     this.db
       .prepare('INSERT OR REPLACE INTO rows (ss, sheet, rownum, cells) VALUES (?, ?, ?, ?)')
       .run(ss, name, rownum, JSON.stringify((cellsArray || []).map(encodeCell)));
+    const master = this._master(ss, name);
+    for (let i = master.length; i < rownum - 1; i++) master[i] = [];
+    master[rownum - 1] = (cellsArray || []).slice();
   }
 
   // Delete a row (1-based) and shift every subsequent row up by one, matching
@@ -199,6 +256,14 @@ class Storage {
         .run(ss, name, rownum);
     });
     tx();
+    const master = this._master(ss, name);
+    if (rownum - 1 < master.length) master.splice(rownum - 1, 1);
+  }
+
+  // Drop the in-memory copy (e.g. after an external import into the DB).
+  invalidate(ss, name) {
+    if (ss == null) this._grids.clear();
+    else this._grids.delete(this._key(ss, name));
   }
 
   close() {

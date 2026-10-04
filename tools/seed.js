@@ -133,11 +133,26 @@ function run() {
     ['اختبار الأربعين النووية', 0, 'exam_demo_1', 10, 30, 50],
   ]);
 
-  // --- Empty data sheets student-path readers open (header row only) ---------
+  // --- refID / questions (the demo exam's question bank) ---------------------
+  // ensureQuestionManagementColumns_ throws if the core columns are missing, so
+  // this exact header set is required. Three questions, form ("نموذج") 1,
+  // keyed to the demo exam by its name + level.
+  const qHeaders = ['#', 'الكتاب / المتن', 'نموذج', 'المرحلة', 'السؤال', 'answer-1', 'answer-2', 'answer-3', 'answer-4', 'answer-5', 'الجواب الصحيح'];
+  const q = (n, text, a1, a2, a3, correct) => [n, 'اختبار الأربعين النووية', 1, 0, text, a1, a2, a3, '', '', correct];
+  seedSheet(storage, IDS.refID, 'questions', qHeaders, [
+    q(1, 'كم عدد أحاديث الأربعين النووية؟', 'أربعون', 'اثنان وأربعون', 'خمسون', 'اثنان وأربعون'),
+    q(2, 'من مؤلف الأربعين النووية؟', 'الإمام النووي', 'الإمام البخاري', 'الإمام مسلم', 'الإمام النووي'),
+    q(3, 'ما أول حديث في الأربعين؟', 'إنما الأعمال بالنيات', 'الدين النصيحة', 'بُني الإسلام على خمس', 'إنما الأعمال بالنيات'),
+  ]);
+
+  // --- Empty data sheets that readers open (header row only) -----------------
   // These readers do not auto-create their sheet, so seed a header row to make
   // them return [] instead of throwing on a missing sheet.
   seedSheet(storage, IDS.attendanceData, 'attendance', ['date/time', 'id', 'cpr', 'name', 'by', 'level'], []);
   seedSheet(storage, IDS.answersData, 'answers', ['time', 'cpr', 'exam', 'matn', 'level', 'result'], []);
+  seedSheet(storage, IDS.answersData, 'stWorks', ['cpr', 'name', 'gender', 'stWorks', 'url', 'notes', 'certificate'], []);
+  seedSheet(storage, IDS.mainData, 'lecAttend', ['Timestamp', 'cpr', 'name', 'gender', 'study'], []);
+  seedSheet(storage, IDS.dectationData, 'motonRates', ['طابع زمني', 'اسم الطالب', 'المتن', 'الورد', 'الدرجة', 'student_Cpr', 'responsible', 'code', 'level'], []);
 
   // --- Local identity store: give the hasPassword accounts a login ---------
   const ids = new IdentityService(storage);
