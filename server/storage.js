@@ -87,6 +87,21 @@ class Storage {
         expires INTEGER NOT NULL,
         PRIMARY KEY (scope, key)
       );
+      -- Local file store (replaces Google Drive). Bytes live on disk at <filesDir>/<id>;
+      -- folders have no disk content. Legacy Drive folder ids are auto-created as folders.
+      CREATE TABLE IF NOT EXISTS files (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        mime       TEXT NOT NULL,
+        size       INTEGER NOT NULL DEFAULT 0,
+        parent_id  TEXT,
+        is_folder  INTEGER NOT NULL DEFAULT 0,
+        is_public  INTEGER NOT NULL DEFAULT 0,
+        trashed    INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS files_parent ON files (parent_id);
       -- Time-based triggers (replaces ScriptApp triggers). kind: 'once' | 'every'
       CREATE TABLE IF NOT EXISTS triggers (
         id          TEXT PRIMARY KEY,

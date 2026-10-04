@@ -2077,7 +2077,8 @@ function uploadProfileAvatar(cpr, base64Data, mimeType) {
 
   var file = folder.createFile(blob);
   shareFileAnyoneWithLink_(file.getId());
-  var url = 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w500';
+  // Local file store: use the URL of the file we just created instead of a Google Drive thumbnail URL.
+  var url = file.getUrl();
 
   ensureProfileColumns_();
   var headers = person.sheet.getRange(1, 1, 1, person.sheet.getLastColumn()).getValues()[0];
@@ -2247,7 +2248,8 @@ async function exportNewCard(name, mail, phone, cpr) {
   shareFileAnyoneWithLink_(imageFile.getId());
   
   var fileId = imageFile.getId();
-  var directImageUrl = "https://drive.google.com/uc?export=view&id=" + fileId;
+  // Local file store: use the URL of the image we just created instead of a Google Drive uc?export=view URL.
+  var directImageUrl = imageFile.getUrl();
   var finalImageUrl = imageFile.getUrl();
 
   // 5. حذف ملف السلايد المؤقت للحفاظ على نظافة المجلد (سنبقي الصورة فقط)

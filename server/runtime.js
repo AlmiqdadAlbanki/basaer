@@ -21,6 +21,7 @@ const { makeUrlFetchApp } = require('./shims/urlfetch.js');
 const { makeScriptApp } = require('./shims/scriptapp.js');
 const { makeMailShims } = require('./shims/mail.js');
 const { makeOAuth2 } = require('./shims/oauth2lib.js');
+const { makeDriveShims } = require('./shims/drive.js');
 
 // Files loaded code.js first (it declares the base `var` ids used elsewhere),
 // then the rest alphabetically. Debug/test one-offs are excluded: they are
@@ -68,6 +69,9 @@ class Runtime {
     this.baseUrl = opts.baseUrl || '';
     this.localIssuer = opts.localIssuer || ''; // our local service-account email
     this.outboundLog = opts.outboundLog || null;
+    this.filesDir = opts.filesDir || path.join(__dirname, '..', 'data', 'files');
+    // Drive shims are stateless wrappers over storage, so one instance serves every call.
+    this.driveShims = makeDriveShims({ storage: this.storage, filesDir: this.filesDir, baseUrl: this.baseUrl });
 
     const sources = gasSources(this.gasDir);
     const wrapped = sources
@@ -120,8 +124,8 @@ class Runtime {
       OAuth2: makeOAuth2(() => this._sandbox.UrlFetchApp, this.outboundMode),
 
       // Ported in phase 5; calling one before then throws a named error.
-      DriveApp: notYetProxy('DriveApp'),
-      Drive: notYetProxy('Drive'),
+      DriveApp: this.driveShims.DriveApp,
+      Drive: this.driveShims.Drive,
       DocumentApp: notYetProxy('DocumentApp'),
       SlidesApp: notYetProxy('SlidesApp'),
       CalendarApp: notYetProxy('CalendarApp'),

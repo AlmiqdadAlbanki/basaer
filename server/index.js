@@ -264,6 +264,43 @@ app.post('/exec', (req, res) => {
   }
 });
 
+// ---- Local file store (Drive replacement) ----------------------------------
+// Public files (shared "anyone with link") are served without auth; everything
+// else needs a valid Bearer token. Registered before the generic handlers.
+app.get('/files/folder/:id', (req, res) => {
+  if (!callerFrom(req)) return res.status(401).json({ status: 'error', message: 'authentication required' });
+  const folderRecord = storage.db.prepare('SELECT * FROM files WHERE id = ? AND is_folder = 1 AND trashed = 0').get(req.params.id);
+  if (!folderRecord) return res.status(404).json({ status: 'error', message: 'folder not found' });
+  const childRecords = storage.db
+    .prepare('SELECT * FROM files WHERE parent_id = ? AND is_folder = 0 AND trashed = 0 ORDER BY name')
+    .all(folderRecord.id);
+  res.json({
+    id: folderRecord.id,
+    name: folderRecord.name,
+    files: childRecords.map((record) => ({
+      id: record.id,
+      name: record.name,
+      mime: record.mime,
+      size: record.size,
+      url: `/files/${record.id}/${encodeURIComponent(record.name)}`,
+    })),
+  });
+});
+
+app.get('/files/:id/:name?', (req, res) => {
+  const fileRecord = storage.db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id);
+  if (!fileRecord || fileRecord.is_folder || fileRecord.trashed) return res.status(404).send('Not found');
+  if (!fileRecord.is_public && !callerFrom(req)) return res.status(401).send('Authentication required');
+  const contentPath = path.join(runtime.filesDir, fileRecord.id);
+  if (!fs.existsSync(contentPath)) return res.status(404).send('Not found');
+  res.setHeader('Content-Type', fileRecord.mime);
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  if (req.query.download === '1') {
+    res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'' + encodeURIComponent(fileRecord.name));
+  }
+  res.send(fs.readFileSync(contentPath));
+});
+
 app.get('/healthz', (_req, res) => res.json({ ok: true, mode: OUTBOUND_MODE }));
 
 // --- Dev-only inspection (never in production): what would have been sent ---
