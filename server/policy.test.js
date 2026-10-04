@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { POLICY, enforce } = require('./policy.js');
+const { POLICY, enforce, scopeResult } = require('./policy.js');
 
 // The authoritative set of server functions the client invokes (from the
 // call-site inventory). Every one must have an explicit policy entry, so a new
@@ -79,9 +79,26 @@ test('protected functions reject an anonymous caller (401)', () => {
   assert.strictEqual(enforce('getAnswersData', ['001234567'], null).status, 401);
 });
 
-test('full student list is staff-only (#3)', () => {
-  assert.strictEqual(enforce('getPersons', [], STUDENT).allow, false);
-  assert.strictEqual(enforce('getPersons', [], TEACHER).allow, true);
+test('getPersons: staff get the full list, a student only their own record (#3)', () => {
+  const roster = [{ cpr: '001234567', name: 'me' }, { cpr: '003456789', name: 'other' }];
+
+  const staffDec = enforce('getPersons', [], TEACHER);
+  assert.strictEqual(staffDec.allow, true);
+  assert.deepStrictEqual(scopeResult(staffDec, roster), roster); // not scoped
+
+  const studentDec = enforce('getPersons', [], STUDENT);
+  assert.strictEqual(studentDec.allow, true);
+  const scoped = scopeResult(studentDec, roster);
+  assert.strictEqual(scoped.length, 1);
+  assert.strictEqual(scoped[0].cpr, '001234567'); // only the caller's own row leaves the server
+
+  // anonymous still blocked
+  assert.strictEqual(enforce('getPersons', [], null).status, 401);
+});
+
+test('scopeResult leaves the gas "no data" sentinel (0) untouched', () => {
+  const dec = enforce('getPersons', [], STUDENT);
+  assert.strictEqual(scopeResult(dec, 0), 0);
 });
 
 test('a student can only read their own records; CPR is rescoped (#8)', () => {

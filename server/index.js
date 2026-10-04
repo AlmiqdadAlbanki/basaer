@@ -16,7 +16,7 @@ const path = require('path');
 const { Runtime, Storage } = require('./runtime.js');
 const { Identity } = require('./auth/identity.js');
 const { IdentityService, ensureServiceAccount } = require('./auth/identity-service.js');
-const { enforce } = require('./policy.js');
+const { enforce, scopeResult } = require('./policy.js');
 
 const ROOT = path.join(__dirname, '..');
 const GAS_DIR = path.join(ROOT, 'gas');
@@ -81,26 +81,68 @@ function verifyCustomToken(token) {
   return payload.uid;
 }
 
-// --- Build the single page once at startup --------------------------------
+// --- Page assembly ---------------------------------------------------------
+//
+// The Apps Script page inlines 11 `include()` partials (4 CSS + 7 JS) into one
+// ~1.4MB document, so the browser re-downloads and re-parses every partial —
+// including the 600KB admin bundle — on every load, for every role. We instead
+// serve each partial as its own static, browser-cacheable file and reference it
+// with <link>/<script src>, preserving document order (the JS partials have
+// load-order dependencies and run non-deferred, exactly as when inlined). First
+// load fetches them in parallel; every load after is a conditional 304. gas
+// files stay byte-identical — the split happens here at serve time.
+
+const INCLUDE_RE = /<\?!?=?\s*include\s*\(\s*["']([^"']+)["']\s*\)\s*;?\s*\?>/g;
+
+// Extract each partial's inner content (minus its wrapping <style>/<script>),
+// note whether it is CSS or JS, and give it a content-hashed served name so the
+// browser can cache it immutably and re-fetch only when the content changes.
+// `served` maps the hashed filename -> payload (the route); `ref` maps the base
+// name -> its current hashed filename (the page builder).
+function buildPartials() {
+  const served = new Map();
+  const ref = new Map();
+  const main = fs.readFileSync(path.join(GAS_DIR, 'Main.html'), 'utf8');
+  let m;
+  INCLUDE_RE.lastIndex = 0;
+  while ((m = INCLUDE_RE.exec(main))) {
+    const name = m[1];
+    const file = path.join(GAS_DIR, name + '.html');
+    if (!fs.existsSync(file)) continue;
+    const raw = fs.readFileSync(file, 'utf8');
+    const styleM = raw.match(/^\s*<style[^>]*>([\s\S]*)<\/style>\s*$/i);
+    const scriptM = raw.match(/^\s*<script[^>]*>([\s\S]*)<\/script>\s*$/i);
+    const body = styleM ? styleM[1] : (scriptM ? scriptM[1] : raw);
+    const ext = styleM ? 'css' : 'js';
+    const type = styleM ? 'text/css' : 'application/javascript';
+    const hash = crypto.createHash('sha1').update(body).digest('hex').slice(0, 10);
+    const servedName = `${name}.${hash}.${ext}`;
+    served.set(servedName, { type, body });
+    ref.set(name, servedName);
+  }
+  return { served, ref };
+}
+
+let { served: PARTIALS, ref: PARTIAL_REF } = buildPartials();
+
 function buildIndexHtml() {
+  if (process.env.BASAER_REBUILD) ({ served: PARTIALS, ref: PARTIAL_REF } = buildPartials());
   let html = fs.readFileSync(path.join(GAS_DIR, 'Main.html'), 'utf8');
 
-  // Inline every `<?!= include("name"); ?>` (spaces and quote style vary).
-  html = html.replace(/<\?!?=?\s*include\s*\(\s*["']([^"']+)["']\s*\)\s*;?\s*\?>/g, (_m, name) => {
-    const file = path.join(GAS_DIR, name + '.html');
-    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : `<!-- missing include: ${name} -->`;
+  // Replace each include with a reference to its now-external, cache-busted file.
+  html = html.replace(INCLUDE_RE, (_m, name) => {
+    const file = PARTIAL_REF.get(name);
+    if (!file) return `<!-- missing include: ${name} -->`;
+    return file.endsWith('.css')
+      ? `<link rel="stylesheet" href="/partials/${file}">`
+      : `<script src="/partials/${file}"></script>`;
   });
 
-  // `<base target="_top">` only matters inside the Apps Script iframe; drop it
-  // so links and reloads act on our own page. (Done at serve time to keep
-  // gas/Main.html byte-identical for clasp.)
+  // `<base target="_top">` only matters inside the Apps Script iframe.
   html = html.replace(/<base\s+target=["']_top["']\s*\/?>/i, '');
-
-  // Drop the real Firebase compat SDK scripts — our firebase-shim replaces them.
+  // Drop the real Firebase SDK scripts — our firebase-shim replaces them.
   html = html.replace(/<script[^>]*gstatic\.com\/firebasejs\/[^>]*><\/script>\s*/gi, '');
-
-  // Inject our shims before anything else runs: firebase-shim first (the gas
-  // code calls firebase.auth()), then the google.script.run shim.
+  // Inject our shims first: firebase-shim (gas calls firebase.auth()), then gas-shim.
   html = html.replace(/<head>/i,
     '<head>\n  <script src="/firebase-shim.js"></script>\n  <script src="/gas-shim.js"></script>');
 
@@ -121,6 +163,16 @@ app.get('/firebase-shim.js', (_req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'client', 'firebase-shim.js'));
 });
 
+// The split-out CSS/JS partials. The filename carries a content hash, so each
+// is cached immutably for a year; a content change produces a new filename and
+// a one-time re-fetch. After the first visit the browser serves these from
+// cache with no network at all.
+app.get('/partials/:file', (req, res) => {
+  const p = PARTIALS.get(req.params.file);
+  if (!p) return res.status(404).send('// no such partial');
+  res.type(p.type).set('Cache-Control', 'public, max-age=31536000, immutable').send(p.body);
+});
+
 // Trade a custom token (minted by a login function in auth.js) for a session
 // token the browser then holds and sends on every RPC.
 app.post('/api/auth/exchange', (req, res) => {
@@ -135,9 +187,10 @@ app.post('/api/auth/exchange', (req, res) => {
   }
 });
 
+// Serve the page from the one-time build. Set BASAER_REBUILD=1 to re-inline the
+// partials on every request while actively editing them.
 app.get('/', (_req, res) => {
-  const html = process.env.NODE_ENV === 'production' ? INDEX_HTML : buildIndexHtml();
-  res.type('html').send(html);
+  res.type('html').send(process.env.BASAER_REBUILD ? buildIndexHtml() : INDEX_HTML);
 });
 
 // --- RPC: google.script.run -> POST /api/rpc/:fn ---------------------------
@@ -152,7 +205,7 @@ app.post('/api/rpc/:fn', (req, res) => {
   }
 
   try {
-    const result = runtime.call(fn, decision.args || args);
+    const result = scopeResult(decision, runtime.call(fn, decision.args || args));
     res.json({ ok: true, result: result === undefined ? null : result });
   } catch (err) {
     console.error('RPC', fn, 'failed:', err && err.stack ? err.stack : err);

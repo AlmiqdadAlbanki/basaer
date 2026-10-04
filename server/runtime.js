@@ -80,7 +80,11 @@ class Runtime {
     this.identityService = identityService;
   }
 
-  // Build the global object exposed to the gas code for one invocation.
+  // Build the global object exposed to the gas code. The stateless shims and
+  // constants live here and are created once; the stateful ones (Sheets, Logger
+  // and the auth-aware UrlFetchApp) are refreshed per call in _refreshPerCall so
+  // each invocation still sees the current database and a clean log, matching
+  // Apps Script's "fresh execution" semantics without re-running 15k lines.
   _makeGlobals() {
     const g = {
       SpreadsheetApp: makeSpreadsheetApp(this.storage),
@@ -137,23 +141,41 @@ class Runtime {
     return g;
   }
 
+  // Build the shared context once (all 500+ functions defined a single time),
+  // then reuse it for every call. This is the main performance lever: an
+  // invocation becomes a function call instead of re-executing the whole bundle.
+  _ensureContext() {
+    if (this._sandbox) return;
+    const sandbox = this._makeGlobals();
+    vm.createContext(sandbox);
+    this.script.runInContext(sandbox, { timeout: 30000 });
+    this._sandbox = sandbox;
+  }
+
+  // Swap in fresh instances of the stateful shims before each call so one
+  // invocation never sees another's cached sheet grids or log buffer.
+  _refreshPerCall() {
+    this._sandbox.SpreadsheetApp = makeSpreadsheetApp(this.storage);
+    this._sandbox.Logger = makeLogger(this.logSink);
+    this._sandbox.UrlFetchApp = this.identityService
+      ? makeUrlFetchApp({ identityService: this.identityService, identity: this.identity })
+      : this._sandbox.UrlFetchApp;
+  }
+
   // Run a top-level gas function by name with the given argument array.
   call(fnName, args) {
-    const sandbox = this._makeGlobals();
-    const context = vm.createContext(sandbox);
-    this.script.runInContext(context, { timeout: 30000 });
-    if (typeof sandbox[fnName] !== 'function') {
+    this._ensureContext();
+    this._refreshPerCall();
+    if (typeof this._sandbox[fnName] !== 'function') {
       throw new Error('No such server function: ' + fnName);
     }
-    return sandbox.__invoke__.call(sandbox, fnName, args || []);
+    return this._sandbox.__invoke__.call(this._sandbox, fnName, args || []);
   }
 
   // Introspection: the set of top-level function names the bundle defines.
   functionNames() {
-    const sandbox = this._makeGlobals();
-    const context = vm.createContext(sandbox);
-    this.script.runInContext(context, { timeout: 30000 });
-    return Object.keys(sandbox).filter((k) => typeof sandbox[k] === 'function' && !k.startsWith('__'));
+    this._ensureContext();
+    return Object.keys(this._sandbox).filter((k) => typeof this._sandbox[k] === 'function' && !k.startsWith('__'));
   }
 }
 

@@ -110,7 +110,11 @@ const POLICY = {
   getExams: { level: 'user' },          // exam list; subject cpr is arg 2 (not scoped) — read only
 
   // ---- Staff reads --------------------------------------------------------
-  getPersons: { level: 'staff' },        // full student table — staff only (#3)
+  // getPersons returns the full student table to staff, but only the caller's
+  // own record to a student (#3). The client's student-login path reads its own
+  // record out of this list, so self-scoping keeps that working while never
+  // letting another student's data reach the browser.
+  getPersons: { level: 'user', scopeSelf: true },
   getStaffList: { level: 'staff' },
   getLecturersList: { level: 'staff' },
   getLecturesRef: { level: 'staff' },
@@ -127,6 +131,7 @@ const POLICY = {
   // caller to read their own emp row; only an admin may request every row.
   loginData: {
     level: 'user',
+    selfCprArg: 0, // a non-staff caller is rescoped to their own CPR (no probing staff rows)
     check: (ctx, args) => String(args[0]) !== 'all' ? true : ctx.isAdmin,
   },
 
@@ -278,14 +283,30 @@ function forbidden() {
   return { allow: false, status: 403, message: 'ليس لديك صلاحية لهذه العملية.' };
 }
 
-// Rescope a subject CPR to the caller when the caller is not staff.
+// Rescope a subject CPR to the caller when the caller is not staff, and carry
+// any result-scoping instruction to the dispatcher.
 function finalize(entry, args, ctx) {
   let outArgs = args;
   if (entry.selfCprArg != null && ctx && !ctx.isStaff) {
     outArgs = args.slice();
     outArgs[entry.selfCprArg] = ctx.cpr;
   }
-  return { allow: true, args: outArgs };
+  const scopeSelf = !!(entry.scopeSelf && ctx && !ctx.isStaff);
+  return { allow: true, args: outArgs, scopeSelf, cpr: ctx ? ctx.cpr : null };
 }
 
-module.exports = { POLICY, enforce, policyNames: () => Object.keys(POLICY) };
+function cprEq(a, b) {
+  const na = Number(a); const nb = Number(b);
+  if (!isNaN(na) && !isNaN(nb)) return na === nb;
+  return String(a) === String(b);
+}
+
+// Apply a decision's result-scoping to a function's return value. For a
+// self-scoped array result, keep only the caller's own rows.
+function scopeResult(decision, result) {
+  if (!decision.scopeSelf) return result;
+  if (Array.isArray(result)) return result.filter((r) => r && cprEq(r.cpr, decision.cpr));
+  return result; // non-array (e.g. the gas "no data" sentinel 0) passes through
+}
+
+module.exports = { POLICY, enforce, scopeResult, policyNames: () => Object.keys(POLICY) };
