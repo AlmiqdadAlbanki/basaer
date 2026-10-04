@@ -16,7 +16,7 @@ const { makeDriveShims } = require('../server/shims/drive.js');
 const { DOCX_MIME, PPTX_MIME } = require('../server/docgen/convert.js');
 
 const DEFAULT_DB_PATH = process.env.BASAER_DB || path.join(__dirname, '..', 'data', 'basaer.sqlite');
-const DEFAULT_FILES_DIR = path.join(__dirname, '..', 'data', 'files');
+const DEFAULT_FILES_DIR = process.env.BASAER_FILES || path.join(__dirname, '..', 'data', 'files');
 
 function mimeForFileName(fileName) {
   if (/\.docx$/i.test(fileName)) return DOCX_MIME;

@@ -26,7 +26,7 @@ const { registerTemplate } = require('./register-template.js');
 
 const GAS_DIR = path.join(__dirname, '..', 'gas');
 const DEFAULT_DB_PATH = process.env.BASAER_DB || path.join(__dirname, '..', 'data', 'basaer.sqlite');
-const DEFAULT_FILES_DIR = path.join(__dirname, '..', 'data', 'files');
+const DEFAULT_FILES_DIR = process.env.BASAER_FILES || path.join(__dirname, '..', 'data', 'files');
 const DEMO_GREETING_TEMPLATE_ID = 'local_demo_greeting_template';
 const CERTIFICATE_FILE_NAME = 'demo-certificate-template.docx';
 const GREETING_FILE_NAME = 'demo-greeting-template.pptx';

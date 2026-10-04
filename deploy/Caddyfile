@@ -1,0 +1,26 @@
+# basaer-managed
+# install.sh never overwrites a Caddyfile that contains the marker line above,
+# so edit the domain below freely. Delete the marker to opt out entirely.
+#
+# Replace the default domain, or set DOMAIN in Caddy's environment.
+{$DOMAIN:app.basaerbh.com} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+
+	# Largest accepted upload.
+	request_body {
+		max_size 50MB
+	}
+
+	log {
+		output file /var/log/caddy/basaer.log
+	}
+
+	reverse_proxy localhost:3000
+}

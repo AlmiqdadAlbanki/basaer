@@ -1,0 +1,27 @@
+[Unit]
+Description=Basaer student management server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=basaer
+Group=basaer
+WorkingDirectory=/opt/basaer/app
+EnvironmentFile=/etc/basaer.env
+# LibreOffice needs a writable profile directory.
+Environment=HOME=/var/lib/basaer
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+# Hardening. The app only writes under /var/lib/basaer (BASAER_DB, BASAER_KEYS,
+# BASAER_FILES) and /tmp.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/basaer /tmp
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

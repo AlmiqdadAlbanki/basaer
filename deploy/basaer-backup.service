@@ -1,0 +1,8 @@
+[Unit]
+Description=Basaer nightly backup
+
+[Service]
+Type=oneshot
+User=basaer
+Group=basaer
+ExecStart=/opt/basaer/app/deploy/backup.sh

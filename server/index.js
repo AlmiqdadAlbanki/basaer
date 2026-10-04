@@ -26,6 +26,8 @@ const ROOT = path.join(__dirname, '..');
 const GAS_DIR = path.join(ROOT, 'gas');
 const DB_PATH = process.env.BASAER_DB || path.join(ROOT, 'data', 'basaer.sqlite');
 const KEY_DIR = process.env.BASAER_KEYS || path.join(ROOT, 'data', 'keys');
+// Uploaded files and generated documents (the local replacement for Drive).
+const FILES_DIR = process.env.BASAER_FILES || path.join(ROOT, 'data', 'files');
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 // 'dry-run' (default): emails and external calls are recorded, never sent.
@@ -68,6 +70,7 @@ const runtime = new Runtime({
   baseUrl: BASE_URL,
   localIssuer: SA_CLIENT_EMAIL,
   outboundLog: (m) => console.log('[outbound]', m),
+  filesDir: FILES_DIR,
 });
 
 // Identity layer. ensureServiceAccount seeds the local "service account" key
