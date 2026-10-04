@@ -10,7 +10,7 @@ config in `/etc/basaer.env`.
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
 3. An Elastic IP attached to the instance.
 4. A DNS A record for the app domain (for example `app.basaerbh.com`) pointing at the Elastic IP.
-   Caddy needs this to issue the HTTPS certificate.
+   DNS must point at the IP before you run certbot, which needs it to issue the HTTPS certificate.
 
 ## 2. Install
 
@@ -19,7 +19,7 @@ config in `/etc/basaer.env`.
    sudo mkdir -p /opt/basaer
    sudo git clone <repo-url> /opt/basaer/app
    ```
-2. Run the bootstrap (installs packages, Node 22, Caddy, the `basaer` user, units, timer):
+2. Run the bootstrap (installs packages, Node 22, nginx, certbot, the `basaer` user, units, timer):
    ```
    cd /opt/basaer/app
    sudo bash deploy/install.sh
@@ -30,11 +30,18 @@ config in `/etc/basaer.env`.
    sudo nano /etc/basaer.env
    sudo systemctl restart basaer
    ```
-4. Set the domain in the Caddyfile (replace `app.basaerbh.com`) and reload:
+4. Set the domain: edit `server_name` in `/etc/nginx/sites-available/basaer` (replace
+   `app.basaerbh.com`), reload nginx, then get the certificate. certbot obtains it, adds the 443
+   block and the HTTP to HTTPS redirect, and installs an auto-renew timer
+   (`systemctl list-timers | grep certbot`):
    ```
-   sudo nano /etc/caddy/Caddyfile
-   sudo systemctl reload caddy
+   sudo nano /etc/nginx/sites-available/basaer
+   sudo nginx -t && sudo systemctl reload nginx
+   sudo certbot --nginx -d <domain> --redirect -m <email> --agree-tos
    ```
+   After HTTPS works you may enable HSTS (see the comment in the site file).
+   To test without a domain, use `server_name _;`, skip certbot, use plain HTTP, and set
+   `BASE_URL=http://<ip>` in `/etc/basaer.env`.
 5. Check: `curl https://<domain>/healthz` should return `{"ok":true,"mode":"dry-run"}`.
 
 All writable state (database, keys, uploaded files and generated documents) lives under
@@ -156,11 +163,16 @@ If `deploy/` files changed, run `sudo bash deploy/install.sh` again.
 
 ## 9. Troubleshooting
 
-- Logs: `journalctl -u basaer -f` (app), `sudo tail -f /var/log/caddy/basaer.log` (web).
+- Logs: `journalctl -u basaer -f` (app), `sudo tail -f /var/log/nginx/basaer.access.log /var/log/nginx/basaer.error.log` (web).
 - Health: `curl http://localhost:3000/healthz` on the server, `curl https://<domain>/healthz` outside.
 - The service restarts every 3 seconds if it crashes; `systemctl status basaer` shows the last error.
-- Certificate not issued: the DNS A record must resolve to the Elastic IP and ports 80 and 443
-  must be open. Check `journalctl -u caddy`.
+- certbot fails: DNS probably has not propagated. `dig +short <domain>` must print the Elastic IP,
+  and ports 80 and 443 must be open. See `/var/log/letsencrypt/letsencrypt.log`.
+- `nginx -t` reports a syntax error: fix the line it names in `/etc/nginx/sites-available/basaer`
+  (often a missing `;`), then run `sudo nginx -t` again before reloading.
+- 502 Bad Gateway: the Node service is down. `systemctl status basaer`, `journalctl -u basaer -e`.
+- 413 Request Entity Too Large: the upload exceeds `client_max_body_size` (50m) in the site file.
+  Raise it, then `sudo nginx -t && sudo systemctl reload nginx`.
 - First certificate or PDF generation is slow (30 to 60 seconds): LibreOffice builds its profile
   in `/var/lib/basaer` on first use. Later runs are fast.
 - Arabic text looks wrong in documents: check `fc-list | grep -i amiri`.
