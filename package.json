@@ -14,7 +14,10 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
+    "docx": "^9.8.1",
     "express": "^4.21.2",
+    "jszip": "^3.10.2",
+    "multer": "^2.4.0",
     "xlsx": "^0.18.5"
   }
 }

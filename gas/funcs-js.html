@@ -4391,70 +4391,40 @@ function onlyUnique(value, index, self) {
 ///////////////////////////////////////////////////////////////////////////////////////
 // دالة عامة ترفع أي ملف (صورة أو غيرها)
 async function uploadLargeFileToDrive(file, fileName, folderId, progressBarFill) {
-    const CHUNK_SIZE = 256 * 1024; // 256KB
-    const totalSize = file.size;
+    // SECURITY-FINDINGS #1: this used to upload straight to the Google Drive
+    // resumable API using the owner's OAuth token fetched via getOAuthToken(),
+    // which exposed that token to every student. It now posts the file to our
+    // server, which stores it. Resolves with { id, name, url } (callers use .id).
+    const idToken = await firebase.auth().currentUser.getIdToken();
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+    formData.append("fileName", fileName);
+    formData.append("folderId", folderId);
 
-    // 1) نحصل على OAuth Token
-    const token = await new Promise((resolve, reject) => {
-        google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getOAuthToken();
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/upload/student-work");
+        xhr.setRequestHeader("Authorization", "Bearer " + idToken);
+        xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const progress = Math.min(99, Math.round((e.loaded / e.total) * 100));
+            progressBarFill.style.width = progress + "%";
+            progressBarFill.textContent = progress + "%";
+        };
+        xhr.onload = () => {
+            let json = null;
+            try { json = JSON.parse(xhr.responseText); } catch (_) {}
+            if (xhr.status >= 200 && xhr.status < 300 && json && json.ok) {
+                progressBarFill.style.width = "100%";
+                progressBarFill.textContent = "100%";
+                resolve({ id: json.id, name: json.name, url: json.url });
+            } else {
+                reject(new Error((json && json.message) || ("Upload failed (" + xhr.status + ")")));
+            }
+        };
+        xhr.onerror = () => reject(new Error("Upload failed (network)"));
+        xhr.send(formData);
     });
-
-    // 2) بدء جلسة الرفع Resumable Session
-    const startRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
-        {
-            method: "POST",
-            headers: {
-                "Authorization": "Bearer " + token,
-                "Content-Type": "application/json; charset=UTF-8",
-            },
-            body: JSON.stringify({
-                name: fileName,
-                parents: [folderId],
-                mimeType: file.type || "application/octet-stream"
-            })
-        }
-    );
-
-    const uploadUrl = startRes.headers.get("location");
-
-    // 3) قراءة البيانات على شكل ArrayBuffer
-    const buffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(buffer);
-
-    let uploaded = 0;
-
-    // 4) رفع الملف على Chunks
-    while (uploaded < totalSize) {
-        const end = Math.min(uploaded + CHUNK_SIZE, totalSize);
-        const chunk = uint8Array.slice(uploaded, end);
-
-        const res = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-                "Content-Length": String(chunk.length),
-                "Content-Range": `bytes ${uploaded}-${end - 1}/${totalSize}`
-            },
-            body: chunk
-        });
-
-        if (!res.ok && res.status !== 308) {
-            throw new Error("Upload failed at byte " + uploaded);
-        }
-
-        uploaded = end;
-
-        // تحديث progress bar
-        const progress = Math.round((uploaded / totalSize) * 100);
-        progressBarFill.style.width = progress + "%";
-        progressBarFill.textContent = progress + "%";
-    }
-
-    const json = await fetch(uploadUrl, { method: "PUT" });
-    return json.json();
 }
 
 

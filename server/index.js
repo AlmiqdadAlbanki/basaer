@@ -17,7 +17,9 @@ const { Runtime, Storage } = require('./runtime.js');
 const { Identity } = require('./auth/identity.js');
 const { IdentityService, ensureServiceAccount, SA_CLIENT_EMAIL } = require('./auth/identity-service.js');
 const { enforce, scopeResult } = require('./policy.js');
-const { Mailer } = require('./shims/mail.js');
+const multer = require('multer');
+const { storeStudentWork, isOwnFolder, MAX_UPLOAD_BYTES } = require('./uploads.js');
+const { Mailer }= require('./shims/mail.js');
 const { Scheduler } = require('./scheduler.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -284,6 +286,45 @@ app.get('/files/folder/:id', (req, res) => {
       size: record.size,
       url: `/files/${record.id}/${encodeURIComponent(record.name)}`,
     })),
+  });
+});
+
+// --- Student work upload: replaces the old direct-to-Drive client upload ---
+const studentWorkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
+app.post('/api/upload/student-work', (req, res) => {
+  const caller = callerFrom(req);
+  if (!caller) return res.status(401).json({ ok: false, message: 'authentication required' });
+  if (!caller.isStudent && !caller.isStaff) return res.status(403).json({ ok: false, message: 'forbidden' });
+  studentWorkUpload.single('file')(req, res, (uploadError) => {
+    if (uploadError) {
+      const tooLarge = uploadError.code === 'LIMIT_FILE_SIZE';
+      return res.status(tooLarge ? 413 : 400).json({ ok: false, message: tooLarge ? 'file too large' : 'bad upload' });
+    }
+    if (!req.file) return res.status(400).json({ ok: false, message: 'file is required' });
+    if (!caller.isStaff) {
+      // Students may only upload into their own folder.
+      let ownFolderUrl = '';
+      try {
+        const persons = runtime.call('getPersons', []);
+        const me = Array.isArray(persons) ? persons.find((p) => String(p.cpr) === String(caller.cpr)) : null;
+        ownFolderUrl = me ? me.folderUrl : '';
+      } catch (_) { /* fall through to deny */ }
+      if (!isOwnFolder(ownFolderUrl, req.body && req.body.folderId)) {
+        return res.status(403).json({ ok: false, message: 'uploads are only allowed into your own student folder' });
+      }
+    }
+    try {
+      const stored = storeStudentWork(runtime, {
+        folderId: req.body && req.body.folderId,
+        fileName: req.body && req.body.fileName,
+        mime: req.file.mimetype,
+        bytes: req.file.buffer,
+        originalName: req.file.originalname,
+      });
+      res.json({ ok: true, id: stored.id, name: stored.name, url: stored.url });
+    } catch (err) {
+      res.status(err.status || 500).json({ ok: false, message: err.status ? err.message : 'upload failed' });
+    }
   });
 });
 
