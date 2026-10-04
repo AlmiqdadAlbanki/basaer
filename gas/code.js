@@ -187,8 +187,13 @@ let qr03Color = '8a4b3b';
 ///////////////////////////////////////////////////////////////
 /////////////////////////////whatsApp/////////////////////////isav3xCvCrmnDJMJK6oFwCm
 ///////////////////////////////////////////////////////////////ZoZQ9kQyuqpCz9rjFR5h
+  // Authorization is a lazy getter: the token is read from the sheet only when
+  // a WhatsApp request actually reads this header, not at script-load time.
+  // (On Apps Script the eager read ran on every single invocation; under the
+  // self-hosted runtime every RPC rebuilds the global scope, so an eager read
+  // here would hit the database on every call. Call sites are unchanged.)
   const headersForWatsapp = {
-    'Authorization': getTokenForwhatsApp_(),
+    get Authorization() { return getTokenForwhatsApp_(); },
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };

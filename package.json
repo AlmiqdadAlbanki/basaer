@@ -1,0 +1,19 @@
+{
+  "name": "basaer-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted runtime for the Basaer web app, ported off Google Apps Script",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "seed": "node tools/seed.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "express": "^4.21.2"
+  }
+}
