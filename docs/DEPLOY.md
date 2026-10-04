@@ -46,7 +46,8 @@ The app directory itself is read-only to the service.
 ```
 cd /opt/basaer/app
 sudo -u basaer BASAER_DB=/var/lib/basaer/basaer.sqlite node tools/seed.js
-sudo -u basaer BASAER_DB=/var/lib/basaer/basaer.sqlite node tools/make-demo-templates.js
+sudo -u basaer BASAER_DB=/var/lib/basaer/basaer.sqlite BASAER_FILES=/var/lib/basaer/files node tools/make-demo-templates.js
+sudo systemctl restart basaer
 ```
 
 Demo logins are printed by `seed.js` (default demo password `Test@1234`). Do not leave demo

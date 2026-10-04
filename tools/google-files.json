@@ -1,0 +1,20 @@
+[
+  { "name": "mainData", "id": "1Y3zNCw4i3VmNdj3BjhkerpzIV8VijOVfAwY9_ixN8ic", "kind": "sheet" },
+  { "name": "attendanceData", "id": "1TjNcFeccyK9BhPBbpfx8cZqPvJbJtSfgptse_fahg1g", "kind": "sheet" },
+  { "name": "answersData", "id": "18uSjZYwLzY5O5XlzL46SwAELnrTwzILHs3fzq0x58ok", "kind": "sheet" },
+  { "name": "dectationData", "id": "1qs50ANDMENyGVPxet2S0keRZ2Cxur_jSAj2pMY4Mojo", "kind": "sheet" },
+  { "name": "refID", "id": "1L-VXGGxNX-4th2ytpTC7YsVo1p3xAzc-JLmoGdpIdgo", "kind": "sheet" },
+  { "name": "archiveData", "id": "1RGgPD6r44RCnnGQFlxj9603bu1E-D6YaIVCJSySCxNs", "kind": "sheet" },
+  { "name": "certIdTemp", "id": "1j7fbLyJH4Ef6zLRbHr9upaSy4zapOSu3VJpwrDELlN4", "kind": "doc", "registerAs": "1j7fbLyJH4Ef6zLRbHr9upaSy4zapOSu3VJpwrDELlN4" },
+  { "name": "cardID00", "id": "1GhW_GrSh_rIOM9OvT1OloDAfugspkd9YUq2dRPbCDqI", "kind": "doc", "registerAs": "1GhW_GrSh_rIOM9OvT1OloDAfugspkd9YUq2dRPbCDqI" },
+  { "name": "cardID01", "id": "1jmUA5b5itLCxcI52aHI41boXHEbVo9HWULXAEXlOER4", "kind": "doc", "registerAs": "1jmUA5b5itLCxcI52aHI41boXHEbVo9HWULXAEXlOER4" },
+  { "name": "cardID02", "id": "1DLiQpuBZcdsCzGVMQCCjtDTYDnJdpyYqP_0-QQIv49Q", "kind": "doc", "registerAs": "1DLiQpuBZcdsCzGVMQCCjtDTYDnJdpyYqP_0-QQIv49Q" },
+  { "name": "cardID03", "id": "1Yg-Z22vRduKOggLvV0Q4uG6bWQMcbZoT9ydcGaQvGDU", "kind": "doc", "registerAs": "1Yg-Z22vRduKOggLvV0Q4uG6bWQMcbZoT9ydcGaQvGDU" },
+  { "name": "malesPdfsFolderID", "id": "1olwmdY3CpEifAuiowYq-v2ye-u2kIgWw", "kind": "folder" },
+  { "name": "femalesPdfsFolderID", "id": "1rX1N8Ev05q1iL791iBMYk5lcuVGtDI0_", "kind": "folder" },
+  { "name": "forPrintFolderID", "id": "1lX4uTZx__9DES7SLhvFpfnp8OVvP7sHz", "kind": "folder" },
+  { "name": "tempFolderID", "id": "10JcyF3apckQ1UgrQ3MkquW85og-sQ4rH", "kind": "folder" },
+  { "name": "perArchiveID", "id": "1PexT7pwgJdaBUncuykBh6kYDAzzhyNYs", "kind": "folder" },
+  { "name": "greetingCardsOutputFolderID", "id": "1qQgSGoFAGbjrwl_UBLLo09zFKa7GflX-", "kind": "folder" },
+  { "name": "oldTempFolderID", "id": "1BqEH-ihrkLbPFL5mxBbGUhA2G-MYolae", "kind": "folder" }
+]
