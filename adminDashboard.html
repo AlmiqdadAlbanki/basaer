@@ -1,0 +1,1740 @@
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand-wrap">
+    <img src="https://drive.google.com/thumbnail?id=1zgseX_0_TPsyQlCjiTjKzxJ4dR5lZ1_7&sz=w1000" alt="أكاديمية بصائر">
+    <button class="icon-button sidebar-close" id="sidebarClose" type="button" aria-label="إغلاق القائمة"><i data-icon="x"></i></button>
+  </div>
+
+  <nav class="main-nav" aria-label="التنقل الرئيسي">
+    <span class="nav-caption">نظرة عامة</span>
+    <button class="nav-link active" type="button" data-route="dashboard"><i data-icon="layout-dashboard"></i><span>لوحة المعلومات</span></button>
+
+    <span class="nav-caption">إدارة الأكاديمية</span>
+    <button class="nav-link" type="button" data-route="registrations"><i data-icon="user-round-plus"></i><span>طلبات التسجيل</span><b class="nav-count" id="navCountRegistrations">0</b></button>
+    <button class="nav-link" type="button" data-route="students"><i data-icon="users-round"></i><span>الطلاب</span></button>
+    <button class="nav-link" type="button" data-route="attendance"><i data-icon="calendar-check-2"></i><span>الحضور</span></button>
+    <button class="nav-link" type="button" data-route="certificates"><i data-icon="award"></i><span>الشهادات</span></button>
+    <button class="nav-link" type="button" data-route="messages"><i data-icon="send"></i><span>الرسائل</span></button>
+    <button class="nav-link" type="button" data-route="staff"><i data-icon="shield-check"></i><span>المتعاونون والصلاحيات</span></button>
+    <button class="nav-link" type="button" data-route="exams"><i data-icon="clipboard-check"></i><span>الاختبارات</span></button>
+    <button class="nav-link" type="button" data-route="lectures"><i data-icon="calendar-days"></i><span>إدارة المحاضرات</span></button>
+    <button class="nav-link" type="button" data-route="curriculum"><i data-icon="book-open-check"></i><span>إدارة المواد</span></button>
+    <button class="nav-link" type="button" data-route="stages"><i data-icon="list-checks"></i><span>إدارة المراحل</span></button>
+    <button class="nav-link" type="button" data-route="graduationCandidates"><i data-icon="award"></i><span>مرشّحو الاجتياز</span></button>
+    <button class="nav-link" type="button" data-route="templates"><i data-icon="copy"></i><span>إدارة القوالب</span></button>
+    <button class="nav-link" type="button" data-route="reports"><i data-icon="chart-line"></i><span>التقارير</span></button>
+
+    <span class="nav-caption">أدوات الذكاء الاصطناعي</span>
+    <button class="nav-link" type="button" data-route="pdfAnalysis"><i data-icon="sparkles"></i><span>تحليل ملف بالذكالي</span></button>
+
+    <span class="nav-caption">الحساب</span>
+    <button class="nav-link" type="button" data-route="emp-profile"><i data-icon="user-round"></i><span>الملف الشخصي</span></button>
+  </nav>
+
+  <div class="sidebar-status">
+    <div class="live-content">
+      <span class="status-dot"></span>
+      <div><strong>النظام يعمل بصورة طبيعية</strong><small id="sidebarSyncTime">آخر مزامنة الآن</small></div>
+    </div>
+  </div>
+
+  <div class="sidebar-user">
+    <span class="avatar" id="sidebarUserAvatar">–</span>
+    <div><strong id="sidebarUserName">—</strong><small id="sidebarUserRole">موظف</small></div>
+    <button class="icon-button" type="button" title="تسجيل الخروج" onclick="logout()"><i data-icon="log-out"></i></button>
+  </div>
+</aside>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-start">
+      <button class="icon-button mobile-menu" id="mobileMenu" type="button" aria-label="فتح القائمة"><i data-icon="menu"></i></button>
+      <div class="breadcrumb"><span>الإدارة</span><i data-icon="chevron-left"></i><strong id="breadcrumbTitle">لوحة المعلومات</strong></div>
+    </div>
+    <div class="topbar-actions">
+      <label class="global-search"><i data-icon="search"></i><input id="globalSearch" type="search" placeholder="ابحث في لوحة الإدارة..."><kbd>⌘ K</kbd></label>
+      <div class="font-control">
+        <button class="icon-button" id="fontSizeButton" type="button" aria-label="حجم الخط" aria-expanded="false" title="تغيير حجم الخط"><i data-icon="text-height"></i></button>
+        <div class="font-size-menu" id="fontSizeMenu" hidden>
+          <header><i data-icon="text-height"></i><span><strong>حجم خط الواجهة</strong><small>يُحفظ اختيارك على هذا الجهاز</small></span></header>
+          <div class="font-size-options" role="group" aria-label="اختيار حجم الخط">
+            <button type="button" data-font-size="small" aria-pressed="false"><b>أ</b><span>صغير</span></button>
+            <button class="active" type="button" data-font-size="medium" aria-pressed="true"><b>أ</b><span>متوسط</span></button>
+            <button type="button" data-font-size="large" aria-pressed="false"><b>أ</b><span>كبير</span></button>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="qrButton" class="icon-button qr-button" title="تحضير طالب عبر QR" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i></button>
+      <button class="user-button" id="userButton" type="button"><span class="avatar" id="topbarUserAvatar">–</span><span><strong id="topbarUserName">—</strong><small id="topbarUserRole">موظف</small></span><i data-icon="chevron-down"></i></button>
+    </div>
+    <div class="user-menu" id="userMenu" hidden>
+      <button type="button" data-route="emp-profile"><i data-icon="user-round"></i>الملف الشخصي</button>
+      <button type="button" id="userMenuGoStudentBtn" onclick="goToOwnStudentAccount_()" hidden><i data-icon="graduation-cap"></i>حسابي كطالب</button>
+      <button type="button" onclick="logout()"><i data-icon="log-out"></i>تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- لوحة المعلومات -->
+    <section class="page-view active" data-page="dashboard">
+      <header class="page-heading">
+        <div><span class="eyebrow" id="dashboardEyebrow">—</span><h1 id="dashboardGreeting">إحصاءات عامة</h1><p>هذه خلاصة ما يحدث في الأكاديمية الآن.</p></div>
+        <div class="heading-actions">
+          <label class="registration-switch" title="فتح أو إغلاق استقبال طلبات التسجيل">
+            <input id="registrationToggle" type="checkbox"><span></span><b id="registrationToggleText">التسجيل مغلق</b>
+          </label>
+          <button class="secondary-button refresh-page" type="button" onclick="loadDashboardData()"><i data-icon="refresh-cw"></i>تحديث البيانات</button>
+          <button class="primary-button" type="button" data-go="registrations"><i data-icon="user-round-plus"></i>مراجعة الطلبات</button>
+        </div>
+      </header>
+
+      <div class="metrics-grid">
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon red"><i data-icon="users-round"></i></span><div><small>إجمالي الطلاب النشطين</small><strong id="total-students">0</strong><span>عبر جميع المراحل</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gold"><i data-icon="user-round-clock"></i></span><div><small>طلبات بانتظار المراجعة</small><strong id="pending-students">0</strong><span>بحاجة إلى اتخاذ قرار</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon green"><i data-icon="calendar-check"></i></span><div><small>متوسط الحضور</small><strong id="attendance-rate">0%</strong><span>آخر 4 محاضرات</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="award"></i></span><div><small>الموظفون والمتعاونون</small><strong id="total-certs">0</strong><span>حساب نشط</span></div></div></article>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-3">
+        <section class="panel attendance-panel" data-live data-skeleton="chart">
+          <div class="live-content">
+            <header class="panel-header"><div><h2>الذكور والإناث</h2><p>النسبة من إجمالي الطلاب</p></div><span class="soft-badge green" id="genderSoftBadge">—</span></header>
+            <div class="stage-chart">
+              <div class="stage-total"><span>الإجمالي</span><strong id="stageTotalCount">0</strong><small>طالبًا وطالبة</small></div>
+              <div class="mini-chart" aria-label="نسبة الذكور والإناث" id="genderMiniChart"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel stage-panel" data-live data-skeleton="chart">
+          <div class="live-content">
+            <header class="panel-header"><div><h2>توزيع الطلاب حسب المراحل</h2><p>الطلاب النشطون حاليًا في كل مرحلة</p></div></header>
+            <div class="stage-bars" id="stageBars">
+              <div><span><b class="stage-dot qualifying"></b>التأهيلية <small id="stageCount0">0</small></span><div><i id="stageBar0" style="width:0%;background:#a77d52"></i></div></div>
+              <div><span><b class="stage-dot foundation"></b>التأسيسية <small id="stageCount1">0</small></span><div><i id="stageBar1" style="width:0%;background:#325969"></i></div></div>
+              <div><span><b class="stage-dot rooting"></b>التأصيلية <small id="stageCount2">0</small></span><div><i id="stageBar2" style="width:0%;background:#7b7364"></i></div></div>
+              <div><span><b class="stage-dot achievement"></b>التحصيلية <small id="stageCount3">0</small></span><div><i id="stageBar3" style="width:0%;background:#8a4b3b"></i></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel mazhab-panel" data-live data-skeleton="chart">
+          <div class="live-content">
+            <header class="panel-header"><div><h2>توزيع الطلاب حسب المذاهب</h2><p>المذهب الفقهي المختار</p></div></header>
+            <div class="stage-bars" id="mazhabBars">
+              <div><span><b class="stage-dot" style="background:var(--primary)"></b>المذهب الحنبلي <small id="mazhabCount0">0</small></span><div><i id="mazhabBar0" style="width:0%;background:var(--primary)"></i></div></div>
+              <div><span><b class="stage-dot" style="background:var(--gold)"></b>المذهب الشافعي <small id="mazhabCount1">0</small></span><div><i id="mazhabBar1" style="width:0%;background:var(--gold)"></i></div></div>
+              <div><span><b class="stage-dot" style="background:#325969"></b>المذهب المالكي <small id="mazhabCount2">0</small></span><div><i id="mazhabBar2" style="width:0%;background:#325969"></i></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel age-panel" data-live data-skeleton="chart" style="margin-bottom:16px;">
+        <div class="live-content">
+          <header class="panel-header"><div><h2>توزيع الطلاب حسب الأعمار</h2><p>عدد الطلاب في كل فئة عمرية (كل 5 أعوام)</p></div>
+            <div class="export-format-options" style="grid-template-columns:1fr;width:170px;">
+              <button class="excel" type="button" id="ageExportExcelBtn" style="grid-template-columns:28px 1fr;" title="تصدير الفئات العمرية المعروضة حاليًا إلى Excel"><i data-icon="file-spreadsheet"></i><span><strong>Excel</strong><small>للتحليل والتصفية</small></span></button>
+            </div>
+          </header>
+          <div class="table-toolbar" style="flex-wrap:wrap;">
+            <div class="segmented" data-filter-group="ageStage" id="ageStageFilterGroup">
+              <button class="active" data-filter="all" type="button">الكل <b id="ageStageCount-all">0</b></button>
+              <button data-filter="0" type="button">التأهيلية <b id="ageStageCount-0">0</b></button>
+              <button data-filter="1" type="button">التأسيسية <b id="ageStageCount-1">0</b></button>
+              <button data-filter="2" type="button">التأصيلية <b id="ageStageCount-2">0</b></button>
+              <button data-filter="3" type="button">التحصيلية <b id="ageStageCount-3">0</b></button>
+              <button data-filter="pending" type="button">طلبات جديدة <b id="ageStageCount-pending">0</b></button>
+            </div>
+            <div class="segmented" data-filter-group="ageGender" id="ageGenderFilterGroup">
+              <button class="active" data-filter="all" type="button">الجميع</button>
+              <button data-filter="ذكر" type="button">ذكر</button>
+              <button data-filter="أنثى" type="button">أنثى</button>
+            </div>
+          </div>
+          <div class="stage-bars age-bars" id="ageBars"></div>
+        </div>
+      </section>
+
+      <section class="panel area-panel" data-live data-skeleton="chart" style="margin-bottom:16px;">
+        <div class="live-content">
+          <header class="panel-header"><div><h2>توزيع الطلاب حسب المناطق السكنية</h2><p>أعلى المناطق عددًا من إجمالي الطلاب</p></div>
+            <div class="export-format-options" style="grid-template-columns:1fr;width:170px;">
+              <button class="excel" type="button" id="areaExportExcelBtn" style="grid-template-columns:28px 1fr;" title="تصدير المناطق المعروضة حاليًا إلى Excel"><i data-icon="file-spreadsheet"></i><span><strong>Excel</strong><small>للتحليل والتصفية</small></span></button>
+            </div>
+          </header>
+          <div class="table-toolbar" style="flex-wrap:wrap;">
+            <div class="segmented" data-filter-group="areaStage" id="areaStageFilterGroup">
+              <button class="active" data-filter="all" type="button">الكل <b id="areaStageCount-all">0</b></button>
+              <button data-filter="0" type="button">التأهيلية <b id="areaStageCount-0">0</b></button>
+              <button data-filter="1" type="button">التأسيسية <b id="areaStageCount-1">0</b></button>
+              <button data-filter="2" type="button">التأصيلية <b id="areaStageCount-2">0</b></button>
+              <button data-filter="3" type="button">التحصيلية <b id="areaStageCount-3">0</b></button>
+              <button data-filter="pending" type="button">طلبات جديدة <b id="areaStageCount-pending">0</b></button>
+            </div>
+            <div class="segmented" data-filter-group="areaGender" id="areaGenderFilterGroup">
+              <button class="active" data-filter="all" type="button">الجميع</button>
+              <button data-filter="ذكر" type="button">ذكر</button>
+              <button data-filter="أنثى" type="button">أنثى</button>
+            </div>
+          </div>
+          <div class="stage-bars area-bars" id="areaBars"></div>
+        </div>
+      </section>
+
+      <div class="dashboard-grid lower-grid">
+        <section class="panel recent-panel" data-live data-skeleton="list">
+          <div class="live-content">
+            <header class="panel-header"><div><h2>آخر المسجلين</h2><p>أحدث الطلاب المنضمين للأكاديمية</p></div><button class="text-button" type="button" data-go="students">عرض الجميع<i data-icon="arrow-left"></i></button></header>
+            <div class="compact-list" id="recentRegistrations"><p class="empty-note">جاري التحميل...</p></div>
+          </div>
+        </section>
+        <section class="panel quick-panel">
+          <header class="panel-header"><div><h2>إجراءات سريعة</h2><p>المهام الأكثر استخدامًا</p></div></header>
+          <div class="quick-actions">
+            <button type="button" data-go="attendance"><i data-icon="scan-qr-code"></i><span><strong>تسجيل حضور</strong><small>بالرمز أو يدويًا</small></span><i data-icon="chevron-left"></i></button>
+            <button type="button" data-go="messages"><i data-icon="message-circle-more"></i><span><strong>إرسال رسالة</strong><small>إلى مرحلة أو مجموعة</small></span><i data-icon="chevron-left"></i></button>
+            <button type="button" data-go="staff"><i data-icon="user-cog"></i><span><strong>إضافة متعاون</strong><small>وتحديد الصلاحيات</small></span><i data-icon="chevron-left"></i></button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- طلبات التسجيل -->
+    <section class="page-view" data-page="registrations">
+      <header class="page-heading"><div><span class="eyebrow">إدارة الطلاب</span><h1>طلبات التسجيل</h1><p>راجع بيانات المتقدمين واتخذ قرار القبول أو الرفض.</p></div><div class="heading-actions"><button class="primary-button" id="acceptSelectedBtn" type="button" disabled><i data-icon="user-check"></i><span>قبول المحدد</span><b class="reg-selected-count" id="regSelectedCount">0</b></button></div></header>
+      <div class="metrics-grid compact-metrics metrics-4">
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gold"><i data-icon="inbox"></i></span><div><small>طلبات جديدة</small><strong id="regMetricNew">0</strong><span id="regMetricNewSub">—</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="globe"></i></span><div><small>طلبات عن بُعد</small><strong id="regMetricRemote">0</strong><span id="regMetricRemoteSub">—</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon green"><i data-icon="user-check"></i></span><div><small>إجمالي الطلاب المقبولين</small><strong id="regMetricAccepted">0</strong><span>منذ بداية الأكاديمية</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="timer"></i></span><div><small>أقدم طلب</small><strong id="regMetricOldest">—</strong><span id="regMetricOldestSub">—</span></div></div></article>
+      </div>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div id="appAdminRegistrationsPanel"><p class="empty-note">جاري التحميل...</p></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- قوائم الطلاب -->
+    <section class="page-view" data-page="students">
+      <header class="page-heading"><div><span class="eyebrow">إدارة الطلاب</span><h1>قوائم الطلاب</h1><p>بيانات الطلاب وتقدمهم في البرامج الدراسية.</p></div><div class="heading-actions"><button class="secondary-button" type="button" onclick="exportStudentsToExcel()"><i data-icon="file-spreadsheet"></i>تصدير Excel</button></div></header>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar students-table-toolbar">
+            <div class="reg-filter-unit">
+              <span class="reg-filter-label">المرحلة</span>
+              <div class="segmented" data-filter-group="student" id="studentFilterGroup">
+                <button class="active" data-filter="all" type="button">الجميع <b id="count-all">0</b></button>
+                <button data-filter="class0" type="button">التأهيلية <b id="count-class0">0</b></button>
+                <button data-filter="class1" type="button">التأسيسية <b id="count-class1">0</b></button>
+                <button data-filter="class2" type="button">التأصيلية <b id="count-class2">0</b></button>
+                <button data-filter="class3" type="button">التحصيلية <b id="count-class3">0</b></button>
+              </div>
+            </div>
+            <div class="reg-filter-unit">
+              <span class="reg-filter-label">نمط الدراسة</span>
+              <div class="segmented" data-filter-group="studentMode" id="studentModeFilterGroup" role="group" aria-label="تصفية حسب نمط الدراسة">
+                <button class="active" data-mode-filter="all" type="button" aria-pressed="true">الجميع <b id="count-mode-all">0</b></button>
+                <button data-mode-filter="onsite" type="button" aria-pressed="false">حضوري <b id="count-mode-onsite">0</b></button>
+                <button data-mode-filter="remote" type="button" aria-pressed="false">عن بُعد <b id="count-mode-remote">0</b></button>
+              </div>
+            </div>
+            <div class="reg-filter-unit students-search-unit">
+              <span class="reg-filter-label">البحث</span>
+              <label class="table-search"><i data-icon="search"></i><input id="students-search-input" type="search" placeholder="الاسم، الهاتف، الرقم الشخصي..."></label>
+            </div>
+          </div>
+          <div class="responsive-table">
+            <table id="studentsTable">
+              <thead>
+                <tr>
+                  <th style="width:44px;">#</th>
+                  <th data-sort="name">الطالب</th>
+                  <th data-sort="phone">الهاتف</th>
+                  <th data-sort="nationality">الجنسية</th>
+                  <th>البرنامج الدراسي</th>
+                  <th>الحضور</th>
+                  <th>الأوراد</th>
+                  <th>الاختبارات</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="students-table-body">
+                <tr><td colspan="9" class="text-muted" style="text-align:center;padding:24px;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="students-visible-count">0</b></span>
+            <div class="page-size">
+              <label for="students-page-size">عدد الصفوف</label>
+              <select id="students-page-size"><option value="50">50</option><option value="100">100</option></select>
+            </div>
+            <div class="pagination" id="students-pagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- الحضور -->
+    <section class="page-view" data-page="attendance">
+      <header class="page-heading"><div><span class="eyebrow">المتابعة اليومية</span><h1>الحضور</h1><p>متابعة سجلات الحضور وإضافة حضور يدوي عند الحاجة.</p></div><div class="heading-actions"><label class="registration-switch" title="تفعيل أو إلغاء إمكانية طلب إضافة حضور من صفحة الطالب"><input id="attendReqToggle" type="checkbox"><span></span><b id="attendReqToggleText">طلبات الحضور مغلقة</b></label><button class="secondary-button" type="button" onclick="openAttendanceRequestsModal()"><i data-icon="inbox"></i>طلبات الحضور</button><button class="secondary-button" type="button" onclick="openManualAttendModal()"><i data-icon="calendar-plus"></i>إضافة يدويًا</button><button class="primary-button" type="button" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i>فتح قارئ QR</button></div></header>
+      <div class="metrics-grid">
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon green"><i data-icon="user-check"></i></span><div><small>حضور اليوم</small><strong id="attendMetricToday">0</strong><span id="attendMetricTodaySub">—</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon red"><i data-icon="user-x"></i></span><div><small>الغياب اليوم</small><strong id="attendMetricAbsent">0</strong><span>من الطلاب النشطين</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="calendar-days"></i></span><div><small>آخر تسجيل</small><strong id="attendMetricLast">—</strong><span>اليوم</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gold"><i data-icon="chart-no-axes-column-increasing"></i></span><div><small>متوسط آخر 4 أيام</small><strong id="attendMetricAvg">0%</strong><span>من الطلاب النشطين</span></div></div></article>
+      </div>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div id="appAdminAttendancePanel"><p class="empty-note">جاري التحميل...</p></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- الشهادات -->
+    <section class="page-view" data-page="certificates">
+      <header class="page-heading"><div><span class="eyebrow">الإنجازات</span><h1>إدارة الشهادات</h1><p>متابعة الشهادات المستخرَجة، واستخراج دفعات جديدة حسب الاختبار أو عمل الطالب.</p></div><div class="heading-actions"><button class="secondary-button" type="button" onclick="loadStWorksCertiView()"><i data-icon="badge-plus"></i>استخراج شهادات الأعمال</button><button class="primary-button" type="button" onclick="loadCertiView()"><i data-icon="award"></i>استخراج شهادات الاختبارات</button></div></header>
+      <div class="metrics-grid compact-metrics">
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="award"></i></span><div><small>إجمالي الشهادات المستخرَجة</small><strong id="certMetricTotal">0</strong><span>منذ بداية الأكاديمية</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gold"><i data-icon="loader-circle"></i></span><div><small>قيد التجهيز</small><strong id="certMetricPending">0</strong><span>لم تُستخرج بعد</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon green"><i data-icon="chart-no-axes-column-increasing"></i></span><div><small>نسبة الإنجاز</small><strong id="certMetricRate">0%</strong><span>من إجمالي المستحقين</span></div></div></article>
+      </div>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="segmented" id="certFilterGroup">
+              <button class="active" type="button" data-filter="all">الجميع <b id="certCountAll">0</b></button>
+              <button type="button" data-filter="ready">جاهزة <b id="certCountReady">0</b></button>
+              <button type="button" data-filter="pending">قيد التجهيز <b id="certCountPending">0</b></button>
+            </div>
+            <label class="table-search"><i data-icon="search"></i><input id="certSearchInput" type="search" placeholder="ابحث بالاسم أو البرنامج..."></label>
+          </div>
+          <div class="responsive-table">
+            <table id="certTable">
+              <thead>
+                <tr>
+                  <th style="width:44px;">#</th>
+                  <th data-sort="name">الطالب</th>
+                  <th data-sort="program">البرنامج / الاختبار</th>
+                  <th data-sort="date">التاريخ</th>
+                  <th>نوع الشهادة</th>
+                  <th>الحالة</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="certTableBody">
+                <tr><td colspan="7" style="text-align:center;padding:24px;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عدد النتائج المعروضة: <b id="cert-visible-count">0</b></span>
+            <div class="page-size">
+              <label for="certPageSize">عدد الصفوف</label>
+              <select id="certPageSize"><option value="50">50</option><option value="100">100</option></select>
+            </div>
+            <div class="pagination" id="certPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- الرسائل -->
+    <section class="page-view messages-page" data-page="messages">
+      <header class="page-heading">
+        <div><span class="eyebrow">مركز التواصل</span><h1>إدارة الرسائل</h1><p>إدارة قوالب واتساب، وتنظيم المجموعات، وإرسال الحملات ومتابعة نتائجها من مكان واحد.</p></div>
+        <div class="heading-actions">
+          <button class="secondary-button" type="button" onclick="activateMessagesTab_('log')"><i data-icon="history"></i>سجل الإرسال</button>
+          <button class="primary-button" type="button" onclick="activateMessagesTab_('broadcast')"><i data-icon="send"></i>إنشاء حملة</button>
+        </div>
+      </header>
+
+      <section class="whatsapp-provider-card" aria-labelledby="whatsappProviderTitle">
+        <div class="whatsapp-provider-copy">
+          <span class="message-template-icon green"><i class="fab fa-whatsapp"></i></span>
+          <div><h2 id="whatsappProviderTitle">مزوّد إرسال حملات واتساب</h2><p id="whatsappProviderHint">جاري تحميل المزوّد الحالي...</p></div>
+        </div>
+        <div class="whatsapp-provider-actions">
+          <div class="segmented whatsapp-provider-switch" id="whatsappProviderSwitch" role="radiogroup" aria-label="مزوّد واتساب">
+            <button class="active" type="button" data-whatsapp-provider="fonnte" role="radio" aria-checked="true" disabled>Fonnte</button>
+            <button type="button" data-whatsapp-provider="meta" role="radio" aria-checked="false" disabled>Meta الرسمي</button>
+          </div>
+          <button class="secondary-button" id="metaWhatsappSettingsBtn" type="button" onclick="openMetaWhatsAppSettings_()" hidden><i data-icon="settings-2"></i>إعداد Meta</button>
+        </div>
+      </section>
+
+      <nav class="messages-tabs" id="messagesTabGroup" role="tablist" aria-label="أقسام إدارة الرسائل">
+        <button class="active" id="messagesTabTemplates" type="button" role="tab" aria-selected="true" aria-controls="messagesPanelTemplates" data-msg-tab="templates"><i data-icon="copy"></i><span><strong>القوالب</strong><small>النصوص التلقائية</small></span></button>
+        <button id="messagesTabGroups" type="button" role="tab" aria-selected="false" aria-controls="messagesPanelGroups" data-msg-tab="groups"><i data-icon="users"></i><span><strong>المجموعات</strong><small>جهات واتساب</small></span></button>
+        <button id="messagesTabBroadcast" type="button" role="tab" aria-selected="false" aria-controls="messagesPanelBroadcast" data-msg-tab="broadcast"><i data-icon="send"></i><span><strong>حملة جديدة</strong><small>إرسال جماعي</small></span></button>
+        <button id="messagesTabNotifications" type="button" role="tab" aria-selected="false" aria-controls="messagesPanelNotifications" data-msg-tab="notifications"><i data-icon="bell"></i><span><strong>الإشعارات</strong><small>تنبيهات فورية</small></span></button>
+        <button id="messagesTabStatus" type="button" role="tab" aria-selected="false" aria-controls="messagesPanelStatus" data-msg-tab="status"><i data-icon="activity"></i><span><strong>حالة الإرسال</strong><small>تقدّم الحملة</small></span></button>
+        <button id="messagesTabLog" type="button" role="tab" aria-selected="false" aria-controls="messagesPanelLog" data-msg-tab="log"><i data-icon="history"></i><span><strong>السجل</strong><small>آخر العمليات</small></span></button>
+      </nav>
+
+      <!-- تبويب: قوالب الرسائل -->
+      <section class="panel data-panel messages-panel" id="messagesPanelTemplates" role="tabpanel" aria-labelledby="messagesTabTemplates" data-live data-skeleton="table" data-msg-panel="templates">
+        <div class="live-content">
+          <header class="panel-header messages-panel-header">
+            <div><h2>قوالب الرسائل التلقائية</h2><p>راجع النصوص والمتغيّرات المستخدمة قبل إرسال الإشعارات التلقائية.</p></div>
+            <span class="messages-info-badge"><i data-icon="circle-check"></i>تُطبّق التعديلات فور الحفظ</span>
+          </header>
+          <div id="messageTemplatesGrid" class="message-template-grid"></div>
+        </div>
+      </section>
+
+      <!-- تبويب: مجموعات واتساب -->
+      <section class="panel data-panel messages-panel" id="messagesPanelGroups" role="tabpanel" aria-labelledby="messagesTabGroups" data-live data-skeleton="table" data-msg-panel="groups" hidden>
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-title"><h2>مجموعات واتساب</h2><span>المجموعات المتاحة للاستهداف في الحملات الجماعية.</span></div>
+            <div class="messages-toolbar-actions">
+              <button class="secondary-button" type="button" id="refreshWhatsappGroupsBtn" onclick="refreshWhatsappGroupsFromFonnte_()"><i data-icon="refresh-cw"></i>تحديث القائمة من واتساب</button>
+              <button class="primary-button" type="button" onclick="openWhatsappGroupModal()"><i data-icon="plus"></i>إضافة يدويًا</button>
+            </div>
+          </div>
+          <div class="messages-inline-note"><i data-icon="triangle-alert"></i><span><strong>التحديث من واتساب يُستخدم عند الحاجة فقط.</strong> تتم مزامنة القائمة المحفوظة تلقائيًا عند فتح هذا التبويب.</span></div>
+          <div class="responsive-table">
+            <table id="whatsappGroupsTable">
+              <thead><tr><th>الاسم</th><th>معرّف المجموعة</th><th></th></tr></thead>
+              <tbody id="whatsappGroupsRows"><tr class="message-table-state"><td colspan="3"><span class="message-state compact"><i data-icon="loader-circle"></i><strong>جاري تحميل المجموعات...</strong></span></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- تبويب: إرسال رسالة جماعية -->
+      <section class="panel data-panel messages-panel broadcast-panel" id="messagesPanelBroadcast" role="tabpanel" aria-labelledby="messagesTabBroadcast" data-live data-skeleton="table" data-msg-panel="broadcast" hidden>
+        <div class="live-content">
+          <header class="panel-header messages-panel-header">
+            <div><h2>إنشاء حملة واتساب</h2><p>حدّد الجمهور، اكتب الرسالة، ثم راجع إعدادات الإرسال قبل البدء.</p></div>
+            <span class="messages-info-badge whatsapp" id="broadcastProviderBadge"><i class="fab fa-whatsapp"></i>واتساب عبر Fonnte</span>
+          </header>
+          <div class="broadcast-layout">
+          <!-- يمينًا (أول بالترتيب — الصفحة RTL): تحديد الجمهور -->
+          <div class="broadcast-audience broadcast-work-card">
+            <header class="broadcast-section-heading"><span>١</span><div><h3>تحديد الجمهور</h3><p>اختر الفئة ثم استخدم الفلاتر للوصول إلى المستلمين المطلوبين.</p></div></header>
+            <div class="broadcast-filters">
+              <div class="broadcast-filter-row">
+                <span>الفئة</span>
+                <div class="segmented" id="broadcastTargetTypeGroup">
+                  <button class="active" type="button" data-target-type="students">طلاب</button>
+                  <button type="button" data-target-type="staff">موظفين</button>
+                  <button type="button" data-target-type="groups">مجموعات</button>
+                </div>
+              </div>
+              <div class="broadcast-filter-row">
+                <span>المرحلة</span>
+                <div class="segmented" id="broadcastStageGroup">
+                  <button class="active" type="button" data-stage="all">كل المراحل</button>
+                  <button type="button" data-stage="0">التأهيلية</button>
+                  <button type="button" data-stage="1">التأسيسية</button>
+                  <button type="button" data-stage="2">التأصيلية</button>
+                  <button type="button" data-stage="3">التحصيلية</button>
+                  <button type="button" data-stage="-1">بدون مرحلة</button>
+                </div>
+              </div>
+              <div class="broadcast-filter-row broadcast-filter-row-split">
+                <div class="broadcast-filter-unit">
+                  <span>الجنس</span>
+                <div class="segmented" id="broadcastGenderGroup">
+                  <button class="active" type="button" data-gender="all">الكل</button>
+                  <button type="button" data-gender="ذكر">ذكور</button>
+                  <button type="button" data-gender="أنثى">إناث</button>
+                </div>
+                </div>
+                <label class="table-search"><i data-icon="search"></i><input id="broadcastSearchInput" type="search" placeholder="ابحث بالاسم..."></label>
+              </div>
+            </div>
+
+            <div class="broadcast-stats">
+              <article class="broadcast-stat"><span class="metric-icon blue"><i data-icon="users"></i></span><div><small>مطابق للتصفية</small><strong id="broadcastFilteredCount">0</strong></div></article>
+              <article class="broadcast-stat"><span class="metric-icon gold"><i data-icon="user-check"></i></span><div><small>مُحدَّد للإرسال</small><strong id="broadcastSelectedCount">0</strong></div></article>
+              <article class="broadcast-stat"><span class="metric-icon gray"><i data-icon="triangle-alert"></i></span><div><small>بدون رقم صالح</small><strong id="broadcastNoPhoneCount">0</strong></div></article>
+            </div>
+
+            <div class="responsive-table broadcast-recipient-table" id="broadcastTableWrap">
+              <table id="broadcastRecipientsTable">
+                <thead><tr><th class="message-check-cell"><input type="checkbox" id="broadcastSelectAll" aria-label="تحديد جميع المستلمين الظاهرين"></th><th>الاسم</th><th id="broadcastTargetColHeader">الهاتف</th></tr></thead>
+                <tbody id="broadcastRecipientsRows"><tr class="message-table-state"><td colspan="3"><span class="message-state compact"><i data-icon="loader-circle"></i><strong>جاري تحميل المستلمين...</strong></span></td></tr></tbody>
+              </table>
+            </div>
+
+            <!-- تظهر فقط لفئة "مجموعات" بدل الجدول أعلاه — قائمة منسدلة متعددة الاختيار
+                 مُعبَّأة من واتساب مباشرة (getWhatsappGroupsFromFonnte)، بطلب المستخدم صراحةً. -->
+            <label class="field broadcast-groups-field" id="broadcastGroupsSelectWrap" hidden>
+              <span>اختر مجموعة أو أكثر</span>
+              <select id="broadcastGroupsSelect" multiple size="8"></select>
+              <small>يمكن اختيار أكثر من مجموعة بالنقر مع الضغط على Ctrl أو Cmd.</small>
+            </label>
+          </div>
+
+          <!-- يسارًا (ثاني بالترتيب): كتابة الرسالة -->
+          <div class="broadcast-compose broadcast-work-card">
+            <header class="broadcast-section-heading"><span>٢</span><div><h3>إعداد الرسالة والإرسال</h3><p>اختر القالب، راجع النص، ثم اضبط موعد الحملة.</p></div></header>
+
+            <section class="broadcast-meta-template" id="broadcastMetaTemplateSettings" hidden>
+              <header>
+                <div class="meta-template-head-copy"><i data-icon="badge-check"></i><div><strong>قالب Meta للإرسال</strong><small>اختيار قالب معتمد مطلوب قبل بدء الحملة.</small></div></div>
+                <span class="meta-template-requirement" id="metaTemplateRequirementBadge">اختيار مطلوب</span>
+              </header>
+
+              <div class="meta-template-picker">
+                <label class="field">
+                  <span>القالب المعتمد</span>
+                  <select id="broadcastMetaTemplateSelect" aria-describedby="broadcastMetaTemplateHelp">
+                    <option value="">جاري تحميل القوالب المعتمدة...</option>
+                  </select>
+                  <small id="broadcastMetaTemplateHelp">تظهر هنا القوالب المعتمدة المتوافقة مع متغيّر الاسم <code>{name}</code>.</small>
+                </label>
+                <button class="secondary-button meta-template-refresh" id="refreshMetaTemplatesBtn" type="button"><i data-icon="refresh-cw"></i>تحديث</button>
+              </div>
+
+              <input id="broadcastMetaTemplateName" type="hidden" value="">
+              <input id="broadcastMetaLanguageCode" type="hidden" value="">
+
+              <div class="meta-template-selected" id="metaTemplateSelectedSummary" hidden>
+                <span class="meta-template-selected-icon"><i data-icon="circle-check-big"></i></span>
+                <div><strong id="metaTemplateSelectedName"></strong><small id="metaTemplateSelectedDetails"></small></div>
+                <button class="secondary-button" id="clearMetaTemplateBtn" type="button">تغيير القالب</button>
+              </div>
+
+              <details class="meta-template-admin" id="broadcastMetaTemplateAdmin" hidden>
+                <summary><span><i data-icon="settings-2"></i>إنشاء قالب جديد أو فحص قالب غير معتمد</span><i data-icon="chevron-down"></i></summary>
+                <div class="meta-template-admin-body">
+                  <p>استخدم «تغيير القالب» أولًا إن كان هناك قالب محدد، ثم اكتب النص في الحقل أدناه وأدخل بياناته هنا لإرساله إلى Meta للمراجعة.</p>
+                  <div class="broadcast-settings-grid meta-template-admin-grid">
+                    <label class="field"><span>اسم القالب الجديد</span><input id="broadcastMetaDraftName" type="text" value="student_registration_accepted_ar" dir="ltr" autocomplete="off"><small>حروف إنجليزية صغيرة وأرقام وشرطة سفلية</small></label>
+                    <label class="field"><span>لغة القالب</span><input id="broadcastMetaDraftLanguageCode" type="text" value="ar" dir="ltr" autocomplete="off"><small>مثال: ar</small></label>
+                    <label class="field" id="broadcastMetaCategoryField"><span>تصنيف المراجعة</span><select id="broadcastMetaTemplateCategory"><option value="MARKETING">Marketing</option><option value="UTILITY">Utility</option></select><small>Meta صاحبة القرار النهائي في التصنيف</small></label>
+                  </div>
+                  <div class="meta-template-actions">
+                    <button class="secondary-button" id="submitMetaTemplateBtn" type="button" onclick="submitCurrentMetaTemplate_()" hidden><i data-icon="send"></i>إرسال القالب إلى Meta للمراجعة</button>
+                    <button class="secondary-button" id="checkMetaTemplateStatusBtn" type="button" onclick="checkCurrentMetaTemplateStatus_()" hidden><i data-icon="search"></i>فحص حالة القالب</button>
+                    <span class="meta-template-status" id="metaTemplateStatusText" role="status" aria-live="polite"></span>
+                  </div>
+                </div>
+              </details>
+
+              <p class="messages-inline-note"><i data-icon="info"></i><span>عند اختيار قالب معتمد سيُملأ نصه تلقائيًا ويُقفل لحمايته من الاختلاف عن النسخة التي وافقت عليها Meta.</span></p>
+            </section>
+
+            <label class="field">
+              <span class="field-label-line"><b>نص الرسالة</b><small id="broadcastCharacterCount">0 حرف</small></span>
+              <textarea id="broadcastMessageText" rows="7" placeholder="مثال: مرحبًا {name}، ..."></textarea>
+              <small class="field-help"><i data-icon="circle-check"></i>أضف <code>{name}</code> لتخصيص الرسالة تلقائيًا لكل مستلم. المتغيّر إلزامي للأفراد ولا ينطبق على المجموعات.</small>
+            </label>
+
+            <section class="broadcast-settings">
+              <header><i data-icon="timer"></i><div><strong>إعدادات الإرسال</strong><small>تقلّل الفواصل المنتظمة مخاطر تقييد رقم واتساب.</small></div></header>
+              <div class="broadcast-settings-grid">
+                <label class="field"><span>وقت الإرسال</span>
+                  <select id="broadcastScheduleMode"><option value="now">الآن</option><option value="later">وقت مستقبلي</option></select>
+                </label>
+                <label class="field broadcast-schedule-field" id="broadcastScheduleAtField" hidden><span>موعد البدء</span><input id="broadcastScheduleAt" type="datetime-local"></label>
+                <label class="field"><span>حجم الدفعة</span><input id="broadcastBatchSize" type="number" min="1" value="20"><small>رسالة قبل الفاصل الأطول بين الدفعات</small></label>
+                <label class="field"><span>بين الرسائل</span><input id="broadcastPerMessageDelay" type="number" min="60" value="60"><small>بالثواني، الحد الأدنى 60</small></label>
+                <label class="field"><span>بين الدفعات</span><input id="broadcastBetweenBatches" type="number" min="0" value="0"><small>بالثواني</small></label>
+              </div>
+            </section>
+
+            <p class="broadcast-estimate" id="broadcastEstimate" aria-live="polite"></p>
+            <button class="primary-button broadcast-send-button" id="broadcastSendBtn" type="button" disabled><i data-icon="send"></i>مراجعة وإرسال الرسالة</button>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- تبويب: إرسال إشعار فوري (FCM) -->
+      <section class="panel data-panel messages-panel broadcast-panel" id="messagesPanelNotifications" role="tabpanel" aria-labelledby="messagesTabNotifications" data-live data-skeleton="table" data-msg-panel="notifications" hidden>
+        <div class="live-content">
+          <header class="panel-header messages-panel-header">
+            <div><h2>إشعار فوري للطلاب</h2><p>يصل مباشرة لهاتف/جهاز كل طالب فعّل الإشعارات من صفحة المنصة — بديل واتساب حين يكون الأخير غير مستقر.</p></div>
+            <span class="messages-info-badge fcm"><i data-icon="bell"></i>قناة الإشعارات</span>
+          </header>
+          <div class="broadcast-layout">
+          <!-- يمينًا: تحديد الجمهور (طلاب فعّلوا الإشعارات فقط — لا يوجد استهداف موظفين/مجموعات هنا) -->
+          <div class="broadcast-audience broadcast-work-card">
+            <header class="broadcast-section-heading"><span>١</span><div><h3>تحديد الجمهور</h3><p>الطلاب الذين فعّلوا الإشعارات فعليًا فقط — استخدم الفلاتر لتضييق القائمة.</p></div></header>
+            <div class="broadcast-filters">
+              <div class="broadcast-filter-row">
+                <span>المرحلة</span>
+                <div class="segmented" id="fcmStageGroup">
+                  <button class="active" type="button" data-stage="all">كل المراحل</button>
+                  <button type="button" data-stage="0">التأهيلية</button>
+                  <button type="button" data-stage="1">التأسيسية</button>
+                  <button type="button" data-stage="2">التأصيلية</button>
+                  <button type="button" data-stage="3">التحصيلية</button>
+                  <button type="button" data-stage="-1">بدون مرحلة</button>
+                </div>
+              </div>
+              <div class="broadcast-filter-row broadcast-filter-row-split">
+                <div class="broadcast-filter-unit">
+                  <span>الجنس</span>
+                <div class="segmented" id="fcmGenderGroup">
+                  <button class="active" type="button" data-gender="all">الكل</button>
+                  <button type="button" data-gender="ذكر">ذكور</button>
+                  <button type="button" data-gender="أنثى">إناث</button>
+                </div>
+                </div>
+                <label class="table-search"><i data-icon="search"></i><input id="fcmSearchInput" type="search" placeholder="ابحث بالاسم..."></label>
+              </div>
+            </div>
+
+            <div class="broadcast-stats">
+              <article class="broadcast-stat"><span class="metric-icon blue"><i data-icon="users"></i></span><div><small>مطابق للتصفية</small><strong id="fcmFilteredCount">0</strong></div></article>
+              <article class="broadcast-stat"><span class="metric-icon gold"><i data-icon="user-check"></i></span><div><small>مُحدَّد للإرسال</small><strong id="fcmSelectedCount">0</strong></div></article>
+              <article class="broadcast-stat"><span class="metric-icon gray"><i data-icon="bell-off"></i></span><div><small>لم يفعّلوا الإشعارات</small><strong id="fcmNotActivatedCount">0</strong></div></article>
+            </div>
+
+            <div class="responsive-table broadcast-recipient-table" id="fcmTableWrap">
+              <table id="fcmRecipientsTable">
+                <thead><tr><th class="message-check-cell"><input type="checkbox" id="fcmSelectAll" aria-label="تحديد جميع المستلمين الظاهرين"></th><th>الاسم</th><th>الحالة</th></tr></thead>
+                <tbody id="fcmRecipientsRows"><tr class="message-table-state"><td colspan="3"><span class="message-state compact"><i data-icon="loader-circle"></i><strong>جاري تحميل المستلمين...</strong></span></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- يسارًا: كتابة الإشعار -->
+          <div class="broadcast-compose broadcast-work-card">
+            <header class="broadcast-section-heading"><span>٢</span><div><h3>كتابة الإشعار</h3><p>خصّص العنوان والنص واضبط توقيت الحملة.</p></div></header>
+
+            <label class="field">
+              <span>عنوان الإشعار</span>
+              <input id="fcmTitleInput" type="text" placeholder="مثال: تنبيه غياب">
+            </label>
+            <label class="field">
+              <span class="field-label-line"><b>نص الإشعار</b><small id="fcmCharacterCount">0 حرف</small></span>
+              <textarea id="fcmBodyText" rows="5" placeholder="مثال: عزيزي {name}، تم تسجيل غيابك اليوم."></textarea>
+              <small class="field-help"><i data-icon="circle-check"></i>أضف <code>{name}</code> اختياريًا لتخصيص النص باسم كل طالب.</small>
+            </label>
+
+            <section class="broadcast-settings">
+              <header><i data-icon="timer"></i><div><strong>إعدادات الإرسال</strong><small>لا يوجد خطر حظر هنا كالواتساب — الفواصل هنا رمزية فقط لتفادي إغراق الحصة اليومية.</small></div></header>
+              <div class="broadcast-settings-grid">
+                <label class="field"><span>حجم الدفعة</span><input id="fcmBatchSize" type="number" min="1" value="20"><small>إشعار قبل الفاصل الأطول بين الدفعات</small></label>
+                <label class="field"><span>بين الإشعارات</span><input id="fcmPerMessageDelay" type="number" min="2" value="2"><small>بالثواني، الحد الأدنى 2</small></label>
+                <label class="field"><span>بين الدفعات</span><input id="fcmBetweenBatches" type="number" min="0" value="0"><small>بالثواني</small></label>
+                <label class="field"><span>وقت الإرسال</span>
+                <select id="fcmScheduleMode"><option value="now">الآن</option><option value="later">وقت مستقبلي</option></select>
+              </label>
+                <label class="field broadcast-schedule-field" id="fcmScheduleAtField" hidden><span>موعد البدء</span><input id="fcmScheduleAt" type="datetime-local"></label>
+              </div>
+            </section>
+
+            <p class="broadcast-estimate" id="fcmEstimate" aria-live="polite"></p>
+            <button class="primary-button broadcast-send-button" id="fcmSendBtn" type="button" disabled><i data-icon="bell"></i>مراجعة وإرسال الإشعار</button>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- تبويب: حالة الإرسال -->
+      <section class="panel data-panel messages-panel" id="messagesPanelStatus" role="tabpanel" aria-labelledby="messagesTabStatus" data-live data-skeleton="table" data-msg-panel="status" hidden>
+        <div class="live-content">
+          <header class="panel-header messages-panel-header"><div><h2>حالة الإرسال</h2><p>راقب تقدّم آخر حملة وراجع الرسائل التي تعذّر إرسالها.</p></div><button class="secondary-button" type="button" onclick="loadMessagesStatusTab_()"><i data-icon="refresh-cw"></i>تحديث الحالة</button></header>
+          <div class="segmented" id="messagesStatusChannelGroup"><button class="active" type="button" data-status-channel="whatsapp"><i class="fab fa-whatsapp"></i> واتساب</button><button type="button" data-status-channel="fcm"><i data-icon="bell"></i> الإشعارات</button></div>
+          <div id="messagesStatusPanel" class="messages-status-panel"></div>
+        </div>
+      </section>
+
+      <!-- تبويب: سجل الإرسال -->
+      <section class="panel data-panel messages-panel" id="messagesPanelLog" role="tabpanel" aria-labelledby="messagesTabLog" data-live data-skeleton="table" data-msg-panel="log" hidden>
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-title"><h2>سجل الإرسال</h2><span>آخر 200 رسالة أرسلها النظام، تلقائية أو جماعية.</span></div>
+            <label class="table-search"><i data-icon="search"></i><input id="messageLogSearchInput" type="search" placeholder="ابحث بالاسم/الهاتف..."></label>
+          </div>
+          <div class="responsive-table">
+            <table id="messageLogTable">
+              <thead><tr><th>التاريخ</th><th>القناة</th><th>المُرسِل</th><th>المستلم</th><th>الهاتف/المعرّف</th><th>النوع</th><th>الحالة</th><th>السبب</th></tr></thead>
+              <tbody id="messageLogRows"><tr class="message-table-state"><td colspan="8"><span class="message-state compact"><i data-icon="loader-circle"></i><strong>جاري تحميل السجل...</strong></span></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- المتعاونون والصلاحيات -->
+    <section class="page-view" data-page="staff">
+      <header class="page-heading"><div><span class="eyebrow">إدارة الوصول</span><h1>المتعاونون والصلاحيات</h1><p>إدارة حسابات المتعاونين وتحديد ما يمكن لكل منهم الوصول إليه.</p></div><button class="primary-button" id="addStaff" type="button" onclick="openStaffModal()"><i data-icon="user-plus"></i>إضافة متعاون</button></header>
+      <div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,260px));">
+        <article class="metric metric-clickable" data-live data-skeleton="stat" id="dictationStatsCard" onclick="openDictationStatsModal()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDictationStatsModal();}" role="button" tabindex="0" title="عرض تفاصيل التسميع لكل مُسمِّع">
+          <div class="live-content"><span class="metric-icon blue"><i data-icon="book-open-check"></i></span><div><small>التسميع</small><strong id="dictationStaffCount">0</strong><span>شيوخ التسميع</span></div></div>
+        </article>
+      </div>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-title"><h2>قائمة المتعاونين</h2><span>الصلاحيات: التسجيل، التسميع، الاختبارات، الإدارة، المتابعة</span></div>
+            <label class="table-search"><i data-icon="search"></i><input id="staff-search-input" type="search" placeholder="الاسم، الوظيفة، الهاتف..."></label>
+          </div>
+          <div class="responsive-table">
+            <table id="staffTable">
+              <thead>
+                <tr>
+                  <th style="width:44px;">#</th>
+                  <th data-sort="name">المتعاون</th>
+                  <th data-sort="job">الوظيفة</th>
+                  <th data-sort="phone">الهاتف</th>
+                  <th>الصلاحيات</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="staff-table-body">
+                <tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="staff-visible-count">0</b></span>
+            <div class="page-size">
+              <label for="staff-page-size">عدد الصفوف</label>
+              <select id="staff-page-size"><option value="50">50</option><option value="100">100</option></select>
+            </div>
+            <div class="pagination" id="staff-pagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- الاختبارات -->
+    <section class="page-view" data-page="exams">
+      <header class="page-heading"><div><span class="eyebrow">التقييم والمتابعة</span><h1>إدارة الاختبارات</h1><p>حدد فترات الاختبارات وجهّز النماذج والأسئلة.</p></div><div class="heading-actions"><label class="registration-switch" title="السماح للطالب بإصدار شهادته بنفسه من بوابته"><input id="selfIssueCertToggle" type="checkbox"><span></span><b id="selfIssueCertToggleText">إصدار الشهادة الذاتي مغلق</b></label><button class="primary-button" id="createExamBtn" type="button"><i data-icon="plus"></i>إنشاء اختبار</button></div></header>
+
+      <div class="metrics-grid">
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon red"><i data-icon="radio"></i></span><div><small>متاحة الآن</small><strong id="examMetricOpen">0</strong><span>اختبارات جارية</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gold"><i data-icon="calendar-clock"></i></span><div><small>مجدولة</small><strong id="examMetricScheduled">0</strong><span>ستفتح لاحقًا</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon gray"><i data-icon="file-pen-line"></i></span><div><small>مسودات</small><strong id="examMetricDraft">0</strong><span>تحتاج إلى إكمال</span></div></div></article>
+        <article class="metric" data-live data-skeleton="stat"><div class="live-content"><span class="metric-icon blue"><i data-icon="list-checks"></i></span><div><small>بنك الأسئلة</small><strong id="examMetricBank">0</strong><span>في جميع النماذج</span></div></div></article>
+      </div>
+
+      <section class="panel" id="examReadinessAlerts" hidden style="margin-bottom:16px;padding:16px;"></section>
+
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-filters">
+              <div class="segmented" id="examStatusFilter">
+                <button class="active" type="button" data-exam-status="all">الكل</button>
+                <button type="button" data-exam-status="open">متاحة الآن</button>
+                <button type="button" data-exam-status="scheduled">مجدولة</button>
+                <button type="button" data-exam-status="closed">منتهية</button>
+                <button type="button" data-exam-status="draft">مسودات</button>
+                <button type="button" data-exam-status="archived">مؤرشفة</button>
+              </div>
+              <div class="segmented" id="examStageFilter">
+                <button class="active" type="button" data-exam-stage="all">كل المراحل</button>
+                <button type="button" data-exam-stage="0">التأهيلية</button>
+                <button type="button" data-exam-stage="1">التأسيسية</button>
+                <button type="button" data-exam-stage="2">التأصيلية</button>
+                <button type="button" data-exam-stage="3">التحصيلية</button>
+              </div>
+            </div>
+            <label class="table-search"><i data-icon="search"></i><input id="examSearchInput" type="search" placeholder="ابحث باسم الاختبار..."></label>
+          </div>
+          <div class="responsive-table">
+            <table id="examTable">
+              <thead><tr><th data-sort="name">الاختبار</th><th data-sort="stage">المرحلة</th><th data-sort="startDate">فترة الإتاحة</th><th data-sort="duration">المدة</th><th data-sort="questionCount">النماذج والأسئلة</th><th data-sort="readiness">الجاهزية</th><th data-sort="status">الحالة</th><th></th></tr></thead>
+              <tbody id="examRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- محرر أسئلة الاختبار (نموذج/أسئلة/اختيارات) -->
+    <section class="page-view exam-editor-page" data-page="exam-editor">
+      <header class="editor-heading">
+        <button class="icon-button" type="button" data-go="exams"><i data-icon="arrow-right"></i></button>
+        <div><span class="eyebrow" id="editorExamStage">—</span><h1 id="editorExamName">—</h1><p id="editorExamMeta">—</p></div>
+        <div class="heading-actions"><span class="saved-state"><i data-icon="cloud-check"></i>تُحفظ الأسئلة تلقائيًا بشيت questions</span><button class="secondary-button" id="examExportExcelBtn" type="button"><i data-icon="download"></i>تصدير الأسئلة</button><button class="secondary-button" id="examImportExcelBtn" type="button"><i data-icon="upload"></i>استيراد من إكسل</button></div>
+      </header>
+      <div class="model-tabs mazhab-tabs" id="examMazhabTabs" hidden></div>
+      <div class="model-tabs" id="examModelTabs"></div>
+      <div class="question-layout">
+        <aside class="question-nav">
+          <header><div><strong>الأسئلة</strong><small id="examQuestionsSummary">0 مكتملة من 0</small></div><button class="icon-button" id="examAddQuestionTopBtn" type="button"><i data-icon="plus"></i></button></header>
+          <div id="questionNav"></div>
+          <button class="secondary-button full" id="examAddQuestionBtn" type="button"><i data-icon="plus"></i>سؤال جديد</button>
+        </aside>
+        <section class="question-form" id="examQuestionForm">
+          <div class="empty-state"><i data-icon="list-plus"></i><h3>لا توجد أسئلة بعد</h3><p>استخدم زر "سؤال جديد" لبدء إضافة أسئلة هذا النموذج.</p></div>
+        </section>
+        <aside class="editor-summary">
+          <h2>ملخص النموذج</h2>
+          <div class="editor-summary-actions">
+            <button class="secondary-button full" id="examModelApprovalBtn" type="button"><i data-icon="badge-check"></i><span>اعتماد النموذج</span></button>
+            <button class="danger-button full" id="examDeleteModelBtn" type="button"><i data-icon="trash-2"></i><span>حذف النموذج كاملًا</span></button>
+          </div>
+          <dl>
+            <div><dt>عدد الأسئلة</dt><dd id="examSummaryTotal">0</dd></div>
+            <div><dt>المكتملة</dt><dd id="examSummaryDone">0</dd></div>
+            <div><dt>غير المكتملة</dt><dd id="examSummaryPending">0</dd></div>
+          </dl>
+          <div class="readiness"><span>الجاهزية <b id="examSummaryReadiness">0%</b></span><div><i id="examSummaryReadinessBar" style="width:0%"></i></div></div>
+          <div class="warning-note" id="examSummaryWarning" hidden><i data-icon="triangle-alert"></i><span></span></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- إدارة المحاضرات — ملخص تشغيلي وسجل موحّد قابل للبحث والتصفية حسب المرحلة. -->
+    <section class="page-view lectures-page" data-page="lectures">
+      <header class="page-heading">
+        <div><span class="eyebrow">الشؤون الأكاديمية</span><h1>إدارة المحاضرات</h1><p>نظّم الجدول الدراسي وتابع المحاضرات والمحاضرين من سجل واحد.</p></div>
+        <div class="heading-actions">
+          <button class="secondary-button" id="refreshLecturesBtn" type="button"><i data-icon="refresh-cw"></i>تحديث السجل</button>
+          <button class="primary-button" id="addLecture" type="button" onclick="openLectureModal()"><i data-icon="plus"></i>إضافة محاضرة</button>
+        </div>
+      </header>
+
+      <div class="academic-metrics lectures-metrics">
+        <article class="academic-metric" data-live data-skeleton="compact"><div class="live-content"><span class="academic-metric-icon red"><i data-icon="calendar-days"></i></span><div><small>إجمالي المحاضرات</small><strong id="lectureMetricTotal">0</strong><span>في السجل الأكاديمي</span></div></div></article>
+        <article class="academic-metric" data-live data-skeleton="compact"><div class="live-content"><span class="academic-metric-icon gold"><i data-icon="calendar-clock"></i></span><div><small>محاضرات هذا الشهر</small><strong id="lectureMetricMonth">0</strong><span>وفق تاريخ المحاضرة</span></div></div></article>
+        <article class="academic-metric" data-live data-skeleton="compact"><div class="live-content"><span class="academic-metric-icon blue"><i data-icon="book-open-check"></i></span><div><small>المواد النشطة</small><strong id="lectureMetricSubjects">0</strong><span>مواد لها محاضرات</span></div></div></article>
+        <article class="academic-metric" data-live data-skeleton="compact"><div class="live-content"><span class="academic-metric-icon green"><i data-icon="users"></i></span><div><small>المحاضرون</small><strong id="lectureMetricLecturers">0</strong><span>مشاركون في السجل</span></div></div></article>
+      </div>
+
+      <section class="panel data-panel academic-data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <header class="academic-panel-header">
+            <div><span class="academic-panel-icon"><i data-icon="list-checks"></i></span><span><strong>سجل المحاضرات</strong><small>اختر مرحلة أو ابحث مباشرة داخل جميع بيانات المحاضرة.</small></span></div>
+            <span class="academic-result-badge"><b id="lectureVisibleSummary">0</b> نتيجة</span>
+          </header>
+          <div class="academic-table-tools">
+            <div class="academic-filter-tabs" data-filter-group="lecture" id="lectureFilterGroup">
+              <button class="active" data-filter="all" type="button"><span>الكل</span><b id="lectureCount-all">0</b></button>
+              <button data-filter="التأهيلية" type="button"><span class="academic-filter-dot s0"></span><span>التأهيلية</span><b id="lectureCount-0">0</b></button>
+              <button data-filter="التأسيسية" type="button"><span class="academic-filter-dot s1"></span><span>التأسيسية</span><b id="lectureCount-1">0</b></button>
+              <button data-filter="التأصيلية" type="button"><span class="academic-filter-dot s2"></span><span>التأصيلية</span><b id="lectureCount-2">0</b></button>
+              <button data-filter="التحصيلية" type="button"><span class="academic-filter-dot s3"></span><span>التحصيلية</span><b id="lectureCount-3">0</b></button>
+            </div>
+            <label class="academic-search"><i data-icon="search"></i><input id="lecture-search-input" type="search" placeholder="ابحث بالدرس أو المادة أو المحاضر..."></label>
+          </div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="lecturesTable">
+              <thead>
+                <tr>
+                  <th style="width:44px;">#</th>
+                  <th data-sort="lessonNumber">رقم الدرس</th>
+                  <th data-sort="date">التاريخ</th>
+                  <th data-sort="lesson">الدرس</th>
+                  <th data-sort="subject">المادة</th>
+                  <th data-sort="level">المرحلة</th>
+                  <th data-sort="lecturer">المحاضر</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="lectures-table-body">
+                <tr><td colspan="8" style="text-align:center;padding:24px;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="lectures-visible-count">0</b></span>
+            <div class="page-size">
+              <label for="lectures-page-size">عدد الصفوف</label>
+              <select id="lectures-page-size"><option value="50">50</option><option value="100">100</option></select>
+            </div>
+            <div class="pagination" id="lecturesPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- إدارة المواد: مواد / مقررات (شيت curricula — كتاب/متن كوحدة كاملة) / مذاهب / أوراد
+         (شيت matns الحقيقي — كل صف وِرد واحد من مقرر، بعد إلغاء صفحة "إدارة المقررات"
+         المستقلة القديمة). راجع مناقشات.md "تصحيح مفهوم المقررات/الأوراد" -->
+    <section class="page-view curriculum-page" data-page="curriculum">
+      <header class="page-heading"><div><span class="eyebrow">الشؤون الأكاديمية</span><h1>إدارة المواد</h1><p>ابنِ هيكل المحتوى العلمي من المادة إلى المقرر والمتن والوِرد والمذهب.</p></div></header>
+
+      <div class="curriculum-tabs" data-filter-group="curriculumTab" id="curriculumTabGroup" role="tablist" aria-label="أقسام المحتوى العلمي">
+        <button class="active subjects" id="curriculumTab-subjects" data-tab="subjects" type="button" role="tab" aria-selected="true" aria-controls="curriculumSubjectsPanel"><span class="curriculum-tab-icon"><i data-icon="book-open-check"></i></span><span class="curriculum-tab-copy"><small>الهيكل الأساسي</small><strong>المواد</strong><span>المجالات الدراسية الأساسية</span></span><b id="curriculumCount-subjects">0</b></button>
+        <button class="curricula" id="curriculumTab-curricula" data-tab="curricula" type="button" role="tab" aria-selected="false" aria-controls="curriculumCurriculaPanel"><span class="curriculum-tab-icon"><i data-icon="scroll-text"></i></span><span class="curriculum-tab-copy"><small>المحتوى العلمي</small><strong>المقررات</strong><span>الخطط الدراسية المرتبطة بالمواد</span></span><b id="curriculumCount-curricula">0</b></button>
+        <button class="matnCatalog" id="curriculumTab-matnCatalog" data-tab="matnCatalog" type="button" role="tab" aria-selected="false" aria-controls="curriculumMatnsPanel"><span class="curriculum-tab-icon"><i data-icon="bookmark"></i></span><span class="curriculum-tab-copy"><small>المحتوى العلمي</small><strong>المتون</strong><span>الكتب والمتون المرتبطة بالمواد</span></span><b id="curriculumCount-matnCatalog">0</b></button>
+        <button class="awrad" id="curriculumTab-awrad" data-tab="awrad" type="button" role="tab" aria-selected="false" aria-controls="curriculumAwradPanel"><span class="curriculum-tab-icon"><i data-icon="list-checks"></i></span><span class="curriculum-tab-copy"><small>خطة الإنجاز</small><strong>الأوراد</strong><span>تقسيمات القراءة والتسميع</span></span><b id="curriculumCount-awrad">0</b></button>
+        <button class="madhabs" id="curriculumTab-madhabs" data-tab="madhabs" type="button" role="tab" aria-selected="false" aria-controls="curriculumMadhabsPanel"><span class="curriculum-tab-icon"><i data-icon="graduation-cap"></i></span><span class="curriculum-tab-copy"><small>المسار الفقهي</small><strong>المذاهب</strong><span>خيارات التخصص المتاحة للطلاب</span></span><b id="curriculumCount-madhabs">0</b></button>
+      </div>
+
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumSubjectsPanel" role="tabpanel" aria-labelledby="curriculumTab-subjects">
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon red"><i data-icon="book-open-check"></i></span><span><strong>المواد الدراسية</strong><small>المظلة الرئيسية التي تُربط بها المقررات والمحاضرات.</small></span></div><div class="academic-panel-actions">
+              <button class="icon-button" id="refreshSubjectsBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="primary-button" id="addSubjectBtn" type="button"><i data-icon="plus"></i>إضافة مادة</button>
+            </div></header>
+          <div class="academic-table-tools"><label class="academic-search"><i data-icon="search"></i><input id="subjects-search-input" type="search" placeholder="ابحث باسم المادة أو وصفها..."></label></div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="subjectsTable">
+              <thead><tr><th data-sort="name">الاسم</th><th>المرحلة</th><th data-sort="description">الوصف</th><th></th></tr></thead>
+              <tbody id="subjectsRows"><tr><td colspan="4" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="subjects-visible-count">0</b></span>
+            <div class="page-size"><label for="subjects-page-size">عدد الصفوف</label><select id="subjects-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="subjectsPagination"></div>
+          </footer>
+        </div>
+      </section>
+
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumCurriculaPanel" role="tabpanel" aria-labelledby="curriculumTab-curricula" hidden>
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon blue"><i data-icon="scroll-text"></i></span><span><strong>المقررات</strong><small>الخطط والوحدات الدراسية المرتبطة بكل مادة.</small></span></div><div class="academic-panel-actions">
+              <button class="icon-button" id="refreshCurriculaBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="primary-button" id="addCurriculumBtn" type="button"><i data-icon="plus"></i>إضافة مقرر</button>
+            </div></header>
+          <div class="academic-table-tools"><label class="academic-search"><i data-icon="search"></i><input id="curricula-search-input" type="search" placeholder="ابحث باسم المقرر أو وصفه..."></label></div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="curriculaTable">
+              <thead><tr><th data-sort="name">الاسم</th><th>المادة</th><th>المرحلة</th><th data-sort="description">الوصف</th><th></th></tr></thead>
+              <tbody id="curriculaRows"><tr><td colspan="5" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="curricula-visible-count">0</b></span>
+            <div class="page-size"><label for="curricula-page-size">عدد الصفوف</label><select id="curricula-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="curriculaPagination"></div>
+          </footer>
+        </div>
+      </section>
+
+      <!-- "المتون" — مفهوم منفصل تمامًا عن "المقررات" أعلاه بطلب صريح من المستخدم: مادة واحدة
+           قد تضم مقررات ومتونًا معًا بلا أي تبعية بينهما (وبعض المواد ليس لها متون إطلاقًا).
+           المتن هو ما تُبنى عليه "الأوراد" أسفل (كل وِرد ينتمي لمتن واحد بالاسم النصي). -->
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumMatnsPanel" role="tabpanel" aria-labelledby="curriculumTab-matnCatalog" hidden>
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon olive"><i data-icon="bookmark"></i></span><span><strong>المتون</strong><small>الكتب والمتون العلمية المرتبطة بكل مادة، ومنها تُبنى الأوراد.</small></span></div><div class="academic-panel-actions">
+              <button class="icon-button" id="refreshMatnsBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="secondary-button" id="importMatnsBtn" type="button" title="استيراد أسماء المتون الفريدة من صفحة الأوراد دون تكرار"><i data-icon="download"></i>استيراد من الأوراد</button>
+              <button class="primary-button" id="addMatnBtn" type="button"><i data-icon="plus"></i>إضافة متن</button>
+            </div></header>
+          <div class="academic-table-tools academic-table-tools-wrap">
+              <div class="academic-filter-tabs compact" data-filter-group="matnsStage" id="matnsStageFilterGroup">
+                <button class="active" data-filter="all" type="button">الكل <b id="matnsStageCount-all">0</b></button>
+                <button data-filter="التأهيلية" type="button">التأهيلية <b id="matnsStageCount-0">0</b></button>
+                <button data-filter="التأسيسية" type="button">التأسيسية <b id="matnsStageCount-1">0</b></button>
+                <button data-filter="التأصيلية" type="button">التأصيلية <b id="matnsStageCount-2">0</b></button>
+                <button data-filter="التحصيلية" type="button">التحصيلية <b id="matnsStageCount-3">0</b></button>
+              </div>
+              <div class="academic-filter-tabs compact" data-filter-group="matnsSubject" id="matnsSubjectFilterGroup">
+                <button class="active" data-filter="all" type="button">كل المواد <b>0</b></button>
+              </div>
+              <label class="academic-search"><i data-icon="search"></i><input id="matns-search-input" type="search" placeholder="ابحث باسم المتن أو وصفه..."></label>
+          </div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="matnsTable">
+              <thead><tr><th data-sort="name">الاسم</th><th>عدد الأوراد</th><th>المادة</th><th>المرحلة</th><th data-sort="description">الوصف</th><th></th></tr></thead>
+              <tbody id="matnsRows"><tr><td colspan="6" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="matns-visible-count">0</b></span>
+            <div class="page-size"><label for="matns-page-size">عدد الصفوف</label><select id="matns-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="matnsPagination"></div>
+          </footer>
+        </div>
+      </section>
+
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumAwradPanel" role="tabpanel" aria-labelledby="curriculumTab-awrad" hidden>
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon gold"><i data-icon="list-checks"></i></span><span><strong>الأوراد</strong><small>خطط القراءة والتسميع مقسّمة حسب المرحلة والمقرر.</small></span></div><div class="academic-panel-actions">
+              <button class="icon-button" id="refreshAwradBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="primary-button" id="addAwradBtn" type="button"><i data-icon="plus"></i>إضافة وِرد</button>
+            </div></header>
+          <div class="academic-table-tools academic-table-tools-wrap">
+              <div class="academic-filter-tabs compact" data-filter-group="awradStage" id="awradStageFilterGroup">
+                <button class="active" data-filter="all" type="button">الكل <b id="awradStageCount-all">0</b></button>
+                <button data-filter="0" type="button">التأهيلية <b id="awradStageCount-0">0</b></button>
+                <button data-filter="1" type="button">التأسيسية <b id="awradStageCount-1">0</b></button>
+                <button data-filter="2" type="button">التأصيلية <b id="awradStageCount-2">0</b></button>
+                <button data-filter="3" type="button">التحصيلية <b id="awradStageCount-3">0</b></button>
+              </div>
+              <label class="academic-search"><i data-icon="search"></i><input id="awrad-search-input" type="search" placeholder="ابحث بالكتاب أو المتن..."></label>
+          </div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="awradTable">
+              <thead><tr><th data-sort="matn">الكتاب / المتن</th><th data-sort="level">المرحلة</th><th data-sort="werd">الورد</th><th>من</th><th>إلى</th><th>عدد الأوراد</th><th>عدد الصفحات</th><th>عدد الأبيات</th><th>المادة</th><th></th></tr></thead>
+              <tbody id="awradRows"><tr><td colspan="10" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="awrad-visible-count">0</b></span>
+            <div class="page-size"><label for="awrad-page-size">عدد الصفوف</label><select id="awrad-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="awradPagination"></div>
+          </footer>
+        </div>
+      </section>
+
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumMadhabsPanel" role="tabpanel" aria-labelledby="curriculumTab-madhabs" hidden>
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon green"><i data-icon="graduation-cap"></i></span><span><strong>المذاهب الفقهية</strong><small>المسارات الفقهية التي تظهر للطلاب بحسب مرحلتهم.</small></span></div><div class="academic-panel-actions">
+              <label class="registration-switch" title="السماح للطالب باختيار مذهبه الفقهي أو تغييره لاحقًا">
+                <input id="mazhabChangeToggle" type="checkbox"><span></span><b id="mazhabChangeToggleText">تغيير المذهب مغلق</b>
+              </label>
+              <button class="icon-button" id="refreshMadhabsBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="primary-button" id="addMadhabBtn" type="button"><i data-icon="plus"></i>إضافة مذهب</button>
+            </div></header>
+          <div class="academic-table-tools"><label class="academic-search"><i data-icon="search"></i><input id="madhabs-search-input" type="search" placeholder="ابحث باسم المذهب أو وصفه..."></label></div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="madhabsTable">
+              <thead><tr><th data-sort="name">الاسم</th><th>المرحلة</th><th data-sort="description">الوصف</th><th></th></tr></thead>
+              <tbody id="madhabsRows"><tr><td colspan="4" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="madhabs-visible-count">0</b></span>
+            <div class="page-size"><label for="madhabs-page-size">عدد الصفوف</label><select id="madhabs-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="madhabsPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- إدارة المراحل — منتقي للمراحل الأربع الثابتة + محرّر مستقل للتسجيل والمدة والقوالب
+         والحقيبة وشروط الاجتياز. لا تُضاف/تُحذف مراحل. -->
+    <section class="page-view stages-page" data-page="stages">
+      <header class="page-heading">
+        <div><span class="eyebrow">الشؤون الأكاديمية</span><h1>إدارة المراحل</h1><p>اضبط رحلة كل مرحلة من التسجيل حتى الاجتياز من مساحة عمل واحدة.</p></div>
+        <div class="heading-actions">
+          <button class="secondary-button" id="seedCardTemplatesBtn" type="button" title="نسخ معرّفات قوالب بطاقات الطلاب القديمة إلى إعدادات المراحل"><i data-icon="download"></i>استيراد القوالب القديمة</button>
+        </div>
+      </header>
+      <div class="stage-management" id="stagesGrid">
+        <div class="stage-loading-state" role="status"><i data-icon="loader-circle"></i><strong>جاري تحميل المراحل...</strong><span>نجهّز الإعدادات وشروط الاجتياز.</span></div>
+      </div>
+    </section>
+
+    <!-- مرشّحو الاجتياز — طلاب حقّقوا كل شروط الاجتياز الإلزامية لمرحلتهم الحالية ولم تُصدَر
+         شهادتهم بعد. راجع مناقشات.md "نظام إدارة المراحل" للسياق الكامل. -->
+    <section class="page-view" data-page="graduationCandidates">
+      <header class="page-heading"><div><span class="eyebrow">الشؤون الأكاديمية</span><h1>مرشّحو الاجتياز</h1><p>جميع الطلاب وتقدّمهم بشروط اجتياز مرحلتهم الحالية — يُسمح بتحديد من اجتاز فقط لإصدار شهادته.</p></div>
+        <div class="heading-actions">
+          <button class="icon-button" id="refreshGraduationCandidatesBtn" type="button" title="تحديث القائمة"><i data-icon="refresh-cw"></i></button>
+          <button class="secondary-button" id="exportGraduationCandidatesBtn" type="button"><i data-icon="file-spreadsheet"></i>تصدير Excel</button>
+          <button class="primary-button" id="issueSelectedCertsBtn" type="button" disabled><i data-icon="award"></i>إصدار شهادات المحدَّدين</button>
+        </div>
+      </header>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-filters">
+              <div class="segmented" data-filter-group="gradCandStage" id="gradCandStageFilterGroup">
+                <button class="active" data-filter="all" type="button">الجميع <b id="gradCandStageCount-all">0</b></button>
+                <button data-filter="0" type="button">التأهيلية <b id="gradCandStageCount-0">0</b></button>
+                <button data-filter="1" type="button">التأسيسية <b id="gradCandStageCount-1">0</b></button>
+                <button data-filter="2" type="button">التأصيلية <b id="gradCandStageCount-2">0</b></button>
+                <button data-filter="3" type="button">التحصيلية <b id="gradCandStageCount-3">0</b></button>
+              </div>
+              <div class="segmented" data-filter-group="gradCandGender" id="gradCandGenderFilterGroup">
+                <button class="active" data-filter="all" type="button">الكل</button>
+                <button data-filter="ذكر" type="button">ذكور</button>
+                <button data-filter="أنثى" type="button">إناث</button>
+              </div>
+            </div>
+            <label class="table-search"><i data-icon="search"></i><input id="gradCandSearchInput" type="search" placeholder="اسم الطالب..."></label>
+          </div>
+          <footer class="table-footer table-footer-top">
+            <span>عرض النتائج: <b id="gradCand-visible-count-top">0</b></span>
+            <div class="page-size"><label for="gradCand-page-size-top">عدد الصفوف</label><select id="gradCand-page-size-top"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="all">الجميع</option></select></div>
+            <div class="pagination" id="gradCandPaginationTop"></div>
+          </footer>
+          <div class="responsive-table">
+            <table id="graduationCandidatesTable">
+              <thead><tr>
+                <th style="width:40px;"><input type="checkbox" id="gradCandSelectAll" title="تحديد كل من اجتاز"></th>
+                <th data-sort="name">الطالب</th>
+                <th>المرحلة</th>
+                <th data-sort="attendance">نسبة الحضور</th>
+                <th data-sort="examPassRate">نسبة النجاح</th>
+                <th data-sort="recitationRate">نسبة تسميع الأوراد</th>
+                <th data-sort="mandatoryAvg">متوسط النسب الإلزامية</th>
+                <th>الحالة</th>
+              </tr></thead>
+              <tbody id="graduationCandidatesRows"><tr><td colspan="8" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="gradCand-visible-count">0</b></span>
+            <div class="page-size"><label for="gradCand-page-size">عدد الصفوف</label><select id="gradCand-page-size"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="all">الجميع</option></select></div>
+            <div class="pagination" id="gradCandPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- إدارة القوالب: شهادات الاختبارات (+أعمال الطلاب، يشتركان بنفس الشيت/الآلية) وكروت
+         التهنئة بالمناسبات. راجع مناقشات.md "إدارة القوالب" للسياق الكامل. لا تغطي قوالب
+         بطاقة الطالب/شهادة الاجتياز — تلك ضمن "إدارة المراحل" لأنها مرتبطة بمرحلة بعينها. -->
+    <section class="page-view" data-page="templates">
+      <header class="page-heading"><div><span class="eyebrow">الشؤون الأكاديمية</span><h1>إدارة القوالب</h1><p>قوالب شهادات الاختبارات وكروت التهنئة بالمناسبات.</p></div></header>
+
+      <div class="segmented" data-filter-group="templatesTab" id="templatesTabGroup">
+        <button class="active" data-tab="examCerts" type="button">شهادات الاختبارات</button>
+        <button data-tab="greetings" type="button">كروت التهنئة</button>
+      </div>
+
+      <section class="panel data-panel" id="templatesExamCertsPanel">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-filters">
+              <div class="segmented" data-filter-group="examCertsStage" id="examCertsStageFilterGroup">
+                <button class="active" data-filter="all" type="button">الكل <b id="examCertsStageCount-all">0</b></button>
+                <button data-filter="0" type="button">التأهيلية <b id="examCertsStageCount-0">0</b></button>
+                <button data-filter="1" type="button">التأسيسية <b id="examCertsStageCount-1">0</b></button>
+                <button data-filter="2" type="button">التأصيلية <b id="examCertsStageCount-2">0</b></button>
+                <button data-filter="3" type="button">التحصيلية <b id="examCertsStageCount-3">0</b></button>
+              </div>
+              <label class="table-search"><i data-icon="search"></i><input id="examCertsSearchInput" type="search" placeholder="اسم الاختبار..."></label>
+            </div>
+            <button class="primary-button" id="addExamCertBtn" type="button"><i data-icon="plus"></i>إضافة قالب</button>
+          </div>
+          <div class="responsive-table">
+            <table id="examCertsTable">
+              <thead><tr><th>اسم الاختبار</th><th>المرحلة</th><th>معرّف القالب</th><th></th></tr></thead>
+              <tbody id="examCertsRows"><tr><td colspan="4" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel data-panel" id="templatesGreetingsPanel" hidden>
+        <div class="live-content">
+          <div class="table-toolbar">
+            <label class="table-search"><i data-icon="search"></i><input id="greetingsSearchInput" type="search" placeholder="اسم المناسبة..."></label>
+            <button class="primary-button" id="addGreetingBtn" type="button"><i data-icon="plus"></i>إضافة قالب</button>
+          </div>
+          <div class="responsive-table">
+            <table id="greetingsTable">
+              <thead><tr><th>اسم المناسبة</th><th>معرّف القالب</th><th>مفعَّل؟</th><th></th></tr></thead>
+              <tbody id="greetingsRows"><tr><td colspan="4" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- تحليل ملف بالذكالي -->
+    <section class="page-view" data-page="pdfAnalysis">
+      <header class="page-heading"><div><span class="eyebrow">أدوات الذكاء الاصطناعي</span><h1>تحليل ملف بالذكالي</h1><p>ارفع ملف PDF لتوليد ملخص وتشجير أفكار وأسئلة اختبار تلقائيًا، مع تصدير Word وPDF وExcel.</p></div><button class="primary-button" id="pdfaiNewBtn" type="button"><i data-icon="sparkles"></i>تحليل جديد</button></header>
+
+      <div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:16px;">
+        <article class="metric"><div class="live-content"><span class="metric-icon blue"><i data-icon="layers"></i></span><div><small>إجمالي التحليلات</small><strong id="pdfaiStatJobs">0</strong><span>منذ التفعيل</span></div></div></article>
+        <article class="metric"><div class="live-content"><span class="metric-icon gold"><i data-icon="coins"></i></span><div><small>إجمالي التوكنز</small><strong id="pdfaiStatTokens">0</strong><span>إدخال + إخراج</span></div></div></article>
+        <article class="metric"><div class="live-content"><span class="metric-icon red"><i data-icon="dollar-sign"></i></span><div><small>التكلفة التقديرية</small><strong id="pdfaiStatCost">$0.00</strong><span>إجماليًا حتى الآن</span></div></div></article>
+      </div>
+
+      <section class="panel" id="pdfaiProgressPanel" hidden>
+        <header class="panel-header text-end"><div><h2 id="pdfaiProgressTitle">جارٍ التحليل...</h2><p id="pdfaiProgressSub">يرجى الانتظار حتى اكتمال المعالجة.</p></div><span class="pdfai-elapsed" id="pdfaiElapsed">00:00</span></header>
+        <div class="panel-body">
+          <div class="pdfai-stepper" id="pdfaiStepper">
+            <div class="pdfai-step" data-step="reading_file"><span class="pdfai-step-label">القراءة</span><i class="pdfai-step-bar"></i></div>
+            <div class="pdfai-step" data-step="building_summary"><span class="pdfai-step-label">التلخيص</span><i class="pdfai-step-bar"></i></div>
+            <div class="pdfai-step" data-step="building_questions"><span class="pdfai-step-label">الأسئلة</span><i class="pdfai-step-bar"></i></div>
+            <div class="pdfai-step" data-step="awaiting_tree_image" id="pdfaiStepTree"><span class="pdfai-step-label">التشجير</span><i class="pdfai-step-bar"></i></div>
+            <div class="pdfai-step" data-step="building_files"><span class="pdfai-step-label">الملفات</span><i class="pdfai-step-bar"></i></div>
+          </div>
+          <div id="pdfaiTreeCaptureBox" hidden style="margin-top:16px;">
+            <p class="empty-note">تشجير الأفكار جاهز — يُبنى الآن كصورة داخل المتصفح لإرفاقها بالملفات النهائية.</p>
+            <div id="pdfaiTreeContainer" style="max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;"></div>
+          </div>
+          <div class="warning-note" id="pdfaiProgressError" hidden style="margin-top:14px;"><i data-icon="triangle-alert"></i><span></span></div>
+          <div class="heading-actions" id="pdfaiProgressActions" style="margin-top:14px;" hidden>
+            <button class="secondary-button" type="button" onclick="pdfaiReset()">تحليل ملف آخر</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="pdfaiResultsPanel" hidden>
+        <header class="panel-header"><div><h2 id="pdfaiResultTitle">اكتمل التحليل</h2><p>حمّل الملفات الناتجة، أو راجع الملخص والأسئلة أدناه.</p></div><button class="secondary-button" type="button" onclick="pdfaiReset()"><i data-icon="rotate-ccw"></i>تحليل ملف جديد</button></header>
+        <div class="panel-body">
+          <div id="pdfaiUsageNote" class="empty-note" style="margin-bottom:12px;"></div>
+          <div id="pdfaiWarnings"></div>
+
+          <div class="export-history-list" id="pdfaiDownloads" style="margin-bottom:18px;"></div>
+
+          <div class="toolbar-title" style="margin-bottom:10px;"><h2>الملخص</h2></div>
+          <div id="pdfaiSummaryBox" class="panel" style="box-shadow:none;border:1px solid var(--line);"></div>
+
+          <div class="toolbar-title" style="margin:18px 0 10px;"><h2>أسئلة الاختبار</h2></div>
+          <div id="pdfaiQuestionsBox"></div>
+        </div>
+      </section>
+
+      <section class="panel data-panel" style="margin-top:20px;" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar">
+            <div class="toolbar-title text-end"><h2>سجل تحليلاتك السابقة</h2><span>روابط التنزيل تنتهي صلاحيتها بعد 24 ساعة من اكتمال كل تحليل</span></div>
+          </div>
+          <div class="responsive-table">
+            <table id="pdfaiHistoryTable">
+              <thead>
+                <tr>
+                  <th style="width:44px;">#</th>
+                  <th>التاريخ</th>
+                  <th>الملف</th>
+                  <th>الحالة</th>
+                  <th>الأسئلة</th>
+                  <th>التكلفة</th>
+                  <th>تنزيل</th>
+                </tr>
+              </thead>
+              <tbody id="pdfaiHistoryBody">
+                <tr><td colspan="7" style="text-align:center;padding:24px;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="pdfaiHistoryVisibleCount">0</b></span>
+            <div class="pagination" id="pdfaiHistoryPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- نموذج "تحليل جديد" لصفحة تحليل ملف بالذكالي — عنصر واحد دائم يُنقَل فعليًا
+         داخل المودال المشترك (#modalBody) عند الفتح، بنفس أسلوب mountAppAdminInto -->
+    <div id="pdfaiUploadPanel" hidden>
+      <div class="form-grid">
+        <div class="field wide">
+          <span>ملف PDF (حتى 25 ميجابايت)</span>
+          <div class="file-picker">
+            <button type="button" class="secondary-button" id="pdfaiBrowseBtn"><i data-icon="upload"></i>اختر ملفًا</button>
+            <span id="pdfaiFileName">لم يُحدَّد أي ملف بعد</span>
+          </div>
+          <input type="file" id="pdfaiFileInput" accept="application/pdf" hidden>
+        </div>
+        <label class="field"><span>طول الملخص</span>
+          <select id="pdfaiSummaryLength">
+            <option value="مختصر">مختصر</option>
+            <option value="متوسط" selected>متوسط</option>
+            <option value="تفصيلي">تفصيلي</option>
+          </select>
+        </label>
+        <label class="field"><span>عدد الأسئلة (5-50)</span>
+          <input type="number" id="pdfaiQuestionCount" min="5" max="50" value="10">
+        </label>
+        <label class="field"><span>مستوى صعوبة الأسئلة</span>
+          <select id="pdfaiDifficulty">
+            <option value="سهل">سهل</option>
+            <option value="متوسط" selected>متوسط</option>
+            <option value="صعب">صعب</option>
+            <option value="متنوع">متنوع</option>
+          </select>
+        </label>
+        <div class="field wide">
+          <span>خيارات إضافية</span>
+          <div class="choice-grid" id="pdfaiTogglesGroup" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+            <button type="button" class="staff-perm-btn" data-toggle="withTree"><i data-icon="git-fork"></i>تضمين تشجير الأفكار</button>
+            <button type="button" class="staff-perm-btn" data-toggle="consentToStore"><i data-icon="save"></i>الاحتفاظ بالملف الأصلي مؤقتًا</button>
+          </div>
+        </div>
+        <label class="field wide"><span>ملاحظات إضافية للذكاء الاصطناعي (اختياري)</span>
+          <textarea id="pdfaiNotes" maxlength="2000" rows="3" placeholder="مثال: ركّز على تعريفات المصطلحات واذكر الأمثلة..."></textarea>
+        </label>
+      </div>
+      <div class="warning-note" id="pdfaiError" hidden><i data-icon="triangle-alert"></i><span></span></div>
+      <div class="heading-actions" style="margin-top:14px;">
+        <button class="primary-button" id="pdfaiStartBtn" type="button"><i data-icon="sparkles"></i>ابدأ التحليل</button>
+      </div>
+    </div>
+
+    <!-- التقارير -->
+    <section class="page-view" data-page="reports">
+      <header class="page-heading"><div><span class="eyebrow">التحليل والتصدير</span><h1>التقارير</h1><p>استخرج بيانات الأكاديمية بصيغة مناسبة للمراجعة أو الأرشفة أو المشاركة.</p></div><div class="heading-actions"><button class="secondary-button" id="reportHistoryButton" type="button"><i data-icon="history"></i>سجل التصدير</button><button class="primary-button" id="createCustomReport" type="button"><i data-icon="file-export"></i>إنشاء تقرير مخصص</button></div></header>
+
+      <div class="toolbar-title" style="margin-bottom:10px;"><h2>نتائج الاختبارات حسب المرحلة</h2><span>عدد الاختبارات الناجحة في كل مرحلة — اضغط على أي بطاقة لعرض التفاصيل</span></div>
+      <div class="metrics-grid" style="margin-bottom:20px;">
+        <article class="metric metric-clickable" data-live data-skeleton="stat" onclick="openExamLevelModal(0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExamLevelModal(0);}" role="button" tabindex="0" title="عرض نتائج المرحلة التأهيلية">
+          <div class="live-content"><span class="metric-icon blue"><i data-icon="award"></i></span><div><small>المرحلة التأهيلية</small><strong id="examLevelCount0">0</strong><span>اختبار تم اجتيازه</span></div></div>
+        </article>
+        <article class="metric metric-clickable" data-live data-skeleton="stat" onclick="openExamLevelModal(1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExamLevelModal(1);}" role="button" tabindex="0" title="عرض نتائج المرحلة التأسيسية">
+          <div class="live-content"><span class="metric-icon gold"><i data-icon="award"></i></span><div><small>المرحلة التأسيسية</small><strong id="examLevelCount1">0</strong><span>اختبار تم اجتيازه</span></div></div>
+        </article>
+        <article class="metric metric-clickable" data-live data-skeleton="stat" onclick="openExamLevelModal(2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExamLevelModal(2);}" role="button" tabindex="0" title="عرض نتائج المرحلة التأصيلية">
+          <div class="live-content"><span class="metric-icon red"><i data-icon="award"></i></span><div><small>المرحلة التأصيلية</small><strong id="examLevelCount2">0</strong><span>اختبار تم اجتيازه</span></div></div>
+        </article>
+        <article class="metric metric-clickable" data-live data-skeleton="stat" onclick="openExamLevelModal(3)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExamLevelModal(3);}" role="button" tabindex="0" title="عرض نتائج المرحلة التحصيلية">
+          <div class="live-content"><span class="metric-icon gray"><i data-icon="award"></i></span><div><small>المرحلة التحصيلية</small><strong id="examLevelCount3">0</strong><span>اختبار تم اجتيازه</span></div></div>
+        </article>
+      </div>
+
+      <section class="report-presets" data-live data-skeleton="list">
+        <div class="live-content">
+          <header class="section-heading"><div><h2>تقارير سريعة</h2><p>أكثر التقارير استخدامًا، جاهزة بالتصفية الافتراضية.</p></div><span class="soft-badge green"><span class="status-dot"></span>البيانات محدثة</span></header>
+          <div class="report-preset-grid" id="reportPresetGrid"></div>
+        </div>
+      </section>
+
+      <div class="report-workspace">
+        <section class="panel report-builder" id="reportBuilder">
+          <header class="panel-header"><div><h2>إنشاء تقرير مخصص</h2><p>حدد مصدر البيانات والفترة والمرحلة ثم اختر صيغة الملف.</p></div><span class="builder-step">تخصيص التصدير</span></header>
+          <div class="report-builder-body">
+            <div class="report-form-grid">
+              <label class="field report-source-field"><span>نوع التقرير</span><select id="reportType">
+                <option value="students">الطلاب الشامل</option>
+                <option value="attendance">الحضور والغياب</option>
+                <option value="exams">نتائج الاختبارات</option>
+                <option value="academic">التقدم الأكاديمي</option>
+                <option value="registrations">طلبات التسجيل</option>
+                <option value="certificates">الشهادات</option>
+              </select></label>
+              <label class="field"><span>من تاريخ</span><input id="reportDateFrom" type="date"></label>
+              <label class="field"><span>إلى تاريخ</span><input id="reportDateTo" type="date"></label>
+            </div>
+
+            <div class="report-option-block"><span class="option-label">المرحلة</span><div class="segmented report-stage-switch" id="reportStages"><button class="active" type="button" data-report-stage="all">جميع المراحل</button><button type="button" data-report-stage="0">التأهيلية</button><button type="button" data-report-stage="1">التأسيسية</button><button type="button" data-report-stage="2">التأصيلية</button><button type="button" data-report-stage="3">التحصيلية</button></div></div>
+
+            <div class="report-option-block"><span class="option-label">البيانات المتضمنة</span><div class="report-columns" id="reportColumnsGroup"><label><input class="report-column" type="checkbox" checked data-group="basic"><span>البيانات الأساسية</span></label><label><input class="report-column" type="checkbox" checked data-group="stage"><span>بيانات المرحلة</span></label><label><input class="report-column" type="checkbox" checked data-group="attendance"><span>الحضور</span></label><label><input class="report-column" type="checkbox" checked data-group="recitation"><span>الأوراد</span></label><label><input class="report-column" type="checkbox" checked data-group="exams"><span>نتائج الاختبارات</span></label><label><input class="report-column" type="checkbox" data-group="contact"><span>بيانات التواصل</span></label></div></div>
+
+            <div class="report-option-block"><span class="option-label">صيغة التصدير</span><div class="export-format-options" id="customReportFormats"><button class="active excel" type="button" data-export-format="excel"><i data-icon="file-spreadsheet"></i><span><strong>Excel</strong><small>للتحليل والتصفية</small></span><i data-icon="circle-check"></i></button><button class="pdf" type="button" data-export-format="pdf"><i data-icon="file-pdf"></i><span><strong>PDF</strong><small>للطباعة والمشاركة</small></span><i data-icon="circle-check"></i></button><button class="csv" type="button" data-export-format="csv"><i data-icon="file-csv"></i><span><strong>CSV</strong><small>للنقل بين الأنظمة</small></span><i data-icon="circle-check"></i></button></div></div>
+          </div>
+          <footer class="report-builder-footer"><div class="report-estimate" data-live data-skeleton="compact"><div class="live-content"><span class="estimate-icon"><i data-icon="file-export"></i></span><div><small>سيتم إنشاء ملف باسم</small><strong id="reportFileName">—</strong><span><b id="reportRecordCount">0</b> سجل · <b id="reportColumnCount">0</b> مجموعات بيانات</span></div></div></div><button class="primary-button export-primary" id="runCustomReport" type="button"><i data-icon="download"></i>تصدير التقرير</button></footer>
+        </section>
+
+        <aside class="panel export-status" data-live data-skeleton="list">
+          <div class="live-content">
+            <header class="panel-header"><div><h2>آخر ملفات التصدير</h2><p>الملفات التي جهّزتها هذه الجلسة.</p></div><button class="icon-button" id="refreshReportsData" type="button" title="تحديث البيانات"><i data-icon="refresh-cw"></i></button></header>
+            <div class="export-history-list" id="exportHistoryList"></div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="panel report-library data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar"><div class="toolbar-title"><h2>مكتبة التقارير</h2><span>الأنواع الستة المتاحة، بأعداد سجلاتها الحالية فعليًا.</span></div><label class="table-search"><i data-icon="search"></i><input id="reportSearch" type="search" placeholder="ابحث عن تقرير..."></label></div>
+          <div class="responsive-table"><table><thead><tr><th>التقرير</th><th>البيانات المتضمنة</th><th>السجلات الحالية</th><th>الصيغ المتاحة</th><th>التصدير</th></tr></thead><tbody id="reportTemplateRows"></tbody></table></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- الملف الشخصي: نفس القسم الموجود حرفيًا في emp.html (نفس المعرّفات بالكامل) — الصفحتان
+         لا تتزامنان أبدًا في DOM (إداري ↔ متعاون غير إداري)، فلا تعارض معرّفات. مُضمَّن داخل
+         #studentPortal.sp-embedded ليعمل تصميم sp- رغم أن غلاف لوحة الإدارة من نظام admin-suite.
+         الفروق عن نسخة الطالب مُقرَّرة صراحة في مناقشات.md: بلا حقول مجمع/منطقة/هاتف بديل،
+         وبطاقة "معلومات العمل" (الوظيفة + الصلاحيات) بدل الملخص الأكاديمي. تصميم فقط بعد، بلا
+         اتصال فعلي بالخادم — راجع design-guidelines.md قبل أي تعديل إضافي. -->
+    <section class="page-view" data-page="emp-profile">
+      <div id="studentPortal" class="sp-embedded">
+
+        <section class="sp-profile-page-heading">
+          <div>
+            <span class="sp-section-kicker">إدارة الحساب</span>
+            <h1>الملف الشخصي</h1>
+            <p>حدّث معلوماتك ووسائل التواصل وإعدادات الأمان من مكان واحد.</p>
+          </div>
+          <div class="sp-save-state" id="empPfSaveState"><span></span><strong>جميع التغييرات محفوظة</strong></div>
+        </section>
+
+        <section class="sp-identity-banner">
+          <div class="sp-profile-avatar-wrap">
+            <div class="sp-profile-avatar" id="empPfProfileAvatar"><img id="empPfAvatarPreview" alt="الصورة الشخصية" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&sz=w500"></div>
+            <label class="sp-avatar-edit" for="empPfAvatarInput" title="تغيير الصورة"><i class="bi bi-camera-fill"></i><input id="empPfAvatarInput" type="file" accept="image/png,image/jpeg" hidden></label>
+          </div>
+          <div class="sp-identity-copy">
+            <div class="sp-identity-name"><h2 id="empPfDisplayName">—</h2><span class="sp-verified-badge"><i class="bi bi-patch-check-fill"></i>حساب موثّق</span></div>
+            <p id="empPfIdentitySub">متعاون · —</p>
+            <div class="sp-identity-tags"><span><i class="bi bi-geo-alt"></i>مملكة البحرين</span><span><i class="bi bi-calendar-week"></i>عضو في أكاديمية بصائر</span></div>
+          </div>
+          <div class="sp-completion-block">
+            <div><span>اكتمال الملف</span><strong id="empPfCompletionPercent">0%</strong></div>
+            <div class="sp-linear-progress"><span id="empPfCompletionBar" style="width:0%"></span></div>
+            <small id="empPfCompletionHint">أضف صورة شخصية وتاريخ ميلاد</small>
+          </div>
+        </section>
+
+        <section class="sp-settings-layout">
+          <aside class="sp-settings-tabs" aria-label="أقسام إعدادات الحساب">
+            <button class="sp-settings-tab active" type="button" data-emp-tab="personal"><span class="sp-tab-icon"><i class="bi bi-person-vcard"></i></span><span><strong>البيانات الشخصية</strong><small>الهوية والمعلومات الأساسية</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="contact"><span class="sp-tab-icon"><i class="bi bi-at"></i></span><span><strong>التواصل</strong><small>البريد والهاتف</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="security"><span class="sp-tab-icon"><i class="bi bi-shield-check"></i></span><span><strong>الأمان والدخول</strong><small>كلمة المرور وطرق الدخول</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="notifications"><span class="sp-tab-icon"><i class="bi bi-bell"></i></span><span><strong>الإشعارات</strong><small>اختر ما تريد استلامه</small></span><i class="bi bi-chevron-left"></i></button>
+            <div class="sp-settings-help"><span><i class="bi bi-headset"></i></span><div><strong>تحتاج إلى مساعدة؟</strong><p>فريق بصائر جاهز لمساعدتك في تحديث بياناتك.</p><button type="button" id="empPfHelpBtn">تواصل مع الدعم</button></div></div>
+          </aside>
+
+          <form class="sp-settings-content" id="empProfileForm" novalidate>
+            <section class="sp-settings-panel active" data-emp-panel="personal">
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">المعلومات الأساسية</span><h2>بياناتك الشخصية</h2><p>يُرجى مطابقة الاسم وتاريخ الميلاد مع البطاقة السكانية.</p></div><span class="sp-panel-status"><i class="bi bi-check-circle"></i>مكتمل</span></div>
+              <div class="sp-form-grid">
+                <label class="sp-form-field sp-span-2"><span>الاسم كاملًا</span><div class="sp-input-wrap"><i class="bi bi-person"></i><input id="empFullName" name="fullName" type="text" required minlength="6"><i class="sp-field-check bi bi-check"></i></div><small class="sp-field-message">اكتب الاسم كما يظهر في البطاقة السكانية</small></label>
+                <label class="sp-form-field"><span>الرقم الشخصي</span><div class="sp-input-wrap sp-readonly"><i class="bi bi-credit-card-2-front"></i><input id="empCpr" name="cpr" type="text" readonly><i class="bi bi-lock"></i></div><small class="sp-field-message">لا يمكن تعديل الرقم الشخصي</small></label>
+                <label class="sp-form-field"><span>تاريخ الميلاد</span><div class="sp-input-wrap"><i class="bi bi-calendar3"></i><input id="empDob" name="dob" type="date"></div></label>
+                <label class="sp-form-field"><span>الجنس</span><div class="sp-input-wrap"><i class="bi bi-people"></i><select id="empGender" name="gender"><option value="">— اختر —</option><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select><i class="bi bi-chevron-down"></i></div></label>
+                <label class="sp-form-field sp-span-2"><span>الجنسية</span><div class="sp-input-wrap"><i class="bi bi-flag"></i><select id="empNationality" name="nationality"><option value="">— اختر —</option><option>البحرين</option><option>أذربيجان</option><option>أرمينيا</option><option>أسبانيا</option><option>أستراليا</option><option>أفغانستان</option><option>ألبانيا</option><option>ألمانيا</option><option>أنتيجوا وبربودا</option><option>أنجولا</option><option>أنجويلا</option><option>أندورا</option><option>أورجواي</option><option>أوزبكستان</option><option>أوغندا</option><option>أوكرانيا</option><option>أيرلندا</option><option>أيسلندا</option><option>اثيوبيا</option><option>اريتريا</option><option>استونيا</option><option>الأرجنتين</option><option>الأردن</option><option>الاكوادور</option><option>الامارات العربية المتحدة</option><option>الباهاما</option><option>البرازيل</option><option>البرتغال</option><option>البوسنة والهرسك</option><option>الجابون</option><option>الجبل الأسود</option><option>الجزائر</option><option>الدانمرك</option><option>الرأس الأخضر</option><option>السلفادور</option><option>السنغال</option><option>السودان</option><option>السويد</option><option>الصحراء الغربية</option><option>الصومال</option><option>الصين</option><option>العراق</option><option>الفاتيكان</option><option>الفيلبين</option><option>القطب الجنوبي</option><option>الكاميرون</option><option>الكونغو - برازافيل</option><option>الكويت</option><option>المجر</option><option>المحيط الهندي البريطاني</option><option>المغرب</option><option>المقاطعات الجنوبية الفرنسية</option><option>المكسيك</option><option>المملكة العربية السعودية</option><option>المملكة المتحدة</option><option>النرويج</option><option>النمسا</option><option>النيجر</option><option>الهند</option><option>الولايات المتحدة الأمريكية</option><option>اليابان</option><option>اليمن</option><option>اليونان</option><option>اندونيسيا</option><option>ايران</option><option>ايطاليا</option><option>بابوا غينيا الجديدة</option><option>باراجواي</option><option>باكستان</option><option>بالاو</option><option>بتسوانا</option><option>بتكايرن</option><option>بربادوس</option><option>برمودا</option><option>بروناي</option><option>بلجيكا</option><option>بلغاريا</option><option>بليز</option><option>بنجلاديش</option><option>بنما</option><option>بنين</option><option>بوتان</option><option>بورتوريكو</option><option>بوركينا فاسو</option><option>بوروندي</option><option>بولندا</option><option>بوليفيا</option><option>بولينيزيا الفرنسية</option><option>بيرو</option><option>تانزانيا</option><option>تايلند</option><option>تايوان</option><option>تركمانستان</option><option>تركيا</option><option>ترينيداد وتوباغو</option><option>تشاد</option><option>توجو</option><option>توفالو</option><option>توكيلو</option><option>تونجا</option><option>تونس</option><option>تيمور الشرقية</option><option>جامايكا</option><option>جبل طارق</option><option>جرينادا</option><option>جرينلاند</option><option>جزر أولان</option><option>جزر الأنتيل الهولندية</option><option>جزر الترك وجايكوس</option><option>جزر القمر</option><option>جزر الكايمن</option><option>جزر المارشال</option><option>جزر الملديف</option><option>جزر الولايات المتحدة البعيدة الصغيرة</option><option>جزر سليمان</option><option>جزر فارو</option><option>جزر فرجين الأمريكية</option><option>جزر فرجين البريطانية</option><option>جزر فوكلاند</option><option>جزر كوك</option><option>جزر كوكوس</option><option>جزر ماريانا الشمالية</option><option>جزر والس وفوتونا</option><option>جزيرة الكريسماس</option><option>جزيرة بوفيه</option><option>جزيرة مان</option><option>جزيرة نورفوك</option><option>جزيرة هيرد وماكدونالد</option><option>جمهورية افريقيا الوسطى</option><option>جمهورية التشيك</option><option>جمهورية الدومينيك</option><option>جمهورية الكونغو الديمقراطية</option><option>جمهورية جنوب افريقيا</option><option>جواتيمالا</option><option>جوادلوب</option><option>جوام</option><option>جورجيا</option><option>جورجيا الجنوبية وجزر ساندويتش الجنوبية</option><option>جيبوتي</option><option>جيرسي</option><option>دومينيكا</option><option>رواندا</option><option>روسيا</option><option>روسيا البيضاء</option><option>رومانيا</option><option>روينيون</option><option>زامبيا</option><option>زيمبابوي</option><option>ساحل العاج</option><option>ساموا</option><option>ساموا الأمريكية</option><option>سان مارينو</option><option>سانت بيير وميكولون</option><option>سانت فنسنت وغرنادين</option><option>سانت كيتس ونيفيس</option><option>سانت لوسيا</option><option>سانت مارتين</option><option>سانت هيلنا</option><option>ساو تومي وبرينسيبي</option><option>سريلانكا</option><option>سفالبارد وجان مايان</option><option>سلوفاكيا</option><option>سلوفينيا</option><option>سنغافورة</option><option>سوازيلاند</option><option>سوريا</option><option>سورينام</option><option>سويسرا</option><option>سيراليون</option><option>سيشل</option><option>شيلي</option><option>صربيا</option><option>صربيا والجبل الأسود</option><option>طاجكستان</option><option>عمان</option><option>غامبيا</option><option>غانا</option><option>غويانا</option><option>غيانا</option><option>غينيا</option><option>غينيا الاستوائية</option><option>غينيا بيساو</option><option>فانواتو</option><option>فرنسا</option><option>فلسطين</option><option>فنزويلا</option><option>فنلندا</option><option>فيتنام</option><option>فيجي</option><option>قبرص</option><option>قرغيزستان</option><option>قطر</option><option>كازاخستان</option><option>كاليدونيا الجديدة</option><option>كرواتيا</option><option>كمبوديا</option><option>كندا</option><option>كوبا</option><option>كوريا الجنوبية</option><option>كوريا الشمالية</option><option>كوستاريكا</option><option>كولومبيا</option><option>كيريباتي</option><option>كينيا</option><option>لاتفيا</option><option>لاوس</option><option>لبنان</option><option>لوكسمبورج</option><option>ليبيا</option><option>ليبيريا</option><option>ليتوانيا</option><option>ليختنشتاين</option><option>ليسوتو</option><option>مارتينيك</option><option>ماكاو الصينية</option><option>مالطا</option><option>مالي</option><option>ماليزيا</option><option>مايوت</option><option>مدغشقر</option><option>مصر</option><option>مقدونيا</option><option>ملاوي</option><option>منطقة غير معرفة</option><option>منغوليا</option><option>موريتانيا</option><option>موريشيوس</option><option>موزمبيق</option><option>مولدافيا</option><option>موناكو</option><option>مونتسرات</option><option>ميانمار</option><option>ميكرونيزيا</option><option>ناميبيا</option><option>نورو</option><option>نيبال</option><option>نيجيريا</option><option>نيكاراجوا</option><option>نيوزيلاندا</option><option>نيوي</option><option>هايتي</option><option>هندوراس</option><option>هولندا</option><option>هونج كونج الصينية</option></select><i class="bi bi-chevron-down"></i></div></label>
+              </div>
+              <div class="sp-academic-summary">
+                <div class="sp-academic-icon"><i class="bi bi-briefcase"></i></div>
+                <div><span>معلومات العمل</span><h3 id="empPfJobSummary">—</h3><p id="empPfPermsSummary">الصلاحيات الممنوحة لحسابك تُدار من قِبل الإدارة.</p></div>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="contact" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">الوصول إليك</span><h2>التواصل</h2><p>نستخدم هذه البيانات للتنبيهات المهمة والتواصل الرسمي.</p></div><span class="sp-panel-status"><i class="bi bi-shield-check"></i>بيانات محمية</span></div>
+              <div class="sp-form-grid">
+                <div class="sp-email-verification sp-span-2">
+                  <div class="sp-email-verification-head">
+                    <div><span>البريد الإلكتروني</span><small>اختر طريقة إضافة البريد والتحقق منه</small></div>
+                    <span class="sp-email-status unverified" id="empEmailStatus"><i class="bi bi-exclamation-circle"></i><b>غير متحقق</b></span>
+                  </div>
+                  <div class="sp-email-method-picker" role="tablist" aria-label="طريقة التحقق من البريد">
+                    <button class="sp-email-method" type="button" data-emp-email-method="google" role="tab" aria-selected="false"><span class="sp-provider-mark sp-google-mark">G</span><span><strong>Google</strong><small>استخدام حساب Google</small></span><i class="bi bi-chevron-left"></i></button>
+                    <button class="sp-email-method" type="button" data-emp-email-method="yahoo" role="tab" aria-selected="false"><span class="sp-provider-mark sp-yahoo-mark">Y!</span><span><strong>Yahoo</strong><small>استخدام حساب Yahoo</small></span><i class="bi bi-chevron-left"></i></button>
+                    <button class="sp-email-method active" type="button" data-emp-email-method="manual" role="tab" aria-selected="true"><span class="sp-provider-mark sp-manual-mark"><i class="bi bi-envelope"></i></span><span><strong>إدخال يدوي</strong><small>التحقق بواسطة رمز</small></span><i class="bi bi-chevron-left"></i></button>
+                  </div>
+                  <div class="sp-provider-email-panel" id="empProviderEmailPanel" hidden>
+                    <span class="sp-provider-connected-icon sp-google-mark" id="empProviderConnectedIcon">G</span>
+                    <div><small id="empProviderLabel">حساب Google المرتبط</small><strong id="empProviderEmailText">—</strong></div>
+                    <button class="sp-btn-secondary" id="empSwitchProviderAccount" type="button">تغيير الحساب</button>
+                  </div>
+                  <div class="sp-manual-email-panel" id="empManualEmailPanel">
+                    <label class="sp-form-field"><span>اكتب البريد الإلكتروني</span><div class="sp-input-wrap" id="empEmailInputWrap"><i class="bi bi-envelope"></i><input id="empEmail" name="email" type="email" required autocomplete="email" placeholder="name@example.com"><i class="sp-field-check bi bi-patch-check-fill"></i></div><small class="sp-field-message" id="empEmailMessage">سنرسل رمز تحقق مكوّنًا من 6 أرقام</small></label>
+                    <button class="sp-btn-secondary sp-send-code-button" id="empSendEmailCode" type="button"><i class="bi bi-send"></i><span>إرسال رمز التحقق</span></button>
+                    <div class="sp-verification-code-area" id="empVerificationCodeArea" hidden>
+                      <label class="sp-form-field"><span>رمز التحقق</span><div class="sp-input-wrap sp-code-input"><i class="bi bi-key"></i><input id="empEmailVerificationCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="— — — — — —" aria-describedby="empCodeHint"></div><small class="sp-field-message" id="empCodeHint">للمعاينة استخدم الرمز 123456</small></label>
+                      <button class="sp-btn-primary sp-verify-code-button" id="empVerifyEmailCode" type="button"><i class="bi bi-shield-check"></i>تأكيد الرمز</button>
+                      <button class="sp-btn-text sp-resend-code-button" id="empResendEmailCode" type="button" disabled>إعادة الإرسال بعد <b id="empCodeCountdown">30</b> ثانية</button>
+                    </div>
+                  </div>
+                  <input id="empEmailVerificationMethod" name="emailVerificationMethod" type="hidden" value="manual">
+                  <input id="empEmailVerifiedState" name="emailVerifiedState" type="hidden" value="false">
+                </div>
+                <label class="sp-form-field sp-span-2"><span>رقم الهاتف</span><div class="sp-input-wrap"><select class="sp-phone-country-select" id="empPhoneCountrySelect" aria-label="مفتاح الدولة"></select><input id="empPhone" name="phone" type="tel" inputmode="numeric" pattern="[0-9]{8}" required style="direction:ltr;"></div></label>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="security" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">حماية الحساب</span><h2>الأمان وتسجيل الدخول</h2><p>استخدم كلمة مرور قوية وراجع طرق الدخول المرتبطة بحسابك.</p></div><span class="sp-security-score"><i class="bi bi-shield-check"></i><span><strong>غير مُفعّلة</strong><small>مستوى الأمان</small></span></span></div>
+              <div class="sp-security-section">
+                <div class="sp-subsection-heading"><div><h3>تغيير كلمة المرور</h3><p>يجب ألا تقل كلمة المرور الجديدة عن 6 أحرف.</p></div></div>
+                <div class="sp-form-grid">
+                  <label class="sp-form-field sp-span-2"><span>كلمة المرور الحالية</span><div class="sp-input-wrap"><i class="bi bi-lock"></i><input id="empCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" placeholder="أدخل كلمة المرور الحالية"><button class="sp-input-action" type="button" data-emp-toggle-password="empCurrentPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div></label>
+                  <label class="sp-form-field"><span>كلمة المرور الجديدة</span><div class="sp-input-wrap"><i class="bi bi-key"></i><input id="empNewPassword" name="newPassword" type="password" autocomplete="new-password" placeholder="6 أحرف على الأقل" minlength="6"><button class="sp-input-action" type="button" data-emp-toggle-password="empNewPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><div class="sp-password-strength"><span></span><span></span><span></span><span></span><small id="empPasswordStrengthText">لم تُدخل كلمة مرور</small></div></label>
+                  <label class="sp-form-field"><span>تأكيد كلمة المرور</span><div class="sp-input-wrap"><i class="bi bi-key-fill"></i><input id="empConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور"><button class="sp-input-action" type="button" data-emp-toggle-password="empConfirmPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><small class="sp-field-message" id="empPasswordMatch"></small></label>
+                </div>
+              </div>
+              <div class="sp-security-section">
+                <div class="sp-subsection-heading"><div><h3>طرق تسجيل الدخول</h3><p>الطرق المرتبطة حاليًا بحسابك.</p></div></div>
+                <div class="sp-login-methods">
+                  <article><span class="sp-method-icon sp-email-method-icon"><i class="bi bi-key-fill"></i></span><div><strong>الرقم الشخصي وكلمة المرور</strong><small>الدخول الأساسي باستخدام رقمك الشخصي</small></div><span class="sp-status-pill warning">غير مُفعّلة</span></article>
+                  <article><span class="sp-method-icon sp-google-method-icon">G</span><div><strong>حساب Google</strong><small>غير مرتبط بعد</small></div><button class="sp-btn-secondary" type="button" data-emp-action="connect-google" disabled>عبر الإيميل</button></article>
+                </div>
+              </div>
+              <div class="sp-security-section sp-sessions-section d-none">
+                <div class="sp-subsection-heading"><div><h3>الأجهزة النشطة</h3><p>راجع الأجهزة التي تستخدم حسابك الآن.</p></div><button class="sp-btn-text" type="button" data-emp-action="signout-all">تسجيل الخروج من الكل</button></div>
+                <div class="sp-session-list">
+                  <article><span class="sp-session-icon"><i class="bi bi-laptop"></i></span><div><strong>Chrome على Windows</strong><small>المنامة، البحرين · هذا الجهاز</small></div><span class="sp-current-device"><i></i>نشط الآن</span></article>
+                  <article><span class="sp-session-icon"><i class="bi bi-phone"></i></span><div><strong>Safari على iPhone</strong><small>المحرق، البحرين · منذ يومين</small></div><button class="sp-icon-btn" type="button" aria-label="إنهاء جلسة الهاتف" title="إنهاء الجلسة" data-emp-action="end-session"><i class="bi bi-box-arrow-left"></i></button></article>
+                </div>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="notifications" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">ابق على اطلاع</span><h2>إعدادات الإشعارات</h2><p>حدد التنبيهات التي تهمك والطريقة المناسبة لاستلامها.</p></div></div>
+              <div style="position:relative;">
+                <div style="filter:blur(5px);pointer-events:none;user-select:none;">
+                  <div class="sp-notification-channel-grid">
+                    <article class="sp-channel-card active"><span class="sp-channel-icon whatsapp"><i class="bi bi-whatsapp"></i></span><div><strong>واتساب</strong><small>على رقمك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" checked><span></span></label></article>
+                    <article class="sp-channel-card active"><span class="sp-channel-icon email"><i class="bi bi-envelope"></i></span><div><strong>البريد الإلكتروني</strong><small>بريدك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" checked><span></span></label></article>
+                  </div>
+                  <div class="sp-notification-settings">
+                    <div class="sp-notification-group-title"><h3>تنبيهات العمل</h3><p>المهام والتحديثات المرتبطة بصلاحياتك.</p></div>
+                    <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-clipboard2-check"></i></span><span><strong>طلبات جديدة</strong><small>تسجيل/تسميع/اختبارات بانتظار المتابعة</small></span><span class="sp-channel-pills"><em>واتساب</em><em>البريد</em></span><span class="sp-switch"><input type="checkbox" checked><span></span></span></label>
+                    <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-megaphone"></i></span><span><strong>إعلانات الأكاديمية</strong><small>التعاميم الإدارية المهمة</small></span><span class="sp-channel-pills"><em>البريد</em></span><span class="sp-switch"><input type="checkbox" checked><span></span></span></label>
+                  </div>
+                </div>
+                <div class="sp-coming-soon-overlay" style="border-radius:8px;"><i class="bi bi-bell-slash"></i><span>تفضيلات الإشعارات — قريبًا</span></div>
+              </div>
+            </section>
+
+            <div class="sp-settings-actions">
+              <div class="sp-unsaved-indicator" id="empUnsavedIndicator"><span></span><p><strong>لا توجد تغييرات غير محفوظة</strong><small>لم يُحفظ شيء بعد في هذه الجلسة</small></p></div>
+              <div><button class="sp-btn-secondary" id="empDiscardButton" type="button" disabled>تراجع</button><button class="sp-btn-primary" id="empSaveButton" type="submit" disabled><i class="bi bi-check-lg"></i>حفظ التغييرات</button></div>
+            </div>
+          </form>
+        </section>
+
+      </div>
+    </section>
+
+    <footer class="page-footer"><span>© 2026 أكاديمية بصائر للعلوم الشرعية</span></footer>
+  </main>
+</div>
+
+<!-- عنصر مشترك واحد يُنقَل فعليًا بين لوحات (طلبات التسجيل/الحضور/الرسائل) حسب القسم النشط.
+     يجب أن يبقى id="appAdmin" (الاسم الافتراضي المستخدم في loadAdminPage() وبعض الصفحات
+     القديمة المُحمَّلة بداخله مثل newStuReg.html/allAttend.html التي تتحقق من هذا المُعرّف
+     تحديدًا لتقرر سلوك زر "عودة"). -->
+<div id="appAdmin" style="display:none;"></div>
+
+<aside class="detail-drawer" id="detailDrawer" aria-hidden="true"><header><div><span class="eyebrow" id="drawerEyebrow">تفاصيل</span><h2 id="drawerTitle">—</h2></div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><button class="icon-button" id="drawerOpenPageBtn" type="button" title="فتح صفحة الطالب" hidden><i data-icon="panel-left-open"></i></button><button class="icon-button" id="drawerClose" type="button"><i data-icon="x"></i></button></div></header><div class="drawer-body" id="drawerBody"></div><footer id="drawerFooter"></footer></aside>
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<div class="modal-backdrop" id="actionModal" hidden><section class="action-modal" role="dialog" aria-modal="true"><header><div><span class="eyebrow" id="modalEyebrow">إجراء</span><h2 id="modalTitle">العنوان</h2></div><button class="icon-button" id="modalClose" type="button"><i data-icon="x"></i></button></header><div class="modal-body" id="modalBody"></div><footer id="modalFooter"></footer></section></div>
+
+<div class="toast" id="toast" role="status"><i data-icon="circle-check"></i><span></span></div>
+
+<div class="modal fade" id="certManage" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="certManageLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-6 text-danger" id="certManageLabel">إدارة الشهادات</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div id="certManageBody" class="row g-3 modal-body">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger mx-auto w-25" data-bs-dismiss="modal">خروج</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="stWorksMan" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="stWorksManLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-6 text-danger" id="stWorksManLabel">إدارة أعمال الطلاب</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div id="stWorksManBody" class="row g-3 modal-body">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger mx-auto w-25" data-bs-dismiss="modal">خروج</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- مودال إضافة/تعديل متعاون: يُبنى الآن ديناميكيًا عبر openActionModal() في openStaffModal() (admin-js.html)، بنفس نسق مرجع التصميم المعتمد -->
+
+<!-- ====== مودال تفاصيل الحضور ====== -->
+<div class="modal fade" id="attendDetailsModal" tabindex="-1" aria-labelledby="attendDetailsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <div class="d-flex flex-grow-1 align-items-center justify-content-between">
+          <h5 class="modal-title mb-0" id="attendDetailsLabel">
+            <i class="fas fa-calendar-check me-1"></i> أيام الحضور
+          </h5>
+          <button type="button" id="addAttendDayBtn" onclick="handleAddManualAttend()"
+                  class="btn btn-light btn-sm rounded-circle shadow-sm"
+                  title="إضافة يوم حضور يدوي" style="width:36px;height:36px;padding:0;">
+            <i class="bi bi-plus-lg fs-5 text-success"></i>
+          </button>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="attendDetailsSubtitle" class="text-muted small mb-3 text-end"></div>
+        <div id="attendDetailsBody" class="row g-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== مودال تفاصيل الأوراد ====== -->
+<div class="modal fade" id="recitDetailsModal" tabindex="-1" aria-labelledby="recitDetailsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title mb-0" id="recitDetailsLabel">
+          <i class="fas fa-book-open me-1"></i> الأوراد المسموعة
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="recitDetailsSubtitle" class="text-muted small mb-3 text-end"></div>
+        <div id="recitDetailsChecklist" class="mb-3"></div>
+        <div id="recitDetailsBody" class="row g-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== مودال تفاصيل الاختبارات ====== -->
+<div class="modal fade" id="examDetailsModal" tabindex="-1" aria-labelledby="examDetailsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title mb-0" id="examDetailsLabel">
+          <i class="fas fa-certificate me-1"></i> الاختبارات الناجحة
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="examDetailsSubtitle" class="text-muted small mb-3 text-end"></div>
+        <div id="examDetailsChecklist" class="mb-3"></div>
+        <div id="examDetailsBody" class="row g-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* بطاقات تفاصيل المودالات */
+  .detail-card {
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    transition: transform .15s ease, box-shadow .15s ease;
+    height: 100%;
+  }
+  .detail-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.10);
+  }
+  .detail-card .detail-card-header {
+    padding: .6rem .9rem;
+    color: #fff;
+    font-weight: 600;
+    font-size: .95rem;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+  }
+  .detail-card.attend-card .detail-card-header { background: linear-gradient(135deg,#198754,#157347); }
+  .detail-card.recit-card  .detail-card-header { background: linear-gradient(135deg,#0d6efd,#0a58ca); }
+  .detail-card.exam-card-ok .detail-card-header { background: linear-gradient(135deg,#198754,#157347); }
+  .detail-card.exam-card-fail .detail-card-header { background: linear-gradient(135deg,#dc3545,#b02a37); }
+
+  .detail-card .detail-card-body {
+    padding: .8rem .9rem;
+    font-size: .9rem;
+    background: #fff;
+  }
+  .detail-card .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .25rem 0;
+  }
+  .detail-card .detail-row + .detail-row {
+    border-top: 1px dotted rgba(0,0,0,0.08);
+    margin-top: .15rem;
+  }
+  .detail-card .detail-label {
+    color: #6c757d;
+    font-size: .82rem;
+  }
+  .detail-card .detail-value {
+    font-weight: 600;
+    color: #212529;
+  }
+
+  /* الشارات داخل البطاقات: ألوان قوية */
+  .detail-card .badge.grade-pass {
+    background-color: #198754; color: #fff;
+    font-size: .85rem; padding: .35em .7em;
+  }
+  .detail-card .badge.grade-fail {
+    background-color: #dc3545; color: #fff;
+    font-size: .85rem; padding: .35em .7em;
+  }
+  .detail-card .badge.grade-recit {
+    background-color: #0d6efd; color: #fff;
+    font-size: .85rem; padding: .35em .7em;
+  }
+
+  /* ملخّص + قائمة تحقّق كاملة (الأوراد المفروضة/الاختبارات المفروضة) — للتحقق من صحة النسبة
+     الظاهرة بالجدول، بطلب المستخدم صراحةً (2026-09-16). راجع openRecitDetails/renderRecitChecklist
+     بـadmin-js.html ومناقشات.md "شهادات الاجتياز" للسياق الكامل. */
+  .recit-summary-banner {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .7rem 1rem; border-radius: 10px;
+    background: #eef4ff; color: #0a58ca; font-weight: 600; font-size: .95rem;
+    margin-bottom: .9rem;
+  }
+  .recit-checklist-group { margin-bottom: .7rem; }
+  .recit-checklist-matn { font-weight: 700; font-size: .85rem; color: #495057; margin-bottom: .3rem; }
+  .recit-checklist-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .recit-chip {
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .3em .65em; border-radius: 20px; font-size: .8rem; font-weight: 600;
+    cursor: default;
+  }
+  .recit-chip-done { background-color: #198754; color: #fff; }
+  .recit-chip-pending { background-color: #e9ecef; color: #6c757d; }
+  .recit-chip-fail { background-color: #dc3545; color: #fff; }
+
+  /* الأرقام القابلة للنقر في الجدول */
+  .count-link {
+    cursor: pointer; border: 0; background: transparent; padding: 0;
+  }
+  .count-link .badge { font-size: .9rem; padding: .4em .8em; transition: transform .12s ease; }
+  .count-link:hover .badge { transform: scale(1.08); filter: brightness(1.05); }
+
+  /* عنصر فارغ عند غياب البيانات */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 70px 20px; text-align: center; color: var(--muted, #667180);
+  }
+  .empty-state i { width: 40px; height: 40px; font-size: 34px; color: #c8ccd1; }
+  .empty-state h3 { margin: 4px 0 0; color: var(--ink, #20252d); font-size: 17px; }
+  .empty-state p { margin: 0; max-width: 420px; font-size: 13px; }
+  .empty-note { padding: 30px; text-align: center; color: var(--muted, #667180); }
+</style>
+
+<template id="certManageTemp">
+  <div class="certManageRow col-sm-4 mb-3 mb-sm-0">
+    <div class="card rounded-4" style="box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+      <div class="card-body bg-danger rounded-top-4 pb-2">
+        <h5 class="card-title exam text-light text-end"></h5>
+        <p class="card-text"></p>
+      </div>
+      <ul class="list-group list-group-flush text-end px-2 fs-6 p-0">
+        <li class="list-group-item px-1 certDone"></li>
+        <li class="list-group-item px-1 certStill"></li>
+        <li class="list-group-item px-1 successExams"></li>
+        <li class="list-group-item px-1 unSuccessExams"></li>
+      </ul>
+      <div class="card-body">
+        <button class="checkWPconnection extractCertWP badge align-items-center p-2 text-success-emphasis bg-success-subtle border border-success-subtle rounded-pill">
+          <i class="bi bi-whatsapp fs-5" style="pointer-events: none !important;"></i>
+        </button>
+        <a class="card-link extractCert fs-6">استخراج الشهادات وإرسالها</a>
+        <div class="d-flex align-items-center text-center spinner d-none">
+          <strong class="text-secondary" role="status">جاري العمل ...</strong>
+          <div class="spinner-border text-secondary ms-auto" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="stWorksManTemp">
+  <div class="stWorksManRow col-sm-4 mb-3 mb-sm-0">
+    <div class="card rounded-4" style="box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+      <div class="card-body bg-info rounded-top-4 pb-2">
+        <h5 class="card-title exam text-light text-end"></h5>
+        <p class="card-text"></p>
+      </div>
+      <ul class="list-group list-group-flush text-end px-2 fs-6 p-0">
+        <li class="list-group-item px-1 certDone"></li>
+        <li class="list-group-item px-1 certStill"></li>
+      </ul>
+      <div class="card-body">
+        <button class="checkWPconnection extractCertWP badge align-items-center p-2 text-success-emphasis bg-success-subtle border border-success-subtle rounded-pill">
+          <i class="bi bi-whatsapp fs-5" style="pointer-events: none !important;"></i>
+        </button>
+        <a class="card-link extractWrksCert fs-6">استخراج الشهادات وإرسالها</a>
+        <div class="d-flex align-items-center text-center spinner d-none">
+          <strong class="text-secondary" role="status">جاري العمل ...</strong>
+          <div class="spinner-border text-secondary ms-auto" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,1429 @@
+<style>
+/* ============================================================
+   بوابة الطالب — تصميم جديد (مرحلة 1: الهيكل العام + تبويب الرئيسية)
+   كل شيء مُحصور داخل #studentPortal لتفادي أي تعارض مع صفحات أخرى.
+   المتغيرات مُسمّاة بادئة sp- لنفس السبب.
+   ============================================================ */
+#studentPortal {
+  --sp-basair: #b5262c;
+  --sp-basair-dark: #8d1d22;
+  --sp-qualification: #a77d52;
+  --sp-foundation: #325969;
+  --sp-rooting: #7b7364;
+  --sp-attainment: #8a4b3b;
+  --sp-ink: #343a40;
+  --sp-ink-soft: #4f5865;
+  --sp-muted: #7b8490;
+  --sp-line: #e5e8ec;
+  --sp-line-strong: #d9dde2;
+  --sp-surface: #ffffff;
+  --sp-surface-soft: #f5f6f7;
+  --sp-surface-warm: #faf7f5;
+  --sp-green: #167a58;
+  --sp-green-soft: #eaf6f0;
+  --sp-amber: #a76a14;
+  --sp-amber-soft: #fff5df;
+  --sp-blue: #376a83;
+  --sp-blue-soft: #eaf2f6;
+  --sp-red-soft: #fbebec;
+  --sp-shadow-sm: 0 3px 12px rgba(25, 31, 38, 0.05);
+  --sp-shadow-md: 0 12px 32px rgba(25, 31, 38, 0.08);
+  --sp-sidebar-width: 270px;
+  --sp-topbar-height: 72px;
+
+  font-family: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+  font-size: 16px;
+  color: var(--sp-ink);
+  background: var(--sp-surface-soft);
+  position: relative;
+  min-height: 100vh;
+}
+
+/* نسخة مُضمَّنة داخل صفحة أخرى بغلافها الخاص (مثال: تبويب "الملف الشخصي" في emp.html
+   المُضمَّن داخل .page-view من نظام admin-suite) — تُلغي الخلفية/الارتفاع الكامل التي
+   تفترض أن #studentPortal هو الغلاف الرئيسي للصفحة، وتُطابق ارتفاع الشريط العلوي الفعلي
+   لذلك الغلاف (--topbar admin-suite = 68px، بدل 72px الافتراضي لبوابة الطالب). */
+#studentPortal.sp-embedded { min-height: 0; background: transparent; position: static; --sp-topbar-height: 68px; }
+
+#studentPortal * { box-sizing: border-box; }
+#studentPortal button, #studentPortal input { font: inherit; }
+#studentPortal button { cursor: pointer; }
+#studentPortal a { color: inherit; text-decoration: none; }
+#studentPortal img { display: block; max-width: 100%; }
+#studentPortal svg, #studentPortal .bi { font-size: 19px; flex: 0 0 auto; line-height: 1; }
+/* بوابة بوتستراب أيقونات تُضيف vertical-align: -.125em على ::before، مفيد داخل نص
+   عادي لكن يكسر التمركز داخل المربعات الملوّنة (metric-icon/notice-icon/icon-btn...) */
+#studentPortal .sp-metric-icon i::before,
+#studentPortal .sp-notice-icon i::before,
+#studentPortal .sp-icon-btn i::before,
+#studentPortal .sp-stage-dot i::before { vertical-align: 0 !important; }
+#studentPortal .sp-metric-icon i,
+#studentPortal .sp-notice-icon i,
+#studentPortal .sp-icon-btn i,
+#studentPortal .sp-stage-dot i {
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+}
+#studentPortal h1, #studentPortal h2, #studentPortal h3, #studentPortal p { margin-top: 0; }
+#studentPortal h1, #studentPortal h2, #studentPortal h3, #studentPortal .sp-brand strong {
+  font-family: "Readex Pro", "IBM Plex Sans Arabic", sans-serif;
+}
+
+/* ============================================================
+   القائمة الجانبية
+   ============================================================ */
+#studentPortal .sp-sidebar {
+  position: fixed;
+  z-index: 70;
+  top: 0; right: 0; bottom: 0;
+  width: var(--sp-sidebar-width);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px 16px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)),
+    linear-gradient(160deg, #7f191e 0%, var(--sp-basair-dark) 48%, #681418 100%);
+  border-left: 1px solid rgba(255,255,255,0.08);
+  overflow-y: auto;
+  transition: transform 220ms ease;
+}
+#studentPortal .sp-sidebar::after {
+  content: "";
+  position: absolute; inset: 0;
+  opacity: 0.16;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath d='M37 28 L31.42 29.42 L34.36 34.36 L29.42 31.42 L28 37 L26.58 31.42 L21.64 34.36 L24.58 29.42 L19 28 L24.58 26.58 L21.64 21.64 L26.58 24.58 L28 19 L29.42 24.58 L34.36 21.64 L31.42 26.58 Z' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-size: 56px 56px;
+  background-repeat: repeat;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 96%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 96%);
+}
+
+#studentPortal .sp-brand {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 2px 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  position: relative; z-index: 1;
+}
+#studentPortal .sp-brand img { width: 74%; height: auto; display: block; margin: 0 auto; }
+
+#studentPortal .sp-student-mini {
+  display: flex; align-items: center; gap: 9px;
+  padding: 14px 8px; margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+#studentPortal .sp-avatar {
+  width: 38px; height: 38px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--sp-basair-dark);
+  background: #fff;
+  font-weight: 700; font-size: 14px;
+  overflow: hidden;
+}
+#studentPortal .sp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#studentPortal .sp-student-mini strong, #studentPortal .sp-student-mini span {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+}
+#studentPortal .sp-student-mini strong { font-size: 14px; }
+#studentPortal .sp-student-mini span { margin-top: 2px; color: rgba(255,255,255,0.55); font-size: 12px; }
+
+#studentPortal .sp-nav {
+  display: flex; flex: 1; flex-direction: column; gap: 4px;
+  padding-top: 10px;
+  position: relative; z-index: 1;
+}
+#studentPortal .sp-nav-item {
+  width: 100%; min-height: 44px;
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px;
+  border: 0; border-radius: 6px;
+  color: rgba(255,255,255,0.72);
+  background: transparent;
+  font-weight: 500; font-size: 15px;
+  text-align: right;
+  transition: color 160ms ease, background 160ms ease;
+}
+#studentPortal .sp-nav-item:hover { color: #fff; background: rgba(255,255,255,0.08); }
+#studentPortal .sp-nav-item.active {
+  color: var(--sp-basair-dark);
+  background: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(30,6,8,0.16);
+}
+#studentPortal .sp-nav-item span:first-of-type { flex: 1; }
+
+#studentPortal .sp-sidebar-footer {
+  margin-top: auto;
+  padding: 12px 8px 2px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  position: relative; z-index: 1;
+}
+#studentPortal .sp-logout-btn {
+  width: 100%;
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px;
+  border: 0; border-radius: 6px;
+  color: rgba(255,255,255,0.72);
+  background: rgba(255,255,255,0.06);
+  font-size: 14px; font-weight: 600;
+}
+#studentPortal .sp-logout-btn:hover { color: #fff; background: rgba(255,255,255,0.14); }
+
+#studentPortal .sp-footer-card {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+}
+#studentPortal .sp-footer-info { flex: 1; min-width: 0; }
+#studentPortal .sp-footer-info strong {
+  display: block; color: #fff; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#studentPortal .sp-footer-info span {
+  display: block; margin-top: 2px; color: rgba(255,255,255,0.55); font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#studentPortal .sp-footer-logout {
+  flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.08); font-size: 15px;
+}
+#studentPortal .sp-footer-logout:hover { color: #fff; background: rgba(255,255,255,0.18); }
+
+#studentPortal .sp-sidebar-overlay {
+  position: fixed; z-index: 60; inset: 0;
+  display: none;
+  background: rgba(22,24,28,0.46);
+}
+
+/* ============================================================
+   شريط "وضع معاينة الإدارة" (يظهر فقط عند فتح صفحة طالب من لوحة الإدارة)
+   ============================================================ */
+#studentPortal .sp-admin-preview-bar {
+  position: fixed; z-index: 200; top: 0; left: 0; right: 0;
+  height: 40px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 0 16px;
+  color: #fff; background: linear-gradient(90deg, #a76a14, #c98a1f);
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+#studentPortal .sp-admin-preview-bar strong { font-weight: 800; }
+#studentPortal .sp-admin-preview-bar button {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 26px; padding: 3px 12px;
+  border: 1px solid rgba(255,255,255,0.6); border-radius: 6px;
+  color: #fff; background: rgba(255,255,255,0.12);
+  font-size: 12px; font-weight: 700;
+}
+#studentPortal .sp-admin-preview-bar button:hover { background: rgba(255,255,255,0.24); }
+#studentPortal.sp-preview-mode .sp-sidebar { top: 40px; }
+#studentPortal.sp-preview-mode .sp-app-shell { padding-top: 40px; }
+
+/* ============================================================
+   القسم الرئيسي والشريط العلوي
+   ============================================================ */
+#studentPortal .sp-app-shell { min-height: 100vh; margin-right: var(--sp-sidebar-width); }
+
+#studentPortal .sp-topbar {
+  position: sticky; z-index: 50; top: 0;
+  min-height: var(--sp-topbar-height);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; padding: 12px 28px;
+  background: rgba(255,255,255,0.94);
+  border-bottom: 1px solid var(--sp-line);
+  backdrop-filter: blur(14px);
+}
+#studentPortal .sp-topbar-start { display: flex; align-items: center; gap: 12px; }
+#studentPortal .sp-mobile-menu { display: none; }
+#studentPortal .sp-breadcrumb { font-weight: 700; font-size: 16px; color: var(--sp-ink); }
+
+#studentPortal .sp-icon-btn {
+  width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--sp-line); border-radius: 7px;
+  color: var(--sp-ink-soft); background: var(--sp-surface);
+  position: relative;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+#studentPortal .sp-icon-btn:hover { color: var(--sp-basair); border-color: rgba(181,38,44,0.32); background: var(--sp-red-soft); }
+
+#studentPortal .sp-notif-dot {
+  position: absolute;
+  top: -6px;
+  left: -5px;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--sp-basair);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#studentPortal .sp-topbar-actions { display: flex; align-items: center; gap: 10px; position: relative; }
+
+#studentPortal .sp-notification-btn { position: relative; }
+
+#studentPortal .sp-user-trigger {
+  display: flex; align-items: center; gap: 9px;
+  padding: 3px 4px 3px 8px;
+  border: 0; border-radius: 7px;
+  color: var(--sp-ink); background: transparent;
+}
+#studentPortal .sp-user-trigger:hover { background: var(--sp-surface-soft); }
+#studentPortal .sp-user-trigger strong, #studentPortal .sp-user-trigger span { display: block; text-align: right; }
+#studentPortal .sp-user-trigger strong { font-size: 14px; }
+#studentPortal .sp-user-trigger span { margin-top: 2px; color: var(--sp-muted); font-size: 13px; }
+#studentPortal .sp-user-trigger > .bi { font-size: 15px; color: var(--sp-muted); }
+
+#studentPortal .sp-popover {
+  position: absolute; z-index: 90; top: calc(100% + 10px); left: 0;
+  width: 320px; overflow: hidden;
+  border: 1px solid var(--sp-line); border-radius: 8px;
+  background: #fff; box-shadow: var(--sp-shadow-md);
+  color: var(--sp-ink);
+}
+#studentPortal .sp-popover[hidden] { display: none; }
+#studentPortal .sp-user-popover { width: 215px; padding: 6px; }
+#studentPortal .sp-user-popover a, #studentPortal .sp-user-popover button {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 10px 11px; border: 0; border-radius: 6px;
+  color: var(--sp-ink-soft); background: transparent;
+  text-align: right; font-size: 14px;
+}
+#studentPortal .sp-user-popover a:hover, #studentPortal .sp-user-popover button:hover {
+  color: var(--sp-basair); background: var(--sp-red-soft);
+}
+
+#studentPortal .sp-popover-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--sp-line);
+}
+#studentPortal .sp-popover-head strong { font-size: 14px; }
+#studentPortal .sp-popover-head button { border: 0; color: var(--sp-basair); background: transparent; font-size: 13px; }
+#studentPortal .sp-notification-popover > a {
+  display: grid; grid-template-columns: 38px 1fr; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--sp-line);
+}
+#studentPortal .sp-notification-popover > a:hover { background: var(--sp-surface-soft); }
+#studentPortal .sp-notification-popover > a:last-child { border-bottom: 0; }
+#studentPortal .sp-notification-popover strong, #studentPortal .sp-notification-popover small { display: block; }
+#studentPortal .sp-notification-popover strong { margin-bottom: 4px; font-size: 14px; }
+#studentPortal .sp-notification-popover small { color: var(--sp-muted); font-size: 13px; }
+#studentPortal .sp-notice-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 7px; }
+#studentPortal .sp-notice-icon i { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+#studentPortal .sp-notice-exam { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-notice-attend { color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-notice-recite { color: var(--sp-amber); background: var(--sp-amber-soft); }
+#studentPortal .sp-notification-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 30px 16px; color: var(--sp-muted); font-size: 12px; }
+#studentPortal .sp-notification-empty i { font-size: 22px; }
+
+/* ============================================================
+   المحتوى الرئيسي: عناصر مشتركة
+   ============================================================ */
+#studentPortal .sp-main { width: min(1400px, 100%); margin: 0 auto; padding: 26px 28px 40px; }
+
+#studentPortal .sp-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+#studentPortal .sp-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--sp-basair); font-size: 12px; font-weight: 700; }
+#studentPortal .sp-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sp-basair); box-shadow: 0 0 0 4px rgba(181,38,44,0.1); }
+#studentPortal .sp-sticky-alert { position: sticky; top: calc(var(--sp-topbar-height) + 10px); z-index: 40; }
+#studentPortal .sp-page-heading h1 { margin: 5px 0; font-size: 26px; }
+#studentPortal .sp-page-heading p { margin: 0; color: var(--sp-muted); font-size: 14px; }
+#studentPortal .sp-heading-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+
+#studentPortal .sp-stage-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 40px; padding: 5px 11px;
+  border: 1px solid #dedbd7; border-radius: 7px;
+  color: var(--sp-rooting); background: #f6f4f1; font-size: 13px; font-weight: 600;
+}
+#studentPortal .sp-stage-symbol {
+  width: 25px; height: 25px; display: grid; place-items: center;
+  border-radius: 50%; color: #fff; background: var(--sp-rooting); font-size: 12px;
+}
+
+#studentPortal .sp-btn-primary, #studentPortal .sp-btn-secondary, #studentPortal .sp-btn-text, #studentPortal .sp-btn-full {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 7px; font-weight: 700; font-size: 14px;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+#studentPortal .sp-btn-primary {
+  min-height: 42px; padding: 10px 17px; border: 0; color: #fff;
+  background: linear-gradient(135deg, var(--sp-basair-dark), var(--sp-basair));
+  box-shadow: 0 8px 18px rgba(141,29,34,0.2);
+}
+#studentPortal .sp-btn-primary:hover { background: linear-gradient(135deg, #78171c, #a82026); color: #fff; }
+#studentPortal .sp-btn-secondary {
+  min-height: 40px; padding: 9px 14px;
+  border: 1px solid var(--sp-line-strong); color: var(--sp-ink-soft); background: #fff;
+}
+#studentPortal .sp-btn-secondary:hover { color: var(--sp-basair); border-color: rgba(181,38,44,0.35); background: var(--sp-red-soft); }
+#studentPortal .sp-btn-text { min-height: 32px; padding: 4px 0; border: 0; color: var(--sp-basair); background: transparent; font-size: 13px; }
+#studentPortal .sp-btn-text:hover { color: var(--sp-basair-dark); }
+#studentPortal .sp-btn-text.light { color: rgba(255,255,255,0.84); }
+#studentPortal .sp-btn-text.light:hover { color: #fff; }
+#studentPortal .sp-btn-full {
+  width: 100%; min-height: 38px; margin-top: 14px;
+  border: 1px solid var(--sp-line); color: var(--sp-ink-soft); background: var(--sp-surface-soft); font-size: 13px;
+}
+#studentPortal .sp-btn-full:hover { color: var(--sp-basair); border-color: rgba(181,38,44,0.25); background: var(--sp-red-soft); }
+
+/* ============================================================
+   قسم الرئيسية: بطاقة الخطوة التالية + الرحلة العلمية
+   ============================================================ */
+#studentPortal .sp-focus-layout { display: grid; direction: rtl; grid-template-columns: minmax(0,1.8fr) minmax(300px,0.9fr); gap: 16px; margin-bottom: 16px; }
+
+#studentPortal .sp-panel {
+  border: 1px solid var(--sp-line); border-radius: 8px;
+  background: var(--sp-surface); box-shadow: var(--sp-shadow-sm);
+  padding: 20px;
+}
+
+#studentPortal .sp-next-action {
+  min-height: 240px;
+  display: grid; direction: rtl; grid-template-columns: minmax(0,1fr) 180px; align-items: center; gap: 24px;
+  padding: 26px 28px;
+  color: #fff;
+  background: linear-gradient(130deg, rgba(107,19,24,0.97), rgba(181,38,44,0.94)), #8d1d22;
+  border-color: rgba(141,29,34,0.7);
+  box-shadow: 0 14px 30px rgba(104,20,25,0.14);
+  overflow: hidden;
+  position: relative;
+}
+#studentPortal .sp-next-action::after {
+  content: "";
+  position: absolute; inset: 0 45% 0 0;
+  opacity: 0.16;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M26.5 20 L22.49 21.03 L24.60 24.60 L21.03 22.49 L20 26.5 L18.97 22.49 L15.40 24.60 L17.51 21.03 L13.5 20 L17.51 18.97 L15.40 15.40 L18.97 17.51 L20 13.5 L21.03 17.51 L24.60 15.40 L22.49 18.97 Z' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-size: 40px 40px;
+  background-repeat: repeat;
+}
+#studentPortal .sp-next-action-copy {
+  position: relative; z-index: 1; text-align: right;
+  filter: blur(5px); pointer-events: none; user-select: none;
+}
+#studentPortal .sp-lesson-progress {
+  position: relative; z-index: 1;
+  filter: blur(5px); pointer-events: none; user-select: none;
+}
+#studentPortal .sp-coming-soon-overlay {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(88,15,18,0.55);
+  border-radius: inherit;
+  color: #fff; text-align: center;
+}
+#studentPortal .sp-coming-soon-overlay i { font-size: 30px; }
+#studentPortal .sp-coming-soon-overlay span { font-size: 16px; font-weight: 800; }
+#studentPortal .sp-panel-kicker { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; color: rgba(255,255,255,0.72); font-size: 12px; font-weight: 700; }
+#studentPortal .sp-next-action h2 { margin-bottom: 9px; font-size: 23px; line-height: 1.5; text-align: right; }
+#studentPortal .sp-next-action p { margin-bottom: 16px; color: rgba(255,255,255,0.7); font-size: 13px; line-height: 1.8; text-align: right; }
+#studentPortal .sp-lesson-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 18px; color: rgba(255,255,255,0.75); font-size: 12px; }
+#studentPortal .sp-lesson-meta span { display: inline-flex; align-items: center; gap: 5px; }
+#studentPortal .sp-action-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#studentPortal .sp-next-action .sp-btn-primary { color: var(--sp-basair-dark); background: #fff; box-shadow: 0 8px 18px rgba(55,6,9,0.16); }
+
+#studentPortal .sp-lesson-progress { display: grid; place-items: center; gap: 12px; padding-right: 22px; border-right: 1px solid rgba(255,255,255,0.17); }
+#studentPortal .sp-progress-ring {
+  width: 112px; height: 112px; border-radius: 50%; position: relative;
+  display: grid; place-items: center;
+  background: conic-gradient(#fff calc(var(--sp-progress,0) * 1%), rgba(255,255,255,0.16) 0);
+}
+#studentPortal .sp-progress-ring::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--sp-basair-dark); }
+#studentPortal .sp-progress-ring > span { position: relative; z-index: 1; text-align: center; }
+#studentPortal .sp-progress-ring strong { display: block; font-family: "Readex Pro", sans-serif; font-size: 24px; }
+#studentPortal .sp-progress-ring small { display: block; color: rgba(255,255,255,0.6); font-size: 12px; }
+#studentPortal .sp-progress-caption { text-align: center; font-size: 12px; }
+#studentPortal .sp-progress-caption strong { display: block; }
+#studentPortal .sp-progress-caption span { display: block; margin-top: 3px; color: rgba(255,255,255,0.6); }
+
+#studentPortal .sp-panel-heading { display: flex; direction: rtl; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+#studentPortal .sp-panel-heading > div { text-align: right; }
+#studentPortal .sp-panel-heading h2 { margin: 0; font-size: 18px; text-align: right; }
+#studentPortal .sp-section-kicker { display: block; margin-bottom: 4px; color: var(--sp-basair); font-size: 12px; font-weight: 700; text-align: right; }
+
+#studentPortal .sp-stage-timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+#studentPortal .sp-stage-timeline li { min-height: 46px; display: grid; direction: rtl; grid-template-columns: 31px 1fr auto; align-items: center; gap: 10px; position: relative; }
+#studentPortal .sp-stage-timeline li > div { text-align: right; width: 100%; }
+#studentPortal .sp-stage-timeline li:not(:last-child)::after {
+  content: ""; position: absolute; z-index: 0; top: 36px; right: 15px; bottom: -10px; width: 1px; background: var(--sp-line-strong);
+}
+#studentPortal .sp-stage-timeline li.sp-complete::after { background: var(--sp-green); }
+#studentPortal .sp-stage-dot {
+  width: 31px; height: 31px; display: grid; place-items: center; z-index: 1;
+  border: 3px solid #fff; border-radius: 50%; color: #fff;
+  box-shadow: 0 0 0 1px var(--sp-line-strong); font-size: 12px; font-weight: 700;
+}
+#studentPortal .sp-stage-dot.sp-qualification { background: var(--sp-qualification); }
+#studentPortal .sp-stage-dot.sp-foundation { background: var(--sp-foundation); }
+#studentPortal .sp-stage-dot.sp-rooting { background: var(--sp-rooting); }
+#studentPortal .sp-stage-dot.sp-attainment { background: var(--sp-attainment); }
+/* بادج شهادة اجتياز ذهبي (applyStageCertBadges، js.html) — يستبدل نقطة المرحلة العادية <span>
+   بـ<a> قابل للضغط يفتح الشهادة، فوق أي لون مرحلة (qualification/foundation/...) بنفس الأولوية. */
+#studentPortal a.sp-stage-dot.sp-cert-badge {
+  background: linear-gradient(145deg, #f3ce6b, #c9971f); text-decoration: none; cursor: pointer;
+  box-shadow: 0 0 0 1px #c9971f, 0 0 0 3px rgba(201,151,31,0.18);
+}
+#studentPortal a.sp-stage-dot.sp-cert-badge:hover { filter: brightness(1.06); }
+#studentPortal a.sp-stage-dot.sp-cert-badge i { color: #fff; font-size: 14px; }
+#studentPortal .sp-stage-timeline div strong { display: block; font-size: 13px; }
+#studentPortal .sp-stage-timeline div small { display: block; margin-top: 2px; color: var(--sp-muted); font-size: 12px; }
+#studentPortal .sp-stage-timeline li > b { color: var(--sp-green); font-size: 12px; }
+#studentPortal .sp-stage-timeline li.sp-current { margin: 5px -8px; padding: 7px 8px; border: 1px solid #e2ddd8; border-radius: 6px; background: #f8f6f4; }
+#studentPortal .sp-stage-timeline li.sp-current > b { color: var(--sp-rooting); }
+#studentPortal .sp-stage-timeline li > .bi { font-size: 15px; color: #a2a8b0; }
+
+/* ============================================================
+   شبكة الإحصاءات
+   ============================================================ */
+#studentPortal .sp-metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+#studentPortal .sp-metric-card { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 12px; min-height: 104px; padding: 16px; }
+#studentPortal .sp-metric-icon { width: 42px; height: 42px; display: grid !important; place-items: center; border-radius: 7px; }
+#studentPortal .sp-metric-icon i { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+#studentPortal .sp-metric-icon.attendance { color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-metric-icon.lesson { color: var(--sp-foundation); background: var(--sp-blue-soft); }
+#studentPortal .sp-metric-icon.recitation { color: var(--sp-amber); background: var(--sp-amber-soft); }
+#studentPortal .sp-metric-icon.exam { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-metric-card small { display: block; color: var(--sp-muted); font-size: 12px; }
+#studentPortal .sp-metric-card strong { display: block; margin: 2px 0 3px; font-family: "Readex Pro", sans-serif; font-size: 22px; }
+#studentPortal .sp-metric-card span { display: block; color: var(--sp-muted); font-size: 12px; }
+#studentPortal .sp-metric-card span.sp-positive { color: var(--sp-green); }
+#studentPortal .sp-metric-card strong em { color: var(--sp-muted); font-family: inherit; font-size: 12px; font-style: normal; }
+#studentPortal .sp-metrics-grid.sp-cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+/* ============================================================
+   تبويب "الاختبارات والشهادات": شبكة بطاقات الاختبارات (4 بجوار بعض بالشاشات الكبيرة،
+   بطاقة واحدة بالهاتف) — بديل قائمة sp-task-list السابقة. راجع funcs-js.html: setPastExams()
+   ============================================================ */
+#studentPortal .sp-exam-cards-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+#studentPortal .sp-exam-card { display: flex; flex-direction: column; gap: 10px; text-align: center; align-items: center; }
+#studentPortal .sp-exam-card-icon { width: 42px; height: 42px; display: grid !important; place-items: center; border-radius: 7px; color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-exam-card strong { display: block; font-size: 14px; }
+#studentPortal .sp-exam-card small { display: block; color: var(--sp-muted); font-size: 11px; }
+#studentPortal .sp-exam-card .sp-exam-card-action { margin-top: auto; padding-top: 4px; }
+#studentPortal .sp-exam-cards-divider { grid-column: 1 / -1; padding: 10px 16px; background: var(--sp-surface-soft); color: var(--sp-muted); font-size: 12px; font-weight: 700; border-radius: 8px; }
+#studentPortal #examsStatsGrid.sp-exam-loading, #studentPortal #pastExamsList.sp-exam-loading { position: relative; min-height: 220px; }
+
+/* ============================================================
+   تبويب "المذهب الفقهي": بطاقات مذاهب قابلة للضغط (بدل sp-task-list صف بصف) — نفس أسلوب
+   بطاقات اختيار صيغة التصدير (CSV/PDF/Excel) المرجعي: بطاقة عادية بلا شارة، تتحول لحدود/
+   خلفية خضراء + شارة صح أعلى الجانب البادئ عند الاختيار. راجع funcs-js.html: renderMazhabSelection()
+   ============================================================ */
+#studentPortal .sp-mazhab-cards-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+#studentPortal .sp-mazhab-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+  padding: 26px 16px 20px; border: 1.5px solid var(--sp-line); border-radius: 10px;
+  background: var(--sp-surface); color: inherit; text-decoration: none; cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+#studentPortal .sp-mazhab-card:hover { border-color: rgba(181,38,44,0.35); background: var(--sp-red-soft); color: inherit; }
+#studentPortal .sp-mazhab-card-check {
+  position: absolute; top: 12px; inset-inline-start: 12px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--sp-green); color: #fff; font-size: 13px;
+  opacity: 0; transform: scale(0.7); transition: opacity 160ms ease, transform 160ms ease;
+}
+#studentPortal .sp-mazhab-card.selected { border-color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-mazhab-card.selected:hover { background: var(--sp-green-soft); }
+#studentPortal .sp-mazhab-card.selected .sp-mazhab-card-check { opacity: 1; transform: scale(1); }
+/* تغيير المذهب مغلق (allowMazhabChange=false) وطالب اختار بالفعل — بطاقاته غير قابلة للنقر،
+   والبطاقة المختارة تبقى بمظهرها الكامل بينما البقية تُعتَّم لوضوح أنها لم تعد خيارات متاحة. */
+#studentPortal .sp-mazhab-card.locked { cursor: default; pointer-events: none; }
+#studentPortal .sp-mazhab-card.locked:not(.selected) { opacity: .6; }
+#studentPortal .sp-mazhab-card-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 8px; color: var(--sp-basair); background: var(--sp-red-soft); font-size: 20px; }
+#studentPortal .sp-mazhab-card strong { font-size: 15px; }
+#studentPortal .sp-mazhab-card small { color: var(--sp-muted); font-size: 12px; line-height: 1.6; }
+
+/* ============================================================
+   شارات ومؤشرات عامة تُستخدم عبر أكثر من قسم
+   ============================================================ */
+#studentPortal .sp-status-pill { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 3px 7px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+#studentPortal .sp-status-pill.success { color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-status-pill.warning { color: var(--sp-amber); background: var(--sp-amber-soft); }
+#studentPortal .sp-status-pill.danger { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-count-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 4px 8px; border-radius: 6px; color: var(--sp-basair); background: var(--sp-red-soft); font-size: 12px; font-weight: 600; }
+#studentPortal .sp-count-badge.warm { color: var(--sp-amber); background: var(--sp-amber-soft); }
+
+/* ============================================================
+   تذييل عائم + إشعار Toast (اختياري، مشترك)
+   ============================================================ */
+#studentPortal .sp-toast {
+  position: fixed; z-index: 150; left: 24px; bottom: 24px;
+  max-width: min(360px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 9px;
+  padding: 12px 15px; border-radius: 7px;
+  color: #fff; background: #23282f; box-shadow: var(--sp-shadow-md);
+  opacity: 0; transform: translateY(12px); pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease; font-size: 13px;
+}
+#studentPortal .sp-toast.show { opacity: 1; transform: translateY(0); }
+
+#studentPortal .sp-mobile-bottom-nav { display: none; }
+
+/* ============================================================
+   الاستجابة للشاشات الصغيرة
+   ============================================================ */
+@media (max-width: 1180px) {
+  #studentPortal { --sp-sidebar-width: 240px; }
+  #studentPortal .sp-focus-layout { grid-template-columns: 1fr; }
+  #studentPortal .sp-metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  #studentPortal .sp-metrics-grid.sp-cols-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  #studentPortal .sp-exam-cards-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+@media (max-width: 900px) {
+  #studentPortal { --sp-topbar-height: 62px; }
+  #studentPortal .sp-sidebar { width: 280px; transform: translateX(100%); }
+  #studentPortal.sp-sidebar-open .sp-sidebar { transform: translateX(0); }
+  #studentPortal.sp-sidebar-open .sp-sidebar-overlay { display: block; }
+  #studentPortal .sp-app-shell { margin-right: 0; }
+  #studentPortal .sp-mobile-menu { display: inline-flex; align-items: center; justify-content: center; }
+  #studentPortal .sp-user-trigger span, #studentPortal .sp-user-trigger strong { display: none; }
+}
+
+@media (max-width: 640px) {
+  #studentPortal .sp-main { padding: 18px 12px 30px; }
+  #studentPortal .sp-page-heading { flex-direction: column; align-items: flex-start; }
+  #studentPortal .sp-heading-actions { width: 100%; }
+  #studentPortal .sp-heading-actions .sp-stage-badge, #studentPortal .sp-heading-actions .sp-btn-secondary { flex: 1; }
+  #studentPortal .sp-next-action { grid-template-columns: 1fr; padding: 20px 16px; min-height: auto; }
+  #studentPortal .sp-lesson-progress { grid-template-columns: 90px 1fr; place-items: center start; padding: 16px 0 0; border-top: 1px solid rgba(255,255,255,0.17); border-right: 0; }
+  #studentPortal .sp-progress-ring { width: 82px; height: 82px; }
+  #studentPortal .sp-progress-caption { text-align: right; }
+  #studentPortal .sp-metrics-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  #studentPortal .sp-metric-card { grid-template-columns: 1fr; padding: 13px; gap: 8px; }
+  #studentPortal .sp-metrics-grid.sp-cols-3 { grid-template-columns: 1fr; }
+  #studentPortal .sp-exam-cards-grid { grid-template-columns: 1fr; }
+  #studentPortal .sp-mazhab-cards-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   تبويب "المقررات": متصفح ملفات Google Drive (شبكة كروت + درج جانبي)
+   يستبدل iframe عرض المجلد القديم — راجع design-guidelines.md (المرحلة 2)
+   ============================================================ */
+/* الجزء أعلى الشبكة: ملخص الحقيبة + شريط الأدوات */
+#studentPortal .sp-library-summary {
+  display: grid; grid-template-columns: minmax(220px,1fr) auto; align-items: center; gap: 20px;
+  margin-bottom: 14px; padding: 16px 18px;
+  border: 1px solid var(--sp-line); border-radius: 8px;
+  background: linear-gradient(100deg, rgba(141,29,34,0.05), transparent 42%), var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
+}
+#studentPortal .sp-summary-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+#studentPortal .sp-summary-symbol {
+  width: 46px; height: 46px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: 8px; color: #fff; background: linear-gradient(135deg, var(--sp-basair-dark), var(--sp-basair)); font-size: 19px;
+}
+#studentPortal .sp-summary-copy small { display: block; color: var(--sp-basair); font-size: 11px; font-weight: 700; }
+#studentPortal .sp-summary-copy h2 { margin: 3px 0; font-size: 15px; }
+#studentPortal .sp-summary-copy p { margin: 0; color: var(--sp-muted); font-size: 11px; }
+#studentPortal .sp-storage-note { display: flex; align-items: center; gap: 8px; color: var(--sp-green); }
+#studentPortal .sp-storage-note i { font-size: 22px; }
+#studentPortal .sp-storage-note strong { display: block; font-size: 11px; }
+#studentPortal .sp-storage-note small { display: block; margin-top: 2px; color: var(--sp-muted); font-size: 10px; }
+
+#studentPortal .sp-library-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+  margin-bottom: 18px; padding: 9px;
+  border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
+}
+#studentPortal .sp-library-search {
+  display: flex; align-items: center; flex: 1; min-width: 200px; gap: 7px; height: 56px; padding: 0 15px;
+  border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface-soft);
+}
+#studentPortal .sp-library-search:focus-within { border-color: rgba(181,38,44,0.35); background: #fff; box-shadow: 0 0 0 3px rgba(181,38,44,0.06); }
+#studentPortal .sp-library-search i { color: var(--sp-muted); font-size: 13px; }
+#studentPortal .sp-library-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--sp-ink); font-size: 12px; }
+#studentPortal .sp-search-clear { flex: 0 0 auto; border: 0; padding: 0; background: transparent; color: var(--sp-muted); font-size: 14px; line-height: 1; display: grid; place-items: center; }
+#studentPortal .sp-search-clear:hover { color: var(--sp-basair); }
+#studentPortal .sp-filter-group, #studentPortal .sp-view-switch {
+  display: inline-flex; align-items: center; height: 56px; padding: 4px; border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface-soft); box-sizing: border-box;
+}
+#studentPortal .sp-filter-group button, #studentPortal .sp-view-switch button {
+  height: 100%; border: 0; border-radius: 5px; color: var(--sp-muted); background: transparent; font-size: 11px; font-weight: 600; padding: 0 11px;
+}
+#studentPortal .sp-view-switch button { width: 34px; padding: 0; display: grid; place-items: center; }
+#studentPortal .sp-filter-group button.active, #studentPortal .sp-view-switch button.active { color: var(--sp-basair); background: #fff; box-shadow: 0 2px 7px rgba(24,31,38,0.08); }
+
+#studentPortal .sp-section-title-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+#studentPortal .sp-section-title-line > div { display: flex; align-items: center; gap: 9px; }
+#studentPortal .sp-section-title-line h2 { margin: 0; font-size: 16px; }
+#studentPortal .sp-section-title-line > div > span { padding: 3px 8px; border-radius: 5px; color: var(--sp-muted); background: var(--sp-surface-soft); font-size: 11px; }
+#studentPortal .sp-section-title-line > p { margin: 0; color: var(--sp-muted); font-size: 11px; }
+
+/* شبكة الكروت */
+#studentPortal .curriculum-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+}
+#studentPortal .curriculum-grid.list-view { grid-template-columns: 1fr; }
+#studentPortal .curriculum-grid.list-view .curriculum-card { display: grid; grid-template-columns: 130px 1fr; }
+#studentPortal .curriculum-grid.list-view .course-cover { height: 100%; }
+#studentPortal .curriculum-card {
+  cursor: pointer; overflow: hidden; text-align: right;
+  border: 1px solid var(--sp-line); border-radius: 10px;
+  background: var(--sp-surface); box-shadow: var(--sp-shadow-sm);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+#studentPortal .curriculum-card:hover {
+  transform: translateY(-3px); box-shadow: var(--sp-shadow-md); border-color: rgba(181,38,44,0.25);
+}
+#studentPortal .curriculum-card .course-cover {
+  position: relative; height: 96px; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--sp-basair-dark), var(--sp-basair));
+  color: rgba(255,255,255,0.92); font-size: 34px;
+}
+#studentPortal .curriculum-card .file-count {
+  position: absolute; top: 9px; left: 9px; z-index: 1;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 7px; border: 1px solid rgba(255,255,255,0.25); border-radius: 5px;
+  color: #fff; background: rgba(24,29,34,0.42); backdrop-filter: blur(8px); font-size: 10px; font-weight: 600;
+}
+#studentPortal .curriculum-card .curriculum-body { padding: 12px 14px; }
+#studentPortal .course-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#studentPortal .course-category { color: var(--sp-basair); font-size: 10px; font-weight: 700; }
+#studentPortal .curriculum-card h3 {
+  margin: 8px 0 10px; font-size: 14px; line-height: 1.5; font-family: "Readex Pro","IBM Plex Sans Arabic",sans-serif;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+#studentPortal .course-progress-row { margin-bottom: 12px; }
+#studentPortal .course-progress-row > div:first-child { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: var(--sp-muted); font-size: 11px; }
+#studentPortal .course-progress-row strong { color: var(--sp-basair); }
+#studentPortal .linear-progress { height: 6px; border-radius: 4px; background: var(--sp-line); overflow: hidden; }
+#studentPortal .linear-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--sp-basair); }
+#studentPortal .card-actions .sp-btn-secondary { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* الدرج الجانبي (Drawer) */
+#studentPortal .course-drawer-overlay {
+  position: fixed; z-index: 300; inset: 0; background: rgba(22,24,28,0.5);
+}
+#studentPortal .course-drawer {
+  position: fixed; z-index: 310; top: 0; bottom: 0; left: 0;
+  width: min(420px, 100vw); padding: 18px;
+  background: var(--sp-surface); box-shadow: 18px 0 48px rgba(20,24,29,0.2);
+  overflow-y: auto;
+  transform: translateX(-102%); transition: transform 220ms ease;
+}
+#studentPortal .course-drawer.open { transform: translateX(0); }
+#studentPortal .course-drawer-head { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
+#studentPortal .course-drawer-close {
+  width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center;
+  border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface); color: var(--sp-ink-soft);
+}
+#studentPortal .course-drawer-course-head {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--sp-line);
+}
+#studentPortal .course-drawer-icon {
+  width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: 8px; color: #fff; background: var(--sp-basair); font-size: 20px;
+}
+#studentPortal .course-drawer-course-head h3 { margin: 0; font-size: 16px; flex: 1; }
+#studentPortal .course-drawer-search {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 0 12px; min-height: 42px;
+  border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface-soft);
+}
+#studentPortal .course-drawer-search i { color: var(--sp-muted); font-size: 13px; }
+#studentPortal .course-drawer-search input { flex: 1; border: 0; background: transparent; outline: 0; font-size: 13px; color: var(--sp-ink); }
+
+/* عناصر الملفات/المجلدات داخل الدرج */
+#studentPortal .material-item-wrap { margin-bottom: 7px; }
+#studentPortal .material-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 46px;
+  padding: 9px 12px; border: 1px solid var(--sp-line); border-radius: 8px;
+  background: var(--sp-surface); color: var(--sp-ink); text-align: right; font-size: 13px;
+}
+#studentPortal .material-item:hover { border-color: rgba(181,38,44,0.25); background: var(--sp-red-soft); }
+#studentPortal .material-icon { flex: 0 0 auto; width: 26px; text-align: center; color: var(--sp-basair); font-size: 15px; }
+#studentPortal .material-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#studentPortal .material-caret { flex: 0 0 auto; color: var(--sp-muted); font-size: 12px; transition: transform 160ms ease; }
+#studentPortal .material-folder.expanded .material-caret { transform: rotate(-90deg); }
+#studentPortal .material-sublevel { margin: 7px 0 0 18px; padding-right: 10px; border-right: 2px solid var(--sp-line); }
+#studentPortal .material-empty { font-size: 12px; }
+
+@media (max-width: 640px) {
+  #studentPortal .curriculum-grid { grid-template-columns: 1fr; gap: 10px; }
+  #studentPortal .curriculum-card .course-cover { height: 76px; font-size: 26px; }
+  #studentPortal .course-drawer { width: 100vw; padding: 14px; }
+  #studentPortal .sp-library-summary { grid-template-columns: 1fr; }
+  #studentPortal .sp-storage-note { display: none; }
+  #studentPortal .sp-library-toolbar { align-items: stretch; }
+  #studentPortal .sp-library-search { flex: 1 1 100%; }
+  #studentPortal .sp-filter-group { flex: 1 1 auto; justify-content: center; }
+  #studentPortal .sp-view-switch { flex: 0 0 auto; justify-content: center; }
+  #studentPortal .curriculum-grid.list-view .curriculum-card { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   تبويب "التسميع والأوراد": ملخّص إحصائي + قائمة مهام (task-list)
+   يستبدل جدول Bootstrap القديم — راجع design-guidelines.md (المرحلة 3)
+   ============================================================ */
+#studentPortal .sp-recitation-overview {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 18px; border: 1px solid var(--sp-line); border-radius: 8px;
+  background: var(--sp-surface-soft); box-shadow: var(--sp-shadow-sm);
+}
+/* نسخة بإحصائية واحدة فقط (تبويب الحضور) — تدرّج أحمر داكن ونص أبيض، بدل الشكل الفاتح المحايد */
+#studentPortal .sp-recitation-overview.sp-cols-1 {
+  grid-template-columns: 1fr; border: 0;
+  background: linear-gradient(160deg, #7f191e 0%, var(--sp-basair-dark) 48%, #681418 100%);
+}
+#studentPortal .sp-recitation-overview.sp-cols-1 > div { padding: 18px 8px; }
+#studentPortal .sp-recitation-overview.sp-cols-1 strong { color: #fff; font-size: 28px; }
+#studentPortal .sp-recitation-overview.sp-cols-1 span { color: rgba(255,255,255,.8); }
+#studentPortal .sp-recitation-overview > div { padding: 14px 8px; border-inline-start: 1px solid var(--sp-line); text-align: center; }
+#studentPortal .sp-recitation-overview > div:first-child { border-inline-start: 0; }
+#studentPortal .sp-recitation-overview strong { display: block; color: var(--sp-basair); font-family: "Readex Pro","IBM Plex Sans Arabic",sans-serif; font-size: 22px; }
+#studentPortal .sp-recitation-overview span { display: block; margin-top: 3px; color: var(--sp-muted); font-size: 12px; }
+
+#studentPortal .sp-task-list {
+  border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface); box-shadow: var(--sp-shadow-sm); overflow: hidden;
+}
+#studentPortal .sp-task-item {
+  display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 12px;
+  padding: 13px 16px; border-bottom: 1px solid var(--sp-line);
+}
+#studentPortal .sp-task-item:last-child { border-bottom: 0; }
+#studentPortal .sp-task-number {
+  width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: 50%; color: var(--sp-basair); background: var(--sp-red-soft); font-weight: 700; font-size: 13px;
+}
+#studentPortal .sp-task-item strong { display: block; font-size: 13px; }
+#studentPortal .sp-task-item small { display: block; margin-top: 3px; color: var(--sp-muted); font-size: 11px; }
+#studentPortal .sp-task-item.sp-task-item-selected { background: var(--sp-green-soft); }
+#studentPortal .sp-list-divider { padding: 10px 16px; background: var(--sp-surface-soft); color: var(--sp-muted); font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--sp-line); }
+
+/* ============================================================
+   تبويب "الاختبارات والشهادات": بطاقة الاختبار المتاح البارزة
+   ============================================================ */
+#studentPortal .sp-exam-featured {
+  margin-bottom: 16px; padding: 22px 26px; color: #fff;
+  background: linear-gradient(130deg, rgba(107,19,24,0.97), rgba(181,38,44,0.94)), #8d1d22;
+  border-color: rgba(141,29,34,0.7); box-shadow: 0 14px 30px rgba(104,20,25,0.14);
+}
+#studentPortal .sp-exam-featured h2 { margin-bottom: 8px; font-size: 20px; }
+#studentPortal .sp-exam-featured p { margin-bottom: 0; color: rgba(255,255,255,0.75); font-size: 13px; }
+#studentPortal .sp-exam-featured .sp-lesson-meta { margin: 10px 0 16px; }
+#studentPortal .sp-exam-featured .sp-btn-primary { color: var(--sp-basair-dark); background: #fff; box-shadow: 0 8px 18px rgba(55,6,9,0.16); }
+#studentPortal .sp-rating {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  color: var(--sp-amber); font-size: 12px; font-weight: 700;
+}
+#studentPortal .sp-rating i { font-size: 12px; }
+
+@media (max-width: 640px) {
+  #studentPortal .sp-recitation-overview strong { font-size: 18px; }
+  #studentPortal .sp-task-item { grid-template-columns: 30px 1fr; }
+  #studentPortal .sp-task-number { width: 30px; height: 30px; }
+  #studentPortal .sp-rating { grid-column: 2; }
+}
+
+/* ============================================================
+   تبويب "الملف الشخصي" — المرحلة 4 (تصميم فقط، بيانات تجريبية)
+   نسخ مطابق حرفيًا لمرجع profile.html/profile-styles.css/email-verification.css
+   (نفس الأسماء بادئة sp- لتفادي تعارض الأصناف، نفس القيم بالبكسل تمامًا،
+   المتغيرات مُطابقة لمتغيرات المشروع --sp-*). التعديل الوحيد المقصود عن
+   المرجع: مكتبة الأيقونات (Bootstrap Icons بدل Lucide). راجع design-guidelines.md
+   ومناقشات.md للاستثناءات الوظيفية المُقرَّرة صراحة (إخفاء الأجهزة النشطة،
+   الإشعارات "قريبًا"، شارة هاتف المشروع الحقيقية بدل +973 الثابت).
+   ============================================================ */
+#studentPortal .sp-profile-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; flex-wrap: wrap; }
+#studentPortal .sp-profile-page-heading h1 { margin: 2px 0 4px; font-size: 26px; }
+#studentPortal .sp-profile-page-heading p { margin-bottom: 0; color: var(--sp-muted); font-size: 12px; }
+
+#studentPortal .sp-save-state { display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid #dce8e2; border-radius: 7px; color: var(--sp-green); background: var(--sp-green-soft); font-size: 10px; }
+#studentPortal .sp-save-state span { width: 7px; height: 7px; border-radius: 50%; background: var(--sp-green); }
+#studentPortal .sp-save-state.dirty { color: var(--sp-amber); border-color: #eedeba; background: var(--sp-amber-soft); }
+#studentPortal .sp-save-state.dirty span { background: var(--sp-amber); }
+
+#studentPortal .sp-identity-banner {
+  display: flex; align-items: center; min-height: 154px; gap: 18px; margin-bottom: 18px; padding: 24px;
+  border: 1px solid var(--sp-line); border-radius: 8px;
+  background: linear-gradient(100deg, rgba(141,29,34,0.045), transparent 45%), var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
+}
+#studentPortal .sp-profile-avatar-wrap { position: relative; flex: 0 0 auto; }
+#studentPortal .sp-profile-avatar {
+  width: 92px; height: 92px; display: grid; place-items: center; overflow: hidden;
+  border: 4px solid #fff; border-radius: 50%; color: #fff; background: var(--sp-foundation);
+  box-shadow: 0 0 0 1px var(--sp-line), 0 8px 20px rgba(30,37,45,0.12);
+  font-family: "Readex Pro", sans-serif; font-size: 27px; font-weight: 600;
+}
+#studentPortal .sp-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#studentPortal .sp-avatar-edit {
+  position: absolute; left: -2px; bottom: 2px; width: 31px; height: 31px; display: grid; place-items: center;
+  border: 2px solid #fff; border-radius: 50%; color: #fff; background: var(--sp-basair);
+  box-shadow: 0 4px 10px rgba(141,29,34,0.2); cursor: pointer;
+}
+#studentPortal .sp-avatar-edit .bi { font-size: 14px; }
+#studentPortal .sp-identity-copy { min-width: 0; flex: 1; }
+#studentPortal .sp-identity-name { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#studentPortal .sp-identity-name h2 { margin: 0; font-size: 20px; }
+#studentPortal .sp-verified-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 5px; color: var(--sp-green); background: var(--sp-green-soft); font-size: 9px; font-weight: 600; }
+#studentPortal .sp-verified-badge .bi { font-size: 13px; }
+#studentPortal .sp-identity-copy > p { margin: 6px 0 10px; color: var(--sp-muted); font-size: 11px; }
+#studentPortal .sp-identity-tags { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+#studentPortal .sp-identity-tags span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--sp-line); border-radius: 5px; color: var(--sp-ink-soft); background: var(--sp-surface-soft); font-size: 9px; }
+#studentPortal .sp-identity-tags .bi { font-size: 13px; }
+#studentPortal .sp-completion-block { width: 250px; padding: 15px 17px; border-right: 1px solid var(--sp-line); }
+#studentPortal .sp-completion-block > div:first-child { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--sp-muted); font-size: 10px; }
+#studentPortal .sp-completion-block strong { color: var(--sp-basair); font-family: "Readex Pro", sans-serif; font-size: 15px; }
+#studentPortal .sp-completion-block .sp-linear-progress { height: 6px; }
+#studentPortal .sp-completion-block small { display: block; margin-top: 8px; color: var(--sp-muted); font-size: 9px; line-height: 1.6; }
+
+#studentPortal .sp-linear-progress { height: 5px; overflow: hidden; border-radius: 5px; background: #eceef1; }
+#studentPortal .sp-linear-progress span { height: 100%; display: block; border-radius: inherit; background: var(--sp-basair); }
+
+#studentPortal .sp-settings-layout { display: grid; grid-template-columns: 270px minmax(0,1fr); align-items: start; gap: 18px; }
+#studentPortal .sp-settings-tabs { position: sticky; top: calc(var(--sp-topbar-height) + 18px); display: grid; gap: 5px; padding: 10px; border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface); box-shadow: var(--sp-shadow-sm); }
+#studentPortal .sp-settings-tab { width: 100%; min-height: 62px; display: grid; grid-template-columns: 37px 1fr 16px; align-items: center; gap: 9px; padding: 9px; border: 0; border-radius: 6px; color: var(--sp-ink-soft); background: transparent; text-align: right; }
+#studentPortal .sp-settings-tab:hover { background: var(--sp-surface-soft); }
+#studentPortal .sp-settings-tab.active { color: var(--sp-basair-dark); background: var(--sp-red-soft); }
+#studentPortal .sp-tab-icon { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 6px; color: var(--sp-ink-soft); background: var(--sp-surface-soft); }
+#studentPortal .sp-settings-tab.active .sp-tab-icon { color: #fff; background: var(--sp-basair); }
+#studentPortal .sp-tab-icon .bi { font-size: 17px; }
+#studentPortal .sp-settings-tab strong, #studentPortal .sp-settings-tab small { display: block; }
+#studentPortal .sp-settings-tab strong { font-size: 11px; }
+#studentPortal .sp-settings-tab small { margin-top: 2px; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-settings-tab > .bi { font-size: 14px; color: var(--sp-muted); }
+#studentPortal .sp-settings-help { display: grid; grid-template-columns: 34px 1fr; gap: 9px; margin-top: 8px; padding: 13px 10px; border: 1px solid #e7ddd0; border-radius: 7px; background: #faf6f0; }
+#studentPortal .sp-settings-help > span { width: 33px; height: 33px; display: grid; place-items: center; border-radius: 6px; color: var(--sp-qualification); background: #f0e5d8; }
+#studentPortal .sp-settings-help strong { font-size: 10px; }
+#studentPortal .sp-settings-help p { margin: 3px 0 6px; color: var(--sp-muted); font-size: 9px; line-height: 1.55; }
+#studentPortal .sp-settings-help button { padding: 0; border: 0; color: var(--sp-qualification); background: transparent; font-size: 9px; font-weight: 700; }
+
+#studentPortal .sp-settings-content { min-width: 0; }
+#studentPortal .sp-settings-panel { padding: 24px; border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-surface); box-shadow: var(--sp-shadow-sm); }
+#studentPortal .sp-settings-panel[hidden] { display: none; }
+#studentPortal .sp-settings-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--sp-line); }
+#studentPortal .sp-settings-panel-head h2 { margin: 1px 0 4px; font-size: 18px; }
+#studentPortal .sp-settings-panel-head p, #studentPortal .sp-subsection-heading p { margin: 0; color: var(--sp-muted); font-size: 10px; }
+#studentPortal .sp-panel-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 5px; color: var(--sp-green); background: var(--sp-green-soft); font-size: 9px; font-weight: 600; white-space: nowrap; }
+#studentPortal .sp-panel-status .bi { font-size: 13px; }
+
+#studentPortal .sp-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+#studentPortal .sp-form-field { min-width: 0; display: grid; align-content: start; gap: 7px; }
+#studentPortal .sp-form-field.sp-span-2 { grid-column: span 2; }
+#studentPortal .sp-form-field > span { color: var(--sp-ink-soft); font-size: 11px; font-weight: 600; }
+#studentPortal .sp-input-wrap { min-height: 47px; display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid var(--sp-line-strong); border-radius: 7px; background: #fff; transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
+#studentPortal .sp-input-wrap:focus-within { border-color: rgba(181,38,44,0.45); box-shadow: 0 0 0 3px rgba(181,38,44,0.07); }
+#studentPortal .sp-input-wrap.sp-readonly { color: var(--sp-muted); background: var(--sp-surface-soft); }
+#studentPortal .sp-input-wrap.sp-verified { flex: 1; border-color: rgba(22,122,88,0.32); }
+#studentPortal .sp-input-wrap.sp-invalid { border-color: #c73c43; box-shadow: 0 0 0 3px rgba(199,60,67,0.07); }
+#studentPortal .sp-input-wrap > .bi { font-size: 16px; color: var(--sp-muted); }
+#studentPortal .sp-input-wrap > .sp-field-check { color: var(--sp-green); }
+#studentPortal .sp-input-wrap input, #studentPortal .sp-input-wrap select { width: 100%; min-width: 0; height: 45px; padding: 0; border: 0; outline: 0; color: var(--sp-ink); background: transparent; font-size: 12px; }
+#studentPortal .sp-input-wrap select { appearance: none; cursor: pointer; }
+#studentPortal .sp-input-wrap input::placeholder { color: #9aa1aa; }
+#studentPortal .sp-input-wrap input[readonly] { color: var(--sp-muted); cursor: not-allowed; }
+#studentPortal .sp-field-message { min-height: 16px; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-field-message.error { color: #c0363e; }
+/* محدد دولة تفاعلي لحقلَي الهاتف (نفس فكرة #phoneCountry في registration.html)، بدل شارة ثابتة
+   🇧🇭 +973 — يتجاوز عرض 100% الافتراضي لأي select داخل .sp-input-wrap ليبقى مضغوطًا بجوار الحقل. */
+#studentPortal .sp-input-wrap select.sp-phone-country-select {
+  width: auto; max-width: 130px; flex: 0 0 auto; height: 32px; padding: 0 6px;
+  border: 1px solid var(--sp-line-strong); border-radius: 6px; background: var(--sp-surface-soft);
+  color: var(--sp-ink-soft); font-size: 12px; font-weight: 700; direction: ltr;
+}
+
+#studentPortal .sp-academic-summary, #studentPortal .sp-preference-box { display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 15px; border: 1px solid var(--sp-line); border-radius: 7px; background: var(--sp-surface-soft); }
+#studentPortal .sp-academic-icon, #studentPortal .sp-preference-icon { width: 42px; height: 42px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: var(--sp-foundation); background: var(--sp-blue-soft); }
+#studentPortal .sp-academic-summary > div:nth-child(2), #studentPortal .sp-preference-box > div:nth-child(2) { min-width: 0; flex: 1; text-align: start; }
+#studentPortal .sp-academic-summary span, #studentPortal .sp-academic-summary h3, #studentPortal .sp-academic-summary p, #studentPortal .sp-preference-box strong, #studentPortal .sp-preference-box p { display: block; }
+#studentPortal .sp-academic-summary span { color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-academic-summary h3 { margin: 2px 0; font-size: 12px; }
+#studentPortal .sp-academic-summary p, #studentPortal .sp-preference-box p { margin: 0; color: var(--sp-muted); font-size: 9px; }
+
+#studentPortal .sp-choice-buttons { display: inline-grid; grid-template-columns: repeat(2, auto); gap: 4px; padding: 3px; border: 1px solid var(--sp-line); border-radius: 7px; background: #fff; }
+#studentPortal .sp-choice-buttons button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 10px; border: 0; border-radius: 5px; color: var(--sp-muted); background: transparent; font-size: 9px; font-weight: 600; }
+#studentPortal .sp-choice-buttons button.active { color: #fff; background: var(--sp-green); }
+#studentPortal .sp-choice-buttons .bi { font-size: 14px; }
+
+#studentPortal .sp-security-score { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-security-score > .bi { font-size: 20px; }
+#studentPortal .sp-security-score strong, #studentPortal .sp-security-score small { display: block; }
+#studentPortal .sp-security-score strong { font-size: 10px; }
+#studentPortal .sp-security-score small { font-size: 8px; }
+#studentPortal .sp-security-section { padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid var(--sp-line); }
+#studentPortal .sp-security-section:last-child { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+#studentPortal .sp-subsection-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 15px; }
+#studentPortal .sp-subsection-heading h3 { margin: 0 0 3px; font-size: 13px; }
+#studentPortal .sp-input-action { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 5px; color: var(--sp-muted); background: transparent; }
+#studentPortal .sp-input-action:hover { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-input-action .bi { font-size: 15px; }
+#studentPortal .sp-password-strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+#studentPortal .sp-password-strength > span { height: 4px; border-radius: 4px; background: var(--sp-line); }
+#studentPortal .sp-password-strength small { grid-column: 1 / -1; color: var(--sp-muted); font-size: 8px; }
+#studentPortal .sp-password-strength.weak > span:nth-child(1) { background: var(--sp-basair); }
+#studentPortal .sp-password-strength.medium > span:nth-child(-n+2) { background: var(--sp-amber); }
+#studentPortal .sp-password-strength.good > span:nth-child(-n+3) { background: var(--sp-foundation); }
+#studentPortal .sp-password-strength.strong > span { background: var(--sp-green); }
+
+#studentPortal .sp-login-methods, #studentPortal .sp-session-list { display: grid; gap: 8px; }
+#studentPortal .sp-login-methods { grid-template-columns: repeat(2, minmax(0,1fr)); }
+#studentPortal .sp-login-methods article, #studentPortal .sp-session-list article { min-height: 64px; display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--sp-line); border-radius: 7px; background: var(--sp-surface-soft); }
+#studentPortal .sp-login-methods article > div, #studentPortal .sp-session-list article > div { text-align: start; }
+#studentPortal .sp-method-icon, #studentPortal .sp-session-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 7px; font-weight: 700; }
+#studentPortal .sp-method-icon .bi { font-size: 17px; }
+#studentPortal .sp-email-method-icon { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-google-method-icon { color: #3578e5; background: #eaf2ff; font-family: Arial, sans-serif; }
+#studentPortal .sp-session-icon { color: var(--sp-foundation); background: var(--sp-blue-soft); }
+#studentPortal .sp-session-icon .bi { font-size: 17px; }
+#studentPortal .sp-login-methods strong, #studentPortal .sp-login-methods small, #studentPortal .sp-session-list strong, #studentPortal .sp-session-list small { display: block; }
+#studentPortal .sp-login-methods strong, #studentPortal .sp-session-list strong { font-size: 10px; }
+#studentPortal .sp-login-methods small, #studentPortal .sp-session-list small { margin-top: 3px; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-current-device { display: inline-flex; align-items: center; gap: 5px; color: var(--sp-green); font-size: 9px; }
+#studentPortal .sp-current-device i { width: 7px; height: 7px; border-radius: 50%; background: var(--sp-green); }
+
+#studentPortal .sp-notification-channel-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-bottom: 24px; }
+#studentPortal .sp-channel-card { display: flex; align-items: center; min-height: 76px; gap: 10px; padding: 12px; border: 1px solid var(--sp-line); border-radius: 7px; background: var(--sp-surface-soft); }
+#studentPortal .sp-channel-card > div { min-width: 0; flex: 1; }
+#studentPortal .sp-channel-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 7px; }
+#studentPortal .sp-channel-icon .bi { font-size: 18px; }
+#studentPortal .sp-channel-icon.whatsapp { color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-channel-icon.email { color: var(--sp-foundation); background: var(--sp-blue-soft); }
+#studentPortal .sp-channel-card strong, #studentPortal .sp-channel-card small { display: block; }
+#studentPortal .sp-channel-card strong { font-size: 11px; }
+#studentPortal .sp-channel-card small { margin-top: 3px; color: var(--sp-muted); font-size: 9px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+#studentPortal .sp-switch { width: 38px; height: 22px; display: inline-block; position: relative; flex: 0 0 auto; }
+#studentPortal .sp-switch input { position: absolute; opacity: 0; pointer-events: none; }
+#studentPortal .sp-switch > span { position: absolute; inset: 0; border-radius: 999px; background: #c8cdd3; transition: background 160ms ease; cursor: pointer; }
+#studentPortal .sp-switch > span::after { content: ""; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(23,29,35,0.16); transition: transform 160ms ease; }
+#studentPortal .sp-switch input:checked + span { background: var(--sp-green); }
+#studentPortal .sp-switch input:checked + span::after { transform: translateX(-16px); }
+
+#studentPortal .sp-notification-settings { display: grid; }
+#studentPortal .sp-notification-group-title { margin-bottom: 7px; }
+#studentPortal .sp-notification-group-title h3 { margin: 0 0 3px; font-size: 13px; }
+#studentPortal .sp-notification-group-title p { margin: 0; color: var(--sp-muted); font-size: 10px; }
+#studentPortal .sp-notification-setting { min-height: 68px; display: grid; grid-template-columns: 37px 1fr auto 38px; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--sp-line); }
+#studentPortal .sp-setting-icon { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 6px; color: var(--sp-ink-soft); background: var(--sp-surface-soft); }
+#studentPortal .sp-setting-icon .bi { font-size: 16px; }
+#studentPortal .sp-notification-setting strong, #studentPortal .sp-notification-setting small { display: block; }
+#studentPortal .sp-notification-setting strong { font-size: 10px; }
+#studentPortal .sp-notification-setting small { margin-top: 3px; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-channel-pills { display: flex; gap: 4px; }
+#studentPortal .sp-channel-pills em { padding: 3px 6px; border-radius: 4px; color: var(--sp-muted); background: var(--sp-surface-soft); font-size: 8px; font-style: normal; }
+
+#studentPortal .sp-quiet-hours { display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 14px; border: 1px solid #dedfe4; border-radius: 7px; background: #f5f4f7; }
+#studentPortal .sp-quiet-icon { width: 40px; height: 40px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: #665984; background: #e9e5f2; }
+#studentPortal .sp-quiet-hours > div { flex: 1; }
+#studentPortal .sp-quiet-hours strong { font-size: 10px; }
+#studentPortal .sp-quiet-hours p { margin: 3px 0 0; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-quiet-hours label { display: grid; gap: 4px; color: var(--sp-muted); font-size: 8px; }
+#studentPortal .sp-quiet-hours input { width: 100px; height: 35px; padding: 0 7px; border: 1px solid var(--sp-line-strong); border-radius: 6px; color: var(--sp-ink); background: #fff; }
+
+#studentPortal .sp-settings-actions { position: sticky; z-index: 20; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--sp-line); border-radius: 8px; background: rgba(255,255,255,0.96); box-shadow: 0 10px 30px rgba(25,31,38,0.12); backdrop-filter: blur(10px); }
+#studentPortal .sp-settings-actions > div:last-child { display: flex; align-items: center; gap: 8px; }
+#studentPortal .sp-unsaved-indicator { display: flex; align-items: center; gap: 9px; }
+#studentPortal .sp-unsaved-indicator > span { width: 8px; height: 8px; border-radius: 50%; background: var(--sp-green); }
+#studentPortal .sp-unsaved-indicator.dirty > span { background: var(--sp-amber); box-shadow: 0 0 0 4px rgba(167,106,20,0.1); }
+#studentPortal .sp-unsaved-indicator p { margin: 0; }
+#studentPortal .sp-unsaved-indicator strong, #studentPortal .sp-unsaved-indicator small { display: block; }
+#studentPortal .sp-unsaved-indicator strong { font-size: 10px; }
+#studentPortal .sp-unsaved-indicator small { margin-top: 2px; color: var(--sp-muted); font-size: 8px; }
+#studentPortal .sp-settings-actions button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+#studentPortal .sp-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+#studentPortal .sp-btn-secondary:disabled:hover { color: var(--sp-ink-soft); border-color: var(--sp-line-strong); background: #fff; }
+
+/* -- التحقق من البريد الإلكتروني (منقول حرفيًا من email-verification.css) -- */
+#studentPortal .sp-email-verification { display: grid; gap: 13px; padding: 16px; border: 1px solid var(--sp-line); border-radius: 7px; background: var(--sp-surface-soft); }
+#studentPortal .sp-email-verification.sp-span-2 { grid-column: span 2; }
+#studentPortal .sp-email-verification-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+#studentPortal .sp-email-verification-head > div > span, #studentPortal .sp-email-verification-head > div > small { display: block; }
+#studentPortal .sp-email-verification-head > div > span { color: var(--sp-ink-soft); font-size: 11px; font-weight: 600; }
+#studentPortal .sp-email-verification-head > div > small { margin-top: 3px; color: var(--sp-muted); font-size: 9px; }
+#studentPortal .sp-email-status { min-height: 27px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 5px; font-size: 9px; white-space: nowrap; }
+#studentPortal .sp-email-status .bi { font-size: 13px; }
+#studentPortal .sp-email-status.verified { color: var(--sp-green); background: var(--sp-green-soft); }
+#studentPortal .sp-email-status.pending { color: var(--sp-amber); background: var(--sp-amber-soft); }
+#studentPortal .sp-email-status.unverified { color: var(--sp-basair); background: var(--sp-red-soft); }
+#studentPortal .sp-email-method-picker { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+#studentPortal .sp-email-method { min-width: 0; min-height: 68px; display: grid; grid-template-columns: 35px minmax(0,1fr) 14px; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--sp-line-strong); border-radius: 7px; color: var(--sp-ink-soft); background: #fff; text-align: right; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+#studentPortal .sp-email-method:hover { border-color: rgba(181,38,44,0.28); }
+#studentPortal .sp-email-method.active { border-color: rgba(181,38,44,0.45); background: #fffafa; box-shadow: 0 0 0 3px rgba(181,38,44,0.06); }
+#studentPortal .sp-email-method > span:nth-child(2) { min-width: 0; }
+#studentPortal .sp-email-method strong, #studentPortal .sp-email-method small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#studentPortal .sp-email-method strong { font-size: 10px; }
+#studentPortal .sp-email-method small { margin-top: 3px; color: var(--sp-muted); font-size: 8px; }
+#studentPortal .sp-email-method > .bi { font-size: 13px; color: var(--sp-muted); }
+#studentPortal .sp-provider-mark, #studentPortal .sp-provider-connected-icon { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--sp-line); font-family: Arial, sans-serif; font-size: 17px; font-weight: 700; }
+#studentPortal .sp-google-mark { color: #4285f4; }
+#studentPortal .sp-yahoo-mark { color: #6001d2; }
+#studentPortal .sp-manual-mark { color: var(--sp-basair); background: var(--sp-red-soft); box-shadow: none; }
+#studentPortal .sp-manual-mark .bi { font-size: 16px; }
+#studentPortal .sp-microsoft-mark { display: grid; grid-template-columns: repeat(2, 10px); grid-template-rows: repeat(2, 10px); place-content: center; gap: 2px; }
+#studentPortal .sp-microsoft-mark i { display: block; width: 10px; height: 10px; }
+#studentPortal .sp-microsoft-mark i:nth-child(1) { background: #f25022; }
+#studentPortal .sp-microsoft-mark i:nth-child(2) { background: #7fba00; }
+#studentPortal .sp-microsoft-mark i:nth-child(3) { background: #00a4ef; }
+#studentPortal .sp-microsoft-mark i:nth-child(4) { background: #ffb900; }
+#studentPortal .sp-provider-email-panel { min-height: 56px; display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid rgba(22,122,88,0.2); border-radius: 7px; background: var(--sp-green-soft); }
+#studentPortal .sp-provider-email-panel[hidden], #studentPortal .sp-manual-email-panel[hidden], #studentPortal .sp-verification-code-area[hidden] { display: none; }
+#studentPortal .sp-provider-connected-icon { width: 36px; height: 36px; }
+#studentPortal .sp-provider-email-panel small, #studentPortal .sp-provider-email-panel strong { display: block; }
+#studentPortal .sp-provider-email-panel small { color: var(--sp-muted); font-size: 8px; }
+#studentPortal .sp-provider-email-panel strong { margin-top: 2px; overflow: hidden; color: var(--sp-ink); font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+#studentPortal .sp-manual-email-panel { display: grid; grid-template-columns: minmax(0,1fr) 165px; align-items: start; gap: 10px; padding-top: 3px; }
+#studentPortal .sp-send-code-button { min-height: 47px; margin-top: 24px; }
+#studentPortal .sp-verification-code-area { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr) 150px auto; align-items: start; gap: 10px; padding: 13px; border: 1px dashed rgba(181,38,44,0.3); border-radius: 7px; background: #fff; }
+#studentPortal .sp-code-input input { direction: ltr; text-align: center; font-family: "Readex Pro", sans-serif; font-size: 16px; letter-spacing: 5px; }
+#studentPortal .sp-verify-code-button { min-height: 47px; margin-top: 24px; }
+#studentPortal .sp-resend-code-button { min-height: 47px; margin-top: 24px; white-space: nowrap; }
+#studentPortal .sp-resend-code-button:disabled { color: var(--sp-muted); cursor: not-allowed; }
+
+@media (max-width: 1040px) {
+  #studentPortal .sp-settings-layout { grid-template-columns: 230px minmax(0,1fr); }
+  #studentPortal .sp-settings-tab { grid-template-columns: 35px 1fr; }
+  #studentPortal .sp-settings-tab > .bi, #studentPortal .sp-settings-tab small { display: none; }
+  #studentPortal .sp-completion-block { width: 220px; }
+}
+@media (max-width: 900px) {
+  #studentPortal .sp-settings-layout { grid-template-columns: 1fr; }
+  #studentPortal .sp-settings-tabs { position: static; grid-template-columns: repeat(4, minmax(0,1fr)); overflow-x: auto; }
+  #studentPortal .sp-settings-tab { min-width: 130px; grid-template-columns: 32px 1fr; min-height: 54px; }
+  #studentPortal .sp-settings-help { display: none; }
+  #studentPortal .sp-identity-banner { flex-wrap: wrap; }
+  #studentPortal .sp-completion-block { width: 100%; padding: 13px 0 0; border-top: 1px solid var(--sp-line); border-right: 0; }
+  #studentPortal .sp-email-method-picker { grid-template-columns: 1fr; }
+  #studentPortal .sp-email-method { min-height: 58px; }
+  #studentPortal .sp-manual-email-panel { grid-template-columns: 1fr; }
+  #studentPortal .sp-send-code-button { width: 100%; margin-top: 0; }
+  #studentPortal .sp-verification-code-area { grid-template-columns: 1fr 1fr; }
+  #studentPortal .sp-verification-code-area .sp-form-field { grid-column: 1 / -1; }
+  #studentPortal .sp-verify-code-button, #studentPortal .sp-resend-code-button { width: 100%; margin-top: 0; }
+}
+@media (max-width: 640px) {
+  #studentPortal .sp-profile-page-heading { align-items: flex-start; flex-direction: column; }
+  #studentPortal .sp-profile-page-heading h1 { font-size: 22px; }
+  #studentPortal .sp-identity-banner { display: grid; grid-template-columns: 104px minmax(0,1fr); align-items: start; gap: 12px; padding: 16px; }
+  #studentPortal .sp-profile-avatar { width: 100px; height: 118px; border-radius: 8px; }
+  #studentPortal .sp-profile-avatar img { object-position: center top; }
+  #studentPortal .sp-avatar-edit { width: 27px; height: 27px; left: 4px; bottom: 4px; }
+  #studentPortal .sp-identity-name { align-items: flex-start; flex-direction: column; gap: 5px; }
+  #studentPortal .sp-identity-name h2 { font-size: 16px; }
+  #studentPortal .sp-identity-copy > p { font-size: 9px; line-height: 1.6; }
+  #studentPortal .sp-identity-tags span:last-child { display: none; }
+  #studentPortal .sp-completion-block { grid-column: 1 / -1; }
+  #studentPortal .sp-settings-tabs { margin-inline: -12px; padding-inline: 12px; border-right: 0; border-left: 0; border-radius: 0; box-shadow: none; }
+  #studentPortal .sp-settings-tab { min-width: 118px; grid-template-columns: 28px 1fr; padding: 7px; }
+  #studentPortal .sp-tab-icon { width: 28px; height: 28px; }
+  #studentPortal .sp-settings-panel { padding: 17px 14px; }
+  #studentPortal .sp-settings-panel-head { align-items: flex-start; }
+  #studentPortal .sp-settings-panel-head p { line-height: 1.6; }
+  #studentPortal .sp-form-grid { grid-template-columns: 1fr; gap: 14px; }
+  #studentPortal .sp-form-field.sp-span-2 { grid-column: auto; }
+  #studentPortal .sp-academic-summary, #studentPortal .sp-preference-box { align-items: flex-start; flex-wrap: wrap; }
+  #studentPortal .sp-academic-summary .sp-btn-text, #studentPortal .sp-choice-buttons { width: 100%; }
+  #studentPortal .sp-choice-buttons button { width: 100%; }
+  #studentPortal .sp-notification-channel-grid { grid-template-columns: 1fr; }
+  #studentPortal .sp-notification-setting { grid-template-columns: 35px 1fr 38px; }
+  #studentPortal .sp-channel-pills { display: none; }
+  #studentPortal .sp-quiet-hours { align-items: stretch; flex-wrap: wrap; }
+  #studentPortal .sp-quiet-hours > div { width: calc(100% - 54px); flex: auto; }
+  #studentPortal .sp-quiet-hours label { width: calc(50% - 6px); }
+  #studentPortal .sp-quiet-hours input { width: 100%; }
+  #studentPortal .sp-settings-actions { bottom: 12px; align-items: stretch; flex-direction: column; }
+  #studentPortal .sp-settings-actions > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
+  #studentPortal .sp-settings-actions button { width: 100%; }
+  #studentPortal .sp-unsaved-indicator small { display: none; }
+  #studentPortal .sp-email-verification { margin-inline: -4px; padding: 12px; }
+  #studentPortal .sp-email-verification-head { align-items: flex-start; }
+  #studentPortal .sp-provider-email-panel { grid-template-columns: 36px minmax(0,1fr); }
+  #studentPortal .sp-provider-email-panel .sp-btn-secondary { grid-column: 1 / -1; width: 100%; }
+  #studentPortal .sp-verification-code-area { grid-template-columns: 1fr; }
+  #studentPortal .sp-verification-code-area .sp-form-field, #studentPortal .sp-verification-code-area .sp-verify-code-button, #studentPortal .sp-verification-code-area .sp-resend-code-button { grid-column: auto; }
+  #studentPortal .sp-login-methods { grid-template-columns: 1fr; }
+}
+@media (max-width: 390px) {
+  #studentPortal .sp-save-state { width: 100%; justify-content: center; }
+  #studentPortal .sp-settings-panel-head { flex-direction: column; }
+  #studentPortal .sp-login-methods article, #studentPortal .sp-session-list article { grid-template-columns: 36px 1fr; }
+  #studentPortal .sp-login-methods article > :last-child, #studentPortal .sp-session-list article > :last-child { grid-column: 1 / -1; justify-self: stretch; }
+  #studentPortal .sp-login-methods article > .sp-status-pill { justify-self: start; }
+}
+
+/* ============================================================
+   صفحتا "إقرار" و"أداء الاختبار" (Iqrar.html/questions.html) — صفحتان مستقلتان بلا غلاف بوابة
+   الطالب (loadPage تستبدل #app بالكامل)، لذا كل منهما تُضمَّن في #studentPortal.sp-embedded خاص
+   بها. القوالب الأساسية (رأس/مقدمة/بطاقات) في قسم "sp-exam-*" أسفل الملف — هذا القسم فقط لعناصر
+   خاصة بـIqrar.html: بطاقة الملخّص اليسرى + شبكة بنود الضوابط + مربع الإقرار.
+   ============================================================ */
+#studentPortal .sp-iqrar-grid{ width:min(1240px,calc(100% - 40px)); margin:28px auto 70px; display:grid; grid-template-columns:300px minmax(0,1fr); gap:24px; align-items:start; }
+
+#studentPortal .sp-iqrar-summary{ position:sticky; top:96px; padding:20px; background:#fff; border:1px solid var(--sp-line-strong); border-radius:8px; box-shadow:0 12px 34px rgba(35,41,48,.08); }
+#studentPortal .sp-iqrar-summary-icon{ width:44px; height:44px; display:grid; place-items:center; border-radius:10px; background:linear-gradient(135deg,var(--sp-basair-dark),var(--sp-basair)); color:#fff; font-size:19px; margin-bottom:12px; }
+#studentPortal .sp-iqrar-summary-title{ margin:4px 0 16px; font-size:19px; line-height:1.5; }
+#studentPortal .sp-iqrar-stat-list{ display:grid; gap:2px; padding:12px 0; border-top:1px solid var(--sp-line-strong); border-bottom:1px solid var(--sp-line-strong); }
+#studentPortal .sp-iqrar-stat-row{ display:flex; align-items:center; justify-content:space-between; padding:7px 0; font-size:12.5px; }
+#studentPortal .sp-iqrar-stat-row span{ display:flex; align-items:center; gap:7px; color:var(--sp-muted); }
+#studentPortal .sp-iqrar-stat-row span i{ color:var(--sp-basair); }
+#studentPortal .sp-iqrar-stat-row b{ font-size:13px; color:var(--sp-ink); }
+#studentPortal .sp-iqrar-tip{ display:flex; align-items:flex-start; gap:8px; margin-top:14px; padding:12px; border-radius:7px; background:var(--sp-canvas,#f5f6f7); }
+#studentPortal .sp-iqrar-tip i{ color:var(--sp-basair); font-size:16px; margin-top:1px; }
+#studentPortal .sp-iqrar-tip strong{ display:block; margin-bottom:2px; font-size:12px; color:var(--sp-ink); }
+#studentPortal .sp-iqrar-tip span{ display:block; font-size:11.5px; line-height:1.7; color:var(--sp-muted); }
+
+#studentPortal .sp-iqrar-rules-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px 24px; margin-bottom:20px; }
+#studentPortal .sp-iqrar-rule-item{ display:flex; align-items:flex-start; gap:12px; }
+#studentPortal .sp-iqrar-rule-icon{ width:36px; height:36px; flex:0 0 auto; display:grid; place-items:center; border-radius:8px; background:var(--sp-red-soft); color:var(--sp-basair); font-size:16px; }
+#studentPortal .sp-iqrar-rule-icon .bi {color: var(--sp-basair);}
+#studentPortal .sp-iqrar-rule-item strong{ display:block; margin-bottom:3px; font-size:13.5px; }
+#studentPortal .sp-iqrar-rule-item span{ /* display:block; */ font-size:12px; line-height:1.8; color:var(--sp-muted); }
+
+/* بند مميز عن سياسة تكرار دخول الاختبار (allowReentry) — مموَّه بلون التحذير (Amber) ليتمايز
+   بوضوح عن بنود الشرح المحايدة الأربعة أعلاه، ويُقرأ قبل تفعيل الإقرار مباشرة. */
+#studentPortal .sp-iqrar-reentry-notice{ display:flex; align-items:flex-start; gap:10px; margin-bottom:18px; padding:13px 14px; border:1px solid #f0dfb3; border-radius:9px; background:var(--sp-amber-soft); }
+/* [hidden] لازم يفوز صراحة — قاعدة .sp-iqrar-reentry-notice{display:flex} أعلاه أعلى تخصيصًا
+   (ID+class) من قاعدة المتصفح الافتراضية لـ[hidden] (محدِّد سمة فقط)، فتُبطل الإخفاء بلا هذا. */
+#studentPortal .sp-iqrar-reentry-notice[hidden]{ display:none !important; }
+#studentPortal .sp-iqrar-reentry-notice i{ color:var(--sp-amber); font-size:17px; margin-top:1px; }
+#studentPortal .sp-iqrar-reentry-notice strong{ display:block; margin-bottom:3px; font-size:13px; color:var(--sp-ink); }
+#studentPortal .sp-iqrar-reentry-notice span{ display:block; font-size:12px; line-height:1.8; color:#6b5a2e; }
+
+#studentPortal .sp-iqrar-check{ display:block; margin:4px 0 14px; padding:16px; border:1px solid rgba(181,38,44,.25); border-radius:8px; background:var(--sp-red-soft); cursor:pointer; text-align: right; }
+#studentPortal .sp-iqrar-check-head{ display:flex; align-items:center; justify-content:right; gap:10px; margin-bottom:8px; }
+#studentPortal .sp-iqrar-check-title{ color:var(--sp-basair); font-weight:700; font-size:14px; }
+#studentPortal .sp-iqrar-check-head input[type="radio"]{
+  appearance:none; -webkit-appearance:none; width:20px; height:20px; margin:0; flex:0 0 auto;
+  border:2px solid var(--sp-basair); border-radius:5px; background:#fff; cursor:pointer; position:relative;
+}
+#studentPortal .sp-iqrar-check-head input[type="radio"]:checked{ background:var(--sp-basair); }
+#studentPortal .sp-iqrar-check-head input[type="radio"]:checked::after{
+  content:"\2713"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700;
+}
+#studentPortal .sp-iqrar-check-text{ display:block; color:var(--sp-basair-dark); font-weight:600; font-size:13px; line-height:1.9; }
+
+#studentPortal .sp-iqrar-hint{ display:flex; align-items:center; gap:6px; margin:0 0 16px; color:var(--sp-muted); font-size:11.5px; }
+#studentPortal .sp-iqrar-hint i{ color:var(--sp-basair); }
+
+#studentPortal .sp-iqrar-actions{ display:flex; flex-wrap:wrap-reverse; gap:10px; }
+#studentPortal .sp-iqrar-actions .sp-exam-primary-btn{ flex:1; min-width:220px; }
+#studentPortal .sp-exam-primary-btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+
+
+@media (max-width: 900px){
+  #studentPortal .sp-iqrar-grid{ grid-template-columns:1fr; }
+  #studentPortal .sp-iqrar-summary{ position:relative; top:auto; }
+}
+@media (max-width: 640px){
+  #studentPortal .sp-iqrar-rules-grid{ grid-template-columns:1fr; }
+  #studentPortal .sp-iqrar-actions{ flex-direction:column-reverse; }
+  #studentPortal .sp-iqrar-actions .sp-exam-primary-btn{ min-width:0; }
+}
+
+/* ============================================================
+   صفحة "أداء الاختبار" (questions.html) — منقولة حرفيًا من معاينة التصميم المعتمدة
+   basair-student-exam (styles.css)، بادئة sp-exam- لكل صنف لعزلها تمامًا عن باقي نظام sp-
+   (رأس علوي خاص بالصفحة + بطاقة ملخّص جانبية لاصقة بعدّاد دائري وخريطة أسئلة + قائمة أسئلة
+   رئيسية + نافذة تأكيد/نتيجة). الألوان تطابق --sp-basair/--sp-green/--sp-red-soft الحالية
+   فعليًا (نفس القيم تمامًا بالمرجع الأصلي)، فلا حاجة لمتغيرات --exam-* منفصلة إلا لتظليل عدّاد
+   الوقت عند اقتراب الانتهاء (--sp-exam-timer-accent، مضبوطة إنلاين على العنصر فقط، لا تُسرّب
+   لأي عنصر آخر). حجم خط عنوان السؤال والإجابة كُبِّر عمدًا عن المرجع (طلب صريح).
+   ============================================================ */
+#studentPortal .sp-exam-app{ --sp-exam-timer-accent: var(--sp-basair); min-height:100vh; background:var(--sp-canvas,#f5f6f7); }
+
+#studentPortal .sp-exam-header{ position:sticky; top:0; z-index:60; background:rgba(255,255,255,.96); border-bottom:1px solid var(--sp-line-strong); backdrop-filter:blur(12px); }
+#studentPortal .sp-exam-header-inner{ width:min(1240px,calc(100% - 40px)); height:72px; margin:auto; display:flex; align-items:center; gap:24px; }
+#studentPortal .sp-exam-brand{ width:148px; flex:0 0 auto; }
+#studentPortal .sp-exam-brand img{ width:100%; height:auto; display:block; }
+#studentPortal .sp-exam-copy{ padding-right:24px; border-right:1px solid var(--sp-line-strong); min-width:0; }
+#studentPortal .sp-exam-copy span, #studentPortal .sp-exam-copy strong{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#studentPortal .sp-exam-copy span{ font-size:11px; color:var(--sp-muted); }
+#studentPortal .sp-exam-copy strong{ font-size:14px; color:var(--sp-ink-soft); }
+#studentPortal .sp-exam-header-status{ margin-right:auto; display:flex; align-items:center; gap:12px; }
+#studentPortal .sp-exam-student-chip{ display:flex; align-items:center; gap:9px; min-width:190px; }
+#studentPortal .sp-exam-student-chip>span{ width:38px; height:38px; display:grid; place-items:center; border-radius:50%; color:#fff; background:linear-gradient(145deg,var(--sp-basair-dark),var(--sp-basair)); font-weight:700; }
+#studentPortal .sp-exam-student-chip small, #studentPortal .sp-exam-student-chip strong{ display:block; }
+#studentPortal .sp-exam-student-chip small{ font-size:10px; color:var(--sp-muted); }
+#studentPortal .sp-exam-student-chip strong{ font-size:13px; }
+#studentPortal .sp-exam-mobile-timer{ display:none; direction:ltr; align-items:center; gap:7px; color:var(--sp-basair-dark); font-size:14px; }
+
+#studentPortal .sp-exam-intro{ position:relative; overflow:hidden; background:#fff; border-bottom:1px solid var(--sp-line-strong); }
+#studentPortal .sp-exam-intro-inner{ position:relative; z-index:1; width:min(1240px,calc(100% - 40px)); margin:auto; padding:34px 0; display:flex; align-items:center; justify-content:space-between; gap:44px; }
+#studentPortal .sp-exam-eyebrow{ display:inline-flex; align-items:center; gap:8px; margin-bottom:3px; color:var(--sp-basair); font-size:12px; font-weight:700; }
+#studentPortal .sp-exam-eyebrow i{ width:20px; height:2px; background:var(--sp-basair); }
+#studentPortal .sp-exam-intro-inner h1{ margin:0 0 5px; font-size:27px; line-height:1.4; letter-spacing:0; }
+#studentPortal .sp-exam-intro-inner p{ max-width:660px; margin:0; color:var(--sp-muted); font-size:14px; }
+#studentPortal .sp-exam-facts{ margin:0; display:flex; align-items:stretch; border:1px solid var(--sp-line-strong); background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(35,41,48,.04); }
+#studentPortal .sp-exam-facts div{ min-width:118px; padding:12px 16px; border-left:1px solid var(--sp-line-strong); }
+#studentPortal .sp-exam-facts div:last-child{ border-left:0; }
+#studentPortal .sp-exam-facts dt{ display:flex; align-items:center; gap:6px; margin:0; color:var(--sp-muted); font-size:11px; font-weight:400; }
+#studentPortal .sp-exam-facts dt i{ color:var(--sp-basair); }
+#studentPortal .sp-exam-facts dd{ margin:3px 0 0; font-size:13px; font-weight:700; }
+
+#studentPortal .sp-exam-layout{ width:min(1240px,calc(100% - 40px)); margin:28px auto 70px; display:grid; grid-template-columns:minmax(0,1fr) 286px; grid-template-areas:"questions summary"; gap:24px; align-items:start; }
+#studentPortal .sp-exam-overview{ grid-area:summary; position:sticky; top:96px; padding:20px; background:#fff; border:1px solid var(--sp-line-strong); border-radius:8px; box-shadow:0 12px 34px rgba(35,41,48,.08); overflow:hidden; }
+#studentPortal .sp-exam-overview-heading{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:15px; border-bottom:1px solid var(--sp-line-strong); }
+#studentPortal .sp-exam-overview-heading span, #studentPortal .sp-exam-overview-heading h2{ display:block; margin:0; }
+#studentPortal .sp-exam-overview-heading span{ color:var(--sp-muted); font-size:10px; }
+#studentPortal .sp-exam-overview-heading h2{ font-size:16px; }
+#studentPortal .sp-exam-overview-heading>i{ width:38px; height:38px; display:grid; place-items:center; border-radius:7px; color:var(--sp-basair); background:var(--sp-red-soft); font-size:19px; }
+#studentPortal .sp-exam-timer-block{ display:grid; place-items:center; padding:20px 0 15px; }
+#studentPortal .sp-exam-timer-ring{ --sp-exam-timer-progress:100%; width:142px; aspect-ratio:1; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--sp-exam-timer-accent) var(--sp-exam-timer-progress), #eceff2 0); position:relative; transition:background .4s linear; }
+#studentPortal .sp-exam-timer-ring::before{ content:""; position:absolute; inset:8px; border-radius:50%; background:#fff; }
+#studentPortal .sp-exam-timer-ring>div{ position:relative; text-align:center; }
+#studentPortal .sp-exam-timer-ring span, #studentPortal .sp-exam-timer-ring strong{ display:block; }
+#studentPortal .sp-exam-timer-ring span{ color:var(--sp-muted); font-size:10px; }
+#studentPortal .sp-exam-timer-ring strong{ direction:ltr; font-family:"Readex Pro",sans-serif; font-size:25px; line-height:1.25; color:var(--sp-basair-dark); font-weight:700; font-variant-numeric:tabular-nums; }
+#studentPortal .sp-exam-progress-block{ padding:14px 0; border-top:1px solid var(--sp-line-strong); border-bottom:1px solid var(--sp-line-strong); }
+#studentPortal .sp-exam-progress-copy{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; font-size:12px; }
+#studentPortal .sp-exam-progress-copy span{ color:var(--sp-muted); }
+#studentPortal .sp-exam-progress-copy strong{ font-size:12px; }
+#studentPortal .sp-exam-progress-track{ height:6px; border-radius:6px; overflow:hidden; background:#eceff2; }
+#studentPortal .sp-exam-progress-track i{ display:block; width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--sp-basair-dark),var(--sp-basair)); transition:width .25s ease; }
+#studentPortal .sp-exam-navigator-block{ padding:14px 0 12px; }
+#studentPortal .sp-exam-navigator-heading{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; color:var(--sp-ink-soft); font-size:12px; font-weight:700; }
+#studentPortal .sp-exam-icon-btn{ width:34px; height:34px; display:inline-grid; place-items:center; border:1px solid var(--sp-line-strong); border-radius:6px; background:#fff; color:var(--sp-muted); }
+#studentPortal .sp-exam-icon-btn:hover{ color:var(--sp-basair); border-color:#d9b8bb; background:var(--sp-red-soft); }
+#studentPortal .sp-exam-question-map{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+#studentPortal .sp-exam-question-map button{ aspect-ratio:1; min-width:0; border:1px solid var(--sp-line-strong); border-radius:6px; background:#fff; color:var(--sp-muted); font-size:12px; font-weight:700; transition:.18s; }
+#studentPortal .sp-exam-question-map button:hover, #studentPortal .sp-exam-question-map button.current{ border-color:var(--sp-basair); color:var(--sp-basair); box-shadow:0 0 0 2px rgba(181,38,44,.08); }
+#studentPortal .sp-exam-question-map button.answered{ border-color:var(--sp-green); background:var(--sp-green); color:#fff; }
+#studentPortal .sp-exam-question-map button.review{ border-color:#dba74f; background:#fff4df; color:#a76a14; }
+#studentPortal .sp-exam-map-legend{ display:flex; flex-wrap:wrap; gap:7px 12px; margin-top:10px; color:var(--sp-muted); font-size:9.5px; }
+#studentPortal .sp-exam-map-legend span{ display:flex; align-items:center; gap:5px; }
+#studentPortal .sp-exam-map-legend i{ width:7px; height:7px; border-radius:2px; border:1px solid var(--sp-line-strong); background:#fff; }
+#studentPortal .sp-exam-map-legend i.sp-exam-legend-answered{ border-color:var(--sp-green); background:var(--sp-green); }
+#studentPortal .sp-exam-map-legend i.sp-exam-legend-review{ border-color:#dba74f; background:#fff4df; }
+#studentPortal .sp-exam-submission-note{ display:flex; align-items:flex-start; gap:7px; margin:0 0 14px; padding:10px; border-radius:6px; color:var(--sp-ink-soft); background:var(--sp-canvas,#f5f6f7); font-size:10.5px; line-height:1.6; }
+#studentPortal .sp-exam-submission-note i{ color:var(--sp-green); font-size:15px; }
+#studentPortal .sp-exam-submit-btn{ position:relative; z-index:1; width:100%; min-height:43px; display:flex; align-items:center; justify-content:center; gap:8px; border:0; border-radius:6px; background:linear-gradient(135deg,var(--sp-basair-dark),var(--sp-basair)); color:#fff; font-weight:700; box-shadow:0 8px 20px rgba(141,29,34,.18); }
+#studentPortal .sp-exam-submit-btn:hover{ filter:brightness(.96); }
+#studentPortal .sp-exam-submit-btn:disabled{ opacity:.6; cursor:not-allowed; filter:none; }
+
+#studentPortal .sp-exam-questions-region{ /*grid-area:questions;*/ min-width:0; }
+#studentPortal .sp-exam-questions-heading{ display:flex; align-items:end; justify-content:space-between; gap:20px; margin:0 0 15px; }
+#studentPortal .sp-exam-section-kicker{ display:block; margin-bottom:2px; color:var(--sp-basair); font-size:11px; font-weight:700; }
+#studentPortal .sp-exam-questions-heading h2{ margin:0; font-size:21px; }
+#studentPortal .sp-exam-completion-copy{ color:var(--sp-muted); font-size:12px; }
+#studentPortal .sp-exam-validation-alert{ display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; padding:12px 14px; border:1px solid #ead09e; border-radius:7px; background:#fff4df; color:#7f5717; font-size:12px; }
+#studentPortal .sp-exam-validation-alert i{ font-size:17px; }
+#studentPortal .sp-exam-questions-list{ display:grid; gap:14px; }
+
+#studentPortal .sp-exam-question-card{ position:relative; padding:21px 22px; background:#fff; border:1px solid var(--sp-line-strong); border-radius:8px; box-shadow:0 5px 18px rgba(35,41,48,.045); scroll-margin-top:98px; transition:border-color .2s, box-shadow .2s; }
+#studentPortal .sp-exam-question-card:focus-within{ border-color:#d8b1b4; box-shadow:0 8px 24px rgba(80,35,38,.08); }
+#studentPortal .sp-exam-question-card.needs-answer{ animation:sp-exam-alert 1.25s ease; border-color:#d6a54d; box-shadow:0 0 0 3px rgba(219,167,79,.13); }
+#studentPortal .sp-exam-question-card.correct{ border-color:#b8dccd; }
+#studentPortal .sp-exam-question-card.wrong{ border-color:#e3b8bb; }
+#studentPortal .sp-exam-question-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
+#studentPortal .sp-exam-question-number{ display:flex; align-items:center; gap:8px; color:var(--sp-basair); font-size:12px; font-weight:700; }
+#studentPortal .sp-exam-question-number b{ width:29px; height:29px; display:grid; place-items:center; border-radius:6px; background:var(--sp-red-soft); font-size:12px; }
+#studentPortal .sp-exam-review-btn{ display:flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--sp-muted); font-size:10.5px; padding:5px 0; }
+#studentPortal .sp-exam-review-btn:hover, #studentPortal .sp-exam-review-btn.active{ color:#a76a14; }
+#studentPortal .sp-exam-review-btn i{ font-size:15px; }
+/* حجم خط عنوان السؤال والإجابة مُكبَّر عمدًا عن المرجع الأصلي (16px/13.5px) بطلب صريح */
+#studentPortal .sp-exam-question-title{ margin:0 0 16px; font-size:19.5px; line-height:1.9; font-weight:700; text-align:right; }
+#studentPortal .sp-exam-answers-list{ display:grid; gap:9px; }
+#studentPortal .sp-exam-answer-option{ min-height:52px; display:grid; grid-template-columns:22px 1fr; align-items:center; gap:11px; padding:12px 14px; border:1px solid var(--sp-line-strong); border-radius:7px; background:#fff; cursor:pointer; transition:.16s; text-align:right; }
+#studentPortal .sp-exam-answer-option:hover{ border-color:#d8b1b4; background:#fffafa; }
+#studentPortal .sp-exam-answer-option:has(input:checked){ border-color:var(--sp-basair); background:var(--sp-red-soft); box-shadow:0 0 0 2px rgba(181,38,44,.07); }
+#studentPortal .sp-exam-answer-option input{ width:18px; height:18px; margin:0; accent-color:var(--sp-basair); }
+#studentPortal .sp-exam-answer-option input:disabled{ cursor:not-allowed; }
+#studentPortal .sp-exam-answer-option span{ font-size:16px; line-height:1.7; text-align:right; }
+#studentPortal .sp-exam-answer-option.sp-exam-correct-answer{ border-color:#84c3ab !important; background:var(--sp-green-soft) !important; color:var(--sp-green); }
+#studentPortal .sp-exam-answer-option.sp-exam-wrong-answer{ border-color:#d99ca0 !important; background:var(--sp-red-soft) !important; color:var(--sp-basair-dark); }
+#studentPortal .sp-exam-question-result{ display:flex; align-items:center; gap:7px; margin-top:12px; padding-top:11px; border-top:1px solid var(--sp-line-strong); font-size:12px; font-weight:700; }
+#studentPortal .sp-exam-question-result.correct{ color:var(--sp-green); }
+#studentPortal .sp-exam-question-result.wrong{ color:var(--sp-basair-dark); }
+
+#studentPortal .sp-exam-loading{ min-height:500px; pointer-events:none; }
+#studentPortal .sp-exam-loading>*{ visibility:hidden; }
+#studentPortal .sp-exam-loading::before{ content:""; position:absolute; z-index:5; inset:20px; border-radius:6px; background:linear-gradient(90deg,#eef0f2 25%,#f8f9fa 38%,#eef0f2 52%); background-size:400% 100%; animation:sp-exam-shimmer 1.25s infinite; }
+
+#studentPortal .sp-exam-modal-backdrop{ position:fixed; z-index:100; inset:0; display:grid; place-items:center; padding:18px; background:rgba(24,28,33,.58); backdrop-filter:blur(4px); }
+#studentPortal .sp-exam-confirm-dialog{ position:relative; width:min(440px,100%); padding:28px; background:#fff; border-radius:8px; box-shadow:0 28px 80px rgba(0,0,0,.24); text-align:center; }
+#studentPortal .sp-exam-dialog-close{ position:absolute; top:14px; left:14px; }
+#studentPortal .sp-exam-dialog-icon{ width:58px; height:58px; display:grid; place-items:center; margin:0 auto 13px; border-radius:50%; color:#fff; background:linear-gradient(145deg,var(--sp-basair-dark),var(--sp-basair)); font-size:25px; }
+#studentPortal .sp-exam-dialog-kicker{ color:var(--sp-basair); font-size:11px; font-weight:700; }
+#studentPortal .sp-exam-confirm-dialog h2{ margin:3px 0 7px; font-size:20px; }
+#studentPortal .sp-exam-confirm-dialog>p{ margin:0; color:var(--sp-muted); font-size:13px; }
+#studentPortal .sp-exam-dialog-summary{ margin:19px 0; display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--sp-line-strong); border-radius:7px; overflow:hidden; text-align:center; }
+#studentPortal .sp-exam-dialog-summary span{ padding:11px 13px; color:var(--sp-muted); font-size:10.5px; }
+#studentPortal .sp-exam-dialog-summary span+span{ border-right:1px solid var(--sp-line-strong); }
+#studentPortal .sp-exam-dialog-summary strong{ display:block; margin-top:2px; color:var(--sp-ink); font-size:13px; }
+#studentPortal .sp-exam-dialog-actions{ display:flex; gap:9px; }
+#studentPortal .sp-exam-dialog-actions button{ flex:1; }
+#studentPortal .sp-exam-primary-btn, #studentPortal .sp-exam-secondary-btn{ padding:8px 12px; min-height:43px; border-radius:6px; font-weight:700; }
+#studentPortal .sp-exam-primary-btn{ display:flex; align-items:center; justify-content:center; gap:6px; border:0; background:var(--sp-basair); color:#fff; }
+#studentPortal .sp-exam-secondary-btn{ border:1px solid var(--sp-line-strong); background:#fff; color:var(--sp-ink-soft); }
+#studentPortal .sp-exam-secondary-btn:hover{ color:var(--sp-basair); border-color:#d9b8bb; background:var(--sp-red-soft); }
+
+@keyframes sp-exam-shimmer{ 0%{ background-position:100% 0; } 100%{ background-position:-100% 0; } }
+@keyframes sp-exam-alert{ 0%,100%{ transform:none; } 35%{ transform:translateX(-4px); } 70%{ transform:translateX(3px); } }
+
+@media (max-width: 960px){
+  #studentPortal .sp-exam-intro-inner{ align-items:flex-start; flex-direction:column; gap:20px; }
+  #studentPortal .sp-exam-layout{ grid-template-columns:1fr; grid-template-areas:"summary" "questions"; gap:18px; }
+  #studentPortal .sp-exam-overview{ position:relative; top:auto; display:grid; grid-template-columns:140px minmax(0,1fr); gap:0 20px; padding:17px; }
+  #studentPortal .sp-exam-overview-heading{ grid-column:1/-1; }
+  #studentPortal .sp-exam-timer-block{ grid-row:2/5; padding:16px 0; border-left:1px solid var(--sp-line-strong); }
+  #studentPortal .sp-exam-timer-ring{ width:112px; }
+  #studentPortal .sp-exam-timer-ring strong{ font-size:21px; }
+  #studentPortal .sp-exam-progress-block{ align-self:end; border-top:0; }
+  #studentPortal .sp-exam-navigator-block{ padding-bottom:0; }
+  #studentPortal .sp-exam-question-map{ grid-template-columns:repeat(8,34px); overflow-x:auto; padding-bottom:4px; }
+  #studentPortal .sp-exam-question-map button{ width:34px; height:34px; aspect-ratio:auto; }
+  #studentPortal .sp-exam-submission-note{ display:none; }
+  #studentPortal .sp-exam-submit-btn{ grid-column:2; align-self:end; }
+  #studentPortal .sp-exam-loading{ min-height:220px; }
+}
+
+@media (max-width: 700px){
+  #studentPortal .sp-exam-header{ height:64px; }
+  #studentPortal .sp-exam-header-inner{ width:calc(100% - 24px); height:64px; gap:12px; }
+  #studentPortal .sp-exam-brand{ width:105px; }
+  #studentPortal .sp-exam-copy{ display:none; }
+  #studentPortal .sp-exam-header-status{ margin-right:auto; gap:11px; }
+  #studentPortal .sp-exam-mobile-timer{ display:flex; }
+  #studentPortal .sp-exam-student-chip{ min-width:auto; }
+  #studentPortal .sp-exam-student-chip>span{ width:34px; height:34px; font-size:12px; }
+  #studentPortal .sp-exam-student-chip div{ display:none; }
+  #studentPortal .sp-exam-intro-inner{ width:calc(100% - 24px); padding:22px 0; gap:16px; }
+  #studentPortal .sp-exam-intro-inner h1{ font-size:21px; }
+  #studentPortal .sp-exam-intro-inner p{ font-size:12.5px; line-height:1.8; }
+  #studentPortal .sp-exam-facts{ width:100%; }
+  #studentPortal .sp-exam-facts div{ flex:1; min-width:0; padding:9px 10px; }
+  #studentPortal .sp-exam-facts dt{ font-size:9px; }
+  #studentPortal .sp-exam-facts dd{ font-size:11px; }
+  #studentPortal .sp-exam-layout{ width:calc(100% - 24px); margin:14px auto 90px; gap:15px; }
+  /* المؤقت يظهر بالشريط العلوي (sp-exam-mobile-timer) فقط على الجوال — لا داعٍ لتكراره هنا في
+     بطاقة الملخّص، فتُحذف حلقة العدّاد كليًا ويُبسَّط الشريط لعمود واحد فقط */
+  #studentPortal .sp-exam-overview{ position:sticky; top:76px; z-index:45; display:block; padding:10px 12px; box-shadow:0 10px 24px rgba(35,41,48,.1); }
+  #studentPortal .sp-exam-overview-heading, #studentPortal .sp-exam-map-legend{ display:none; }
+  #studentPortal .sp-exam-timer-block{ display:none; }
+  #studentPortal .sp-exam-progress-block{ padding:0 0 8px; border:0; }
+  #studentPortal .sp-exam-progress-copy{ margin-bottom:5px; }
+  #studentPortal .sp-exam-navigator-block{ padding:0; min-width:0; }
+  #studentPortal .sp-exam-navigator-heading{ display:none; }
+  /* خريطة الأسئلة على الجوال: سطر أفقي واحد يُسحب يمينًا/يسارًا يدويًا، والسؤال الحالي يُوسَّط
+     تلقائيًا فيه (spExamCenterMapButton بـfuncs-js.html) بدل شبكة متعددة الأسطر */
+  #studentPortal .sp-exam-question-map{ display:flex; flex-wrap:nowrap; gap:6px; padding:2px 2px 4px; overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; scroll-padding-inline:50%; }
+  #studentPortal .sp-exam-question-map::-webkit-scrollbar{ display:none; }
+  #studentPortal .sp-exam-question-map button{ flex:0 0 auto; width:34px; height:34px; scroll-snap-align:center; }
+  #studentPortal .sp-exam-submit-btn{ position:fixed; z-index:70; right:12px; left:12px; bottom:12px; width:auto; min-height:50px; box-shadow:0 12px 30px rgba(76,18,21,.28); }
+  #studentPortal .sp-exam-loading{ min-height:104px; }
+  #studentPortal .sp-exam-questions-heading{ align-items:flex-start; }
+  #studentPortal .sp-exam-questions-heading h2{ font-size:18px; }
+  #studentPortal .sp-exam-completion-copy{ max-width:110px; text-align:left; font-size:10.5px; }
+  #studentPortal .sp-exam-question-card{ padding:16px 14px; scroll-margin-top:190px; }
+  #studentPortal .sp-exam-question-head{ margin-bottom:9px; }
+  #studentPortal .sp-exam-question-title{ font-size:17.5px; line-height:1.9; margin-bottom:13px; }
+  #studentPortal .sp-exam-review-btn span{ display:none; }
+  #studentPortal .sp-exam-answer-option{ min-height:54px; padding:10px 11px; }
+  #studentPortal .sp-exam-answer-option span{ font-size:15px; }
+  #studentPortal .sp-exam-modal-backdrop{ align-items:end; padding:0; }
+  #studentPortal .sp-exam-confirm-dialog{ width:100%; padding:26px 18px 22px; border-radius:8px 8px 0 0; }
+  #studentPortal .sp-exam-dialog-actions{ flex-direction:column-reverse; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  #studentPortal .sp-exam-app *{ scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+</style>

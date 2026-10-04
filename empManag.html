@@ -1,0 +1,56 @@
+
+<button class="btn shadow-sm btn-outline-danger fs-4 px-4 backEmp" title="عودة للصفحة الرئيسية"><i class="bi bi-arrow-right"></i></button>
+
+<!-----===============================================----->
+
+
+<!----------------- users Temp ------------->
+
+
+      <div id="usersContainer" class="mx-auto" style="max-width: 1000px;">
+
+      </div>
+
+  
+  <!-----===============================================----->
+<template id="usersRow">
+  <div class="card mb-3 p-3 shadow-sm userRow border-0 border-end border-danger border-4">
+    <div class="card-body">
+      <!-- معلومات المستخدم: responsive -->
+      <div class="row align-items-center mb-3 text-center text-md-start">
+        <div class="col-12 col-md-auto num align-middle mb-1 mb-md-0"><strong class="num"></strong></div>
+        <div class="col-12 col-md-auto cpr align-middle mb-1 mb-md-0"><span class="cpr"></span></div>
+        <div class="col-12 col-md name align-middle text-md-end mb-1 mb-md-0"><span class="name"></span></div>
+        <div class="col-12 col-md-auto phone align-middle mb-1 mb-md-0"><span class="phone"></span></div>
+        <div class="col-12 col-md-auto gender align-middle mb-1 mb-md-0"><span class="gender"></span></div>
+      </div>
+
+      <!-- checkboxes في صف واحد، responsive -->
+      <div class="d-flex flex-wrap justify-content-around gap-3">
+        <!-- المجموعة الأولى -->
+        <div class="form-check form-check-inline flex-column text-center">
+          <label class="form-check-label mb-1 registrationLbl">حضور</label>
+          <input class="form-check-input color-checkbox registration" type="checkbox">
+        </div>
+        <!-- المجموعة الثانية -->
+        <div class="form-check form-check-inline flex-column text-center">
+          <label class="form-check-label mb-1 dictationLbl">تسميع</label>
+          <input class="form-check-input color-checkbox dictation" type="checkbox">
+        </div>
+        <!-- المجموعة الثالثة -->
+        <div class="form-check form-check-inline flex-column text-center">
+          <label class="form-check-label mb-1 examLbl">اختبار</label>
+          <input class="form-check-input color-checkbox exam" type="checkbox">
+        </div>
+        <!-- المجموعة الرابعة -->
+        <div class="form-check form-check-inline flex-column text-center">
+          <label class="form-check-label mb-1 manageLbl">إدارة</label>
+          <input class="form-check-input color-checkbox manage" type="checkbox">
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+  <!-----===============================================----->
+

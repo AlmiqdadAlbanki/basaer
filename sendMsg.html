@@ -1,0 +1,77 @@
+<!-- هذه الصفحة غير قابلة للوصول من emp.html (تأكّدنا من ذلك)، بخلاف طلبات التسجيل/الحضور، لذا
+     لا يوجد زر "عودة" هنا — التنقل الدائم عبر الشريط الجانبي للوحة الإدارة الجديدة كافٍ دومًا. -->
+
+<section class="queue-band" data-live data-skeleton="compact">
+  <div class="live-content">
+    <span class="queue-icon"><i data-icon="circle-check-big"></i></span>
+    <div>
+      <strong id="wpQueueStatusText">جارٍ التحقق...</strong>
+      <small id="wpQueueProgressWrap" class="d-none"><span style="display:block;height:6px;border-radius:4px;background:#eef1f3;overflow:hidden;margin-top:6px;"><span id="wpQueueProgressBar" style="display:block;height:100%;width:0%;background:#1d8e5e;border-radius:4px;"></span></span></small>
+    </div>
+    <button class="secondary-button" type="button" id="wpQueueRefreshBtn"><i data-icon="refresh-cw"></i>تحديث</button>
+    <button class="danger-button d-none" type="button" id="wpQueueStopBtn">إيقاف الإرسال</button>
+    <button class="secondary-button d-none" type="button" id="wpQueueDetailsBtn"><i data-icon="eye"></i>عرض التفاصيل</button>
+  </div>
+</section>
+
+<section class="panel message-composer" style="min-height:auto;">
+  <header class="panel-header"><div><h2>الرسالة الجديدة</h2><p>اختر المرحلة والمجموعة ثم راجع الرسالة قبل الإرسال.</p></div></header>
+  <div class="form-stack">
+    <div class="field">
+      <label>المرحلة</label>
+      <div class="choice-grid" id="msgStageGroup">
+        <button class="active" type="button" data-stage="reg00">التأهيلية</button>
+        <button type="button" data-stage="reg01">التأسيسية</button>
+        <button type="button" data-stage="reg02">التأصيلية</button>
+        <button type="button" data-stage="reg03">التحصيلية</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>المجموعة</label>
+      <div class="segmented" id="msgGenderGroup">
+        <button class="active" type="button" data-gender="all">الجميع <b id="msgCountAll">0</b></button>
+        <button type="button" data-gender="male">الذكور <b id="msgCountMale">0</b></button>
+        <button type="button" data-gender="female">الإناث <b id="msgCountFemale">0</b></button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="msgTextArea">نص الرسالة</label>
+      <textarea id="msgTextArea" rows="7" maxlength="800" placeholder="اكتب الرسالة هنا..."></textarea>
+      <small><span id="msgCharCount">0</span> / 800</small>
+    </div>
+    <div class="composer-actions">
+      <button class="whatsapp-button" id="msgSendBtn" type="button"><i data-icon="message-circle"></i>إرسال إلى 0 طالب</button>
+    </div>
+  </div>
+</section>
+
+<section class="panel data-panel" data-live data-skeleton="table" style="margin-top:16px;">
+  <div class="live-content">
+    <div class="table-toolbar">
+      <div class="toolbar-title"><h2>المستلمون</h2><span id="msgRecipientsHint">طلاب المرحلة التأهيلية</span></div>
+      <label class="table-search"><i data-icon="search"></i><input id="msgSearchInput" type="search" placeholder="ابحث بالاسم أو الهاتف..."></label>
+    </div>
+    <div class="responsive-table">
+      <table id="msgRecipientsTable">
+        <thead>
+          <tr>
+            <th style="width:38px;"><input type="checkbox" class="row-check" id="msgSelectAll"></th>
+            <th style="width:44px;">#</th>
+            <th data-sort="name">الطالب</th>
+            <th data-sort="gender" style="width:100px;">الجنس</th>
+          </tr>
+        </thead>
+        <tbody id="msgRecipientsBody">
+        </tbody>
+      </table>
+    </div>
+    <footer class="table-footer">
+      <span>عدد النتائج المعروضة: <b id="msg-visible-count">0</b></span>
+      <div class="page-size">
+        <label for="msgPageSize">عدد الصفوف</label>
+        <select id="msgPageSize"><option value="50">50</option><option value="100">100</option></select>
+      </div>
+      <div class="pagination" id="msgPagination"></div>
+    </footer>
+  </div>
+</section>

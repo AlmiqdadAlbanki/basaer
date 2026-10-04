@@ -1,0 +1,123 @@
+
+<div id="modalLogin" class="modal d-block align-items-center animate__animated animate__fadeIn">
+  <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border rounded-5 text-center p-5 pb-4 mx-auto"
+        style="max-width: 600px !important; box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+        <div class="logHead mb-3">
+          <div id="logoDiv" class="mx-auto animate__animated animate__zoomIn" style="display:flex;justify-content:center;align-items:center;overflow:hidden;">
+            <img id="logo" src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&sz=w1000.png"
+                  style="max-width:170px;width:60%;height:auto;display:block;margin:0 auto;">
+          </div>
+          <div class="modal-header pt-4 border-0 justify-content-center">
+            <p class="modal-title text-secondary small mb-0">أدخل رقمك الشخصي</p>
+          </div>
+        </div>
+
+        <div id="cprPane">
+          <form id="cprStepForm" onsubmit="return false;">
+            <div class="form-floating mb-3">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="9" class="form-control text-center fw-bold fs-4 rounded-5" style="direction: ltr;" id="userId" required>
+              <label for="userId">الرقم الشخصي / هوية الدخول</label>
+            </div>
+
+            <p class="text-muted small mb-3" id="noAccountNote">
+              ليس لديك حساب؟
+              <a href="#" id="goToRegisterLink" class="text-danger fw-bold text-decoration-none">إنشاء حساب جديد</a>
+            </p>
+
+            <div id="cprCheckStatus" class="text-muted small mb-2 d-none">
+              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              جاري البحث...
+            </div>
+
+            <div id="passwordLoginDiv" class="form-floating mb-2 position-relative d-none">
+              <input type="password" class="form-control text-center fs-5 rounded-5" id="loginPassword" placeholder="كلمة المرور" style="padding-inline-end:45px;">
+              <label for="loginPassword">كلمة المرور</label>
+              <i class="fas fa-eye position-absolute" id="toggleLoginPassword" style="top:50%; inset-inline-end:15px; transform:translateY(-50%); cursor:pointer; color:#888; z-index:5;"></i>
+            </div>
+            <div id="rememberMeWrap" class="form-check text-end mb-2 d-none">
+              <input class="form-check-input" type="checkbox" id="rememberMeCheck" style="float:none;margin-inline-start:0;margin-inline-end:.5em;vertical-align:middle;">
+              <label class="form-check-label text-secondary small" for="rememberMeCheck" style="vertical-align:middle;">تذكرني</label>
+            </div>
+            <button type="button" id="forgotPasswordBtn" class="btn btn-link btn-sm text-secondary d-none mb-2">نسيت كلمة المرور؟</button>
+
+            <p class="text-muted small mb-2 d-none" id="emailCaptureNote"></p>
+            <div id="emailCaptureDiv" class="form-floating mb-3 d-none">
+              <input type="email" class="form-control text-center fs-5 rounded-5" style="direction: ltr;" id="emailCapture" placeholder="name@example.com">
+              <label for="emailCapture">بريدك الإلكتروني (لتفعيل حسابك لأول مرة)</label>
+            </div>
+
+            <div id="cprActionButtons" class="d-none">
+              <div class="d-flex gap-2 mt-4 mb-2">
+                <button id="passwordLoginBtn" type="button" class="btn btn-danger rounded-5 flex-fill d-none">
+                  دخـول
+                  <div id="passwordLoginSpin" class="spinner-border spinner-border-sm text-light d-none ms-2" role="status"></div>
+                </button>
+                <button id="sendCodeBtn" type="button" class="btn btn-danger rounded-5 flex-fill d-none">
+                  إرسال رمز التحقق
+                  <div id="sendCodeSpin" class="spinner-border spinner-border-sm text-light d-none ms-2" role="status"></div>
+                </button>
+              </div>
+              <!-- نعرف مزوّد بريده المسجَّل مسبقًا، فنعرض زر ذلك المزوّد تحديدًا فقط (تحقق فوري
+                   ودقيق 100%، دون الحاجة لطلب رمز أو إدخال يدوي) — إن لم يطابق بريده أيًا من
+                   الثلاثة، يظهر "إرسال رمز التحقق" أعلاه بدلًا منها. -->
+              <button id="googleLoginBtn" type="button"
+                class="btn btn-outline-secondary rounded-5 w-100 mb-2 d-flex align-items-center justify-content-center gap-2 d-none">
+                <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                  <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
+                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.581C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"/>
+                </svg>
+                <span>التحقق من بريدك عبر جوجل</span>
+                <div id="googleLoginSpin" class="spinner-border spinner-border-sm d-none ms-1" role="status"></div>
+              </button>
+              <button id="yahooLoginBtn" type="button"
+                class="btn btn-outline-secondary rounded-5 w-100 mb-2 d-flex align-items-center justify-content-center gap-2 d-none">
+                <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#6001D2" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/><path fill="#fff" d="M9.5 7l2 4.7L13.5 7H16l-3.4 7.3V17h-2.2v-2.7L7 7h2.5z"/></svg>
+                <span>التحقق من بريدك عبر ياهو</span>
+                <div id="yahooLoginSpin" class="spinner-border spinner-border-sm d-none ms-1" role="status"></div>
+              </button>
+              <p class="text-muted small mb-2 d-none" id="providerEmailNote"></p>
+              <button type="button" id="skipEmailVerifyBtn" class="btn btn-link btn-sm text-secondary d-block mx-auto mt-1 d-none">
+                تجاوز التحقق من البريد الإلكتروني إلى وقت لاحق
+                <div id="skipEmailVerifySpin" class="spinner-border spinner-border-sm d-none ms-1" role="status"></div>
+              </button>
+            </div>
+          </form>
+
+          <form id="codeStepForm" class="d-none" onsubmit="return false;">
+            <p class="text-muted small mb-3" id="codeSentNote"></p>
+            <div class="form-floating mb-3">
+              <input type="text" inputmode="numeric" maxlength="6" class="form-control text-center fw-bold fs-3 rounded-5" style="direction: ltr; letter-spacing:8px" id="otpCode" required>
+              <label for="otpCode">رمز التحقق</label>
+            </div>
+            <div class="mt-4 mb-2">
+              <button id="verifyCodeBtn" type="button" class="btn btn-lg fs-5 fw-bold btn-danger rounded-5 w-100">
+                دخـول
+                <div id="verifySpin" class="spinner-border spinner-border-sm text-light d-none ms-2" role="status"></div>
+              </button>
+            </div>
+            <button type="button" id="resendCodeBtn" class="btn btn-link btn-sm text-secondary">إعادة إرسال الرمز</button>
+          </form>
+        </div>
+
+          <div class="d-flex justify-content-center gap-4 mt-3 mx-auto border-top w-100 pt-3">
+
+            <a href="https://wa.me/97334440790" target="_blank"
+              class="text-secondary border-0 d-flex align-items-center gap-2 rounded-pill">
+              <i class="fab fa-whatsapp fs-3"></i></a>
+
+            <a href="https://www.instagram.com/basaer.bh/" target="_blank"
+              class="text-secondary border-0 d-flex align-items-center gap-2 rounded-pill">
+              <i class="fab fa-instagram fs-3"></i></a>
+
+            <a href="https://www.youtube.com/@basaer_bh" target="_blank"
+              class="text-secondary border-0 d-flex align-items-center gap-2 rounded-pill">
+              <i class="fab fa-youtube fs-3"></i></a>
+          </div>
+
+      </div>
+  </div>
+</div>
+

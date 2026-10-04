@@ -1,0 +1,54 @@
+<div class="attend-page">
+  <style>
+    .attend-page { max-width: 1100px; margin: 0 auto; padding: 20px 18px; }
+    .attend-back-row { margin-bottom: 14px; }
+  </style>
+
+  <div class="attend-back-row">
+    <button type="button" class="secondary-button backEmp" title="عودة للصفحة الرئيسية"><i data-icon="arrow-right"></i>عودة</button>
+  </div>
+
+  <header class="page-heading">
+    <div><span class="eyebrow">تسجيل الحضور</span><h1>تسجيل الحضور</h1><p>ابحث عن الطالب لفتح بطاقته أو تواصل معه واتساب، أو افتح قارئ QR مباشرة.</p></div>
+    <div class="heading-actions">
+      <button type="button" class="primary-button" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i>فتح قارئ QR</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="table-toolbar">
+      <form id="searchForm" onsubmit="return false" style="display:flex;align-items:center;gap:9px;width:100%;">
+        <label class="table-search" style="flex:1;"><i data-icon="search"></i><input id="searchuser" type="search" placeholder="اكتب جزءًا من الاسم"></label>
+        <button id="clearSearchuser" type="reset" class="icon-button" title="إعادة تعيين البحث"><i data-icon="refresh-cw"></i></button>
+      </form>
+    </div>
+    <div class="responsive-table">
+      <table id="usersTable">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">الاسم</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="usersContainer">
+
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-----===============================================----->
+<template id="usersRow">
+  <tr class="userRow">
+    <th class="num align-middle"></th>
+    <td class="name align-middle"></td>
+    <td class="align-middle">
+      <div class="table-actions">
+        <button type="button" class="icon-button showCard" title="عرض بطاقة QR"><i data-icon="scan-qr-code"></i></button>
+        <button type="button" class="icon-button wpd" title="تواصل واتساب"><i data-icon="message-circle"></i></button>
+      </div>
+    </td>
+  </tr>
+</template>

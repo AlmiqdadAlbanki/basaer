@@ -1,0 +1,615 @@
+<div class="regPage">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    .regPage{
+      --red:#b5262c;
+      --red-dark:#8d1d22;
+      --ink:#222832;
+      --muted:#6f7785;
+      --line:#e8dde0;
+      --danger:#c83232;
+      font-family: 'Tajawal', Tahoma, Arial, sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 14%, rgba(181,38,44,.09), transparent 32%),
+        radial-gradient(circle at 88% 78%, rgba(182,132,74,.12), transparent 30%),
+        linear-gradient(135deg,#fff 0%,#fbf8f5 50%,#f7eeee 100%);
+      padding:24px;
+      border-radius:24px;
+    }
+    .regPage *{box-sizing:border-box}
+    .regPage .page{
+      width:100%;
+      max-width: 1180px !important;
+      margin:auto;
+      display:grid;
+      grid-template-columns:300px 1fr;
+      background:rgba(255,255,255,.88);
+      border:1px solid rgba(141,29,34,.12);
+      border-radius:26px;
+      box-shadow:0 24px 70px rgba(40, 31, 28, .14);
+      overflow:hidden;
+      position:relative;
+    }
+    .regPage .side{
+      position:relative; z-index:1;
+      background:linear-gradient(135deg,#7d171c,#a52228);
+      color:#fff; padding:38px 30px;
+      display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;
+    }
+    .regPage .side:before{
+      content:""; position:absolute; inset:0;
+      background:url('https://basaerbh.com/assets/images/logo-mark-white.png') no-repeat center/70% ;
+      opacity:.16; pointer-events:none;
+    }
+    .regPage .regLogoWrap{ position:relative; z-index:1; background:#fff; border-radius:16px; padding:10px; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
+    .regPage .regLogoWrap img{ max-width:130px; width:100%; height:auto; display:block; }
+    .regPage .side h1{margin:0;font-size:24px;line-height:1.5;position:relative;z-index:1}
+    .regPage .side p{margin:14px 0 0;color:rgba(255,255,255,.78);font-size:14px;line-height:1.9;position:relative;z-index:1}
+    .regPage .help-card{
+      position:relative;z-index:1;background:rgba(255,255,255,.11);
+      border-radius:16px;padding:14px;backdrop-filter:blur(8px);color:rgba(255,255,255,.9);font-size:12.5px;line-height:1.8;
+    }
+    .regPage .main{position:relative;z-index:1;padding:32px 34px 28px;display:flex;flex-direction:column;min-width:0}
+    .regPage .title-block small{color:var(--red);font-weight:800;font-size:13px}
+    .regPage .title-block h2{margin:4px 0 22px;font-size:23px;line-height:1.3}
+    .regPage .form-shell{ display:grid;gap:18px; }
+    .regPage .section-title{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--line)}
+    .regPage .section-title h3{margin:0;font-size:17px}
+    .regPage .section-title span{color:var(--muted);font-size:12px}
+    .regPage .grid{display:flex;flex-wrap:wrap;gap:16px 18px;align-content:start}
+    .regPage .field{flex:1 1 220px;display:grid;gap:6px;min-width:0}
+    .regPage .field label{color:#4f5966;font-weight:700;font-size:12.5px}
+    .regPage .control{
+      width:100%;height:46px;background:#fff;border:1px solid #dde3e8;border-radius:12px;
+      padding:0 13px;color:#465465;font-size:14px;box-shadow:0 7px 18px rgba(31,41,55,.035);
+      outline:none;transition:.18s; text-align:center;
+    }
+    .regPage textarea.control{ height:auto; padding:10px 13px; text-align:right; }
+    .regPage select.control{appearance:auto}
+    .regPage .control:focus{border-color:rgba(181,38,44,.55);box-shadow:0 0 0 4px rgba(181,38,44,.08)}
+    .regPage .control.is-valid{border-color:rgba(23,135,90,.55)}
+    .regPage .control.is-invalid{border-color:rgba(200,50,50,.62)}
+    .regPage .invalid-feedback{min-height:15px;color:var(--danger);font-size:11px;text-align:end;display:none}
+    .regPage .is-invalid ~ .invalid-feedback,
+    .regPage .was-validated .control:invalid ~ .invalid-feedback{display:block}
+    .regPage .verify-row{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+    .regPage .verify-row .field{flex:1 1 240px}
+    .regPage .verify-row .mini-btn{flex:0 0 200px;width:auto}
+    .regPage .verify-code-row{flex:1 1 100%}
+    .regPage .oauth-icon-row{flex:1 1 100%;display:flex;align-items:center;justify-content:center;gap:12px}
+    .regPage .oauth-icon-btn{
+      position:relative;
+      display:flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border-radius:12px;
+      border:1px solid #dde3e8;background:#fff;color:#6f7785;font-size:18px;
+      cursor:pointer;box-shadow:0 2px 6px rgba(31,41,55,.06);transition:.15s;
+    }
+    .regPage .oauth-icon-btn:hover{box-shadow:0 4px 12px rgba(31,41,55,.12)}
+    .regPage .oauth-icon-btn:disabled{opacity:.65;cursor:not-allowed}
+    .regPage .oauth-icon-btn .spinner-border{position:absolute;inset:0;margin:auto;width:18px;height:18px}
+    .regPage .oauth-inline-icon-btn{
+      display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;
+      border:0;background:transparent;vertical-align:middle;cursor:pointer;
+    }
+    .regPage .manual-email-wrap{flex:1 1 100%;display:flex;flex-direction:column;gap:16px}
+    .regPage .google-verified-note{
+      flex:1 1 100%;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+      background:#f0faf5;border:1px solid rgba(23,135,90,.3);color:#158055;border-radius:12px;
+      padding:10px 14px;font-size:13px;font-weight:700;
+    }
+    .regPage .google-undo-btn{
+      border:0;background:transparent;color:#158055;text-decoration:underline;font-size:12px;font-weight:700;cursor:pointer;
+    }
+    .regPage .hint{margin-top:2px;color:var(--muted);font-size:11.5px;line-height:1.7}
+    .regPage .mini-btn{
+      height:46px;border:1px solid rgba(23,135,90,.42);background:#f8fffb;color:#158055;
+      border-radius:12px;font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center;gap:6px;
+      cursor:pointer;
+    }
+    .regPage .backToLoginBtn{
+      display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;
+      border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;padding:2px;
+    }
+    .regPage .backToLoginBtn:hover{color:var(--red)}
+    .regPage .experience{
+      background:linear-gradient(135deg,#fff,#fbf7f5);border:1px solid var(--line);
+      border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    }
+    .regPage .experience strong{font-size:14.5px}
+    .regPage .experience small{display:block;color:var(--muted);margin-top:3px}
+    .regPage .choice-group{display:flex;gap:8px;background:#fff;padding:5px;border:1px solid #e3e7eb;border-radius:14px}
+    .regPage .regChoice{
+      min-width:90px;text-align:center;border:0;border-radius:10px;padding:9px 16px;background:transparent;color:#596474;
+      font-weight:800;cursor:pointer;font-size:13px;
+    }
+    .regPage input.btn-check:checked + .regChoice{background:linear-gradient(135deg,var(--red-dark),var(--red));color:#fff;box-shadow:0 10px 22px rgba(181,38,44,.2)}
+    .regPage .field.field-phone{display:flex;flex-wrap:wrap;gap:8px}
+    .regPage .field.field-phone label{flex:1 1 100%}
+    .regPage .field.field-phone select{flex:0 0 128px}
+    .regPage .field.field-phone input{flex:1 1 140px;min-width:0}
+    .regPage .field.field-phone .invalid-feedback{flex:1 1 100%}
+    .regPage .phone-country-badge{
+      flex:0 0 auto;height:46px;padding:0 14px;display:flex;align-items:center;gap:6px;
+      background:#f5f6f7;border:1px solid #dde3e8;border-radius:12px;color:#465465;font-weight:700;font-size:13px;
+    }
+    .regPage .residency-note{
+      flex:1 1 100%;border-radius:12px;padding:11px 14px;font-size:12.5px;line-height:1.8;
+      background:#fff7ea;border:1px solid rgba(167,106,20,.28);color:#7a5410;
+    }
+    .regPage .residency-note i{margin-inline-end:6px}
+    .regPage .actions{display:flex;justify-content:space-between;align-items:center;gap:14px;padding-top:4px;flex-wrap:wrap}
+    .regPage .note{color:var(--muted);font-size:11.5px}
+    .regPage .submit{
+      border:0;border-radius:13px;padding:13px 30px;background:linear-gradient(135deg,var(--red-dark),var(--red));
+      color:#fff;font-weight:900;font-size:14px;box-shadow:0 16px 32px rgba(181,38,44,.24);cursor:pointer;
+    }
+    @media(max-width:900px){
+      .regPage{padding:12px}
+      .regPage .page{grid-template-columns:1fr}
+      .regPage .side{display:none}
+      .regPage .main{padding:0 0 20px}
+      .regPage .experience,.regPage .actions{align-items:stretch;flex-direction:column}
+      .regPage .choice-group{display:grid;grid-template-columns:1fr 1fr}
+      .regPage .form-shell{padding:0 14px}
+      .regPage .verify-row{flex-direction:column}
+      .regPage .verify-row .field,.regPage .verify-row .mini-btn{flex:1 1 auto;width:100%}
+
+      .regPage .title-block{
+        position:relative; overflow:hidden;
+        background:linear-gradient(135deg,#7d171c,#a52228);
+        color:#fff; padding:26px 20px 22px; margin-bottom:20px;
+      }
+      .regPage .title-block:before{
+        content:""; position:absolute; inset:0;
+        background:url('https://basaerbh.com/assets/images/logo-mark-white.png') no-repeat center/55%;
+        opacity:.16; pointer-events:none;
+      }
+      .regPage .title-block small{position:relative;z-index:1;color:#f0d3d4}
+      .regPage .title-block h2{position:relative;z-index:1;color:#fff;margin-bottom:0}
+    }
+  </style>
+
+  <div class="page">
+    <aside class="side">
+      <div>
+        <div class="regLogoWrap">
+          <img src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&amp;sz=w1000.png">
+        </div>
+        <h1>تسجيل بيانات الطالب</h1>
+        <p>أكمل الحقول المطلوبة، ثم تحقق من بريدك الإلكتروني لإتمام التسجيل.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <button type="button" class="backToLoginBtn" onclick="loadLogin()">
+        <i class="bi bi-arrow-right"></i> العودة لتسجيل الدخول
+      </button>
+
+      <div class="title-block">
+        <small>تسجيل بيانات</small>
+        <h2>أكمل بياناتك للانضمام إلى بصائر</h2>
+      </div>
+
+      <form id="regForm" class="form-shell" onsubmit="return false">
+        <!-- تم اختيار الإقامة بالفعل في مودال صفحة تسجيل الدخول (showResidencyGateModal) قبل
+             الوصول لهذا الفورم، فلا داعي لسؤالها مجددًا هنا — تبقى الحقول (مخفية) فقط لتخزين
+             الحالة التي حُدِّدت سلفًا وتُقرأ برمجيًا (راجع forNewReg/applyResidencyChoice). -->
+        <div class="experience d-none">
+          <div>
+            <strong>مكان الإقامة</strong>
+            <small>هل أنت مقيم بالبحرين، أم خارجها وتودّ الدراسة عن بُعد؟</small>
+          </div>
+          <div class="choice-group">
+            <input type="radio" class="btn-check" name="residency" id="residencyBahrain" value="bahrain" checked autocomplete="off">
+            <label class="regChoice" for="residencyBahrain">مقيم بالبحرين</label>
+
+            <input type="radio" class="btn-check" name="residency" id="residencyAbroad" value="abroad" autocomplete="off">
+            <label class="regChoice" for="residencyAbroad">خارج البحرين</label>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <h3>البيانات الأساسية</h3>
+          <span>الحقول المطلوبة موضحة داخل النموذج</span>
+        </div>
+
+        <div class="grid">
+          <div class="field" id="cprFieldWrap">
+            <label for="cprBox">الرقم الشخصي</label>
+            <input class="control" name="cprBox" type="text" id="cprBox" pattern="^[0-9]{9}$" required>
+            <div id="cprBoxValid" class="invalid-feedback">يرجى كتابة الرقم الشخصي كما هو بالبطاقة السكانية</div>
+          </div>
+
+          <div class="residency-note d-none" id="remoteStudyNote">
+            <i>🌐</i>بما أنك خارج البحرين، ستكون دراستك عن بُعد بالكامل.
+          </div>
+
+          <div class="field">
+            <label for="userNameBox">الاسم كاملًا</label>
+            <input class="control" name="userNameBox" type="text" id="userNameBox" pattern="^[ء-ي\s a-zA-Z\s]+$" required>
+            <div id="userNameBoxValid" class="invalid-feedback">يرجى كتابة الاسم كما هو بالبطاقة السكانية دون رموز</div>
+          </div>
+
+          <div class="field">
+            <label for="dobReg">تاريخ الميلاد</label>
+            <input class="control" name="dobReg" type="date" id="dobReg" required>
+            <div id="dobRegValid" class="invalid-feedback">يرجى إدخال تاريخ الميلاد بشكل صحيح</div>
+          </div>
+
+          <div class="field">
+            <label for="gender">الجنس</label>
+            <select class="control" id="gender" required>
+                <option></option>
+                <option>ذكر</option>
+                <option>أنثى</option>
+            </select>
+            <div id="genderValid" class="invalid-feedback">يرجى اختيار قيمة صحيحة</div>
+          </div>
+
+          <div class="field">
+            <label for="nationality">الجنسية</label>
+            <select class="control" id="nationality" required>
+                      <option></option>
+                      <option>البحرين</option>
+                      <option>أذربيجان</option>
+                      <option>أرمينيا</option>
+                      <option>أسبانيا</option>
+                      <option>أستراليا</option>
+                      <option>أفغانستان</option>
+                      <option>ألبانيا</option>
+                      <option>ألمانيا</option>
+                      <option>أنتيجوا وبربودا</option>
+                      <option>أنجولا</option>
+                      <option>أنجويلا</option>
+                      <option>أندورا</option>
+                      <option>أورجواي</option>
+                      <option>أوزبكستان</option>
+                      <option>أوغندا</option>
+                      <option>أوكرانيا</option>
+                      <option>أيرلندا</option>
+                      <option>أيسلندا</option>
+                      <option>اثيوبيا</option>
+                      <option>اريتريا</option>
+                      <option>استونيا</option>
+                      <option>الأرجنتين</option>
+                      <option>الأردن</option>
+                      <option>الاكوادور</option>
+                      <option>الامارات العربية المتحدة</option>
+                      <option>الباهاما</option>
+                      <option>البرازيل</option>
+                      <option>البرتغال</option>
+                      <option>البوسنة والهرسك</option>
+                      <option>الجابون</option>
+                      <option>الجبل الأسود</option>
+                      <option>الجزائر</option>
+                      <option>الدانمرك</option>
+                      <option>الرأس الأخضر</option>
+                      <option>السلفادور</option>
+                      <option>السنغال</option>
+                      <option>السودان</option>
+                      <option>السويد</option>
+                      <option>الصحراء الغربية</option>
+                      <option>الصومال</option>
+                      <option>الصين</option>
+                      <option>العراق</option>
+                      <option>الفاتيكان</option>
+                      <option>الفيلبين</option>
+                      <option>القطب الجنوبي</option>
+                      <option>الكاميرون</option>
+                      <option>الكونغو - برازافيل</option>
+                      <option>الكويت</option>
+                      <option>المجر</option>
+                      <option>المحيط الهندي البريطاني</option>
+                      <option>المغرب</option>
+                      <option>المقاطعات الجنوبية الفرنسية</option>
+                      <option>المكسيك</option>
+                      <option>المملكة العربية السعودية</option>
+                      <option>المملكة المتحدة</option>
+                      <option>النرويج</option>
+                      <option>النمسا</option>
+                      <option>النيجر</option>
+                      <option>الهند</option>
+                      <option>الولايات المتحدة الأمريكية</option>
+                      <option>اليابان</option>
+                      <option>اليمن</option>
+                      <option>اليونان</option>
+                      <option>اندونيسيا</option>
+                      <option>ايران</option>
+                      <option>ايطاليا</option>
+                      <option>بابوا غينيا الجديدة</option>
+                      <option>باراجواي</option>
+                      <option>باكستان</option>
+                      <option>بالاو</option>
+                      <option>بتسوانا</option>
+                      <option>بتكايرن</option>
+                      <option>بربادوس</option>
+                      <option>برمودا</option>
+                      <option>بروناي</option>
+                      <option>بلجيكا</option>
+                      <option>بلغاريا</option>
+                      <option>بليز</option>
+                      <option>بنجلاديش</option>
+                      <option>بنما</option>
+                      <option>بنين</option>
+                      <option>بوتان</option>
+                      <option>بورتوريكو</option>
+                      <option>بوركينا فاسو</option>
+                      <option>بوروندي</option>
+                      <option>بولندا</option>
+                      <option>بوليفيا</option>
+                      <option>بولينيزيا الفرنسية</option>
+                      <option>بيرو</option>
+                      <option>تانزانيا</option>
+                      <option>تايلند</option>
+                      <option>تايوان</option>
+                      <option>تركمانستان</option>
+                      <option>تركيا</option>
+                      <option>ترينيداد وتوباغو</option>
+                      <option>تشاد</option>
+                      <option>توجو</option>
+                      <option>توفالو</option>
+                      <option>توكيلو</option>
+                      <option>تونجا</option>
+                      <option>تونس</option>
+                      <option>تيمور الشرقية</option>
+                      <option>جامايكا</option>
+                      <option>جبل طارق</option>
+                      <option>جرينادا</option>
+                      <option>جرينلاند</option>
+                      <option>جزر أولان</option>
+                      <option>جزر الأنتيل الهولندية</option>
+                      <option>جزر الترك وجايكوس</option>
+                      <option>جزر القمر</option>
+                      <option>جزر الكايمن</option>
+                      <option>جزر المارشال</option>
+                      <option>جزر الملديف</option>
+                      <option>جزر الولايات المتحدة البعيدة الصغيرة</option>
+                      <option>جزر سليمان</option>
+                      <option>جزر فارو</option>
+                      <option>جزر فرجين الأمريكية</option>
+                      <option>جزر فرجين البريطانية</option>
+                      <option>جزر فوكلاند</option>
+                      <option>جزر كوك</option>
+                      <option>جزر كوكوس</option>
+                      <option>جزر ماريانا الشمالية</option>
+                      <option>جزر والس وفوتونا</option>
+                      <option>جزيرة الكريسماس</option>
+                      <option>جزيرة بوفيه</option>
+                      <option>جزيرة مان</option>
+                      <option>جزيرة نورفوك</option>
+                      <option>جزيرة هيرد وماكدونالد</option>
+                      <option>جمهورية افريقيا الوسطى</option>
+                      <option>جمهورية التشيك</option>
+                      <option>جمهورية الدومينيك</option>
+                      <option>جمهورية الكونغو الديمقراطية</option>
+                      <option>جمهورية جنوب افريقيا</option>
+                      <option>جواتيمالا</option>
+                      <option>جوادلوب</option>
+                      <option>جوام</option>
+                      <option>جورجيا</option>
+                      <option>جورجيا الجنوبية وجزر ساندويتش الجنوبية</option>
+                      <option>جيبوتي</option>
+                      <option>جيرسي</option>
+                      <option>دومينيكا</option>
+                      <option>رواندا</option>
+                      <option>روسيا</option>
+                      <option>روسيا البيضاء</option>
+                      <option>رومانيا</option>
+                      <option>روينيون</option>
+                      <option>زامبيا</option>
+                      <option>زيمبابوي</option>
+                      <option>ساحل العاج</option>
+                      <option>ساموا</option>
+                      <option>ساموا الأمريكية</option>
+                      <option>سان مارينو</option>
+                      <option>سانت بيير وميكولون</option>
+                      <option>سانت فنسنت وغرنادين</option>
+                      <option>سانت كيتس ونيفيس</option>
+                      <option>سانت لوسيا</option>
+                      <option>سانت مارتين</option>
+                      <option>سانت هيلنا</option>
+                      <option>ساو تومي وبرينسيبي</option>
+                      <option>سريلانكا</option>
+                      <option>سفالبارد وجان مايان</option>
+                      <option>سلوفاكيا</option>
+                      <option>سلوفينيا</option>
+                      <option>سنغافورة</option>
+                      <option>سوازيلاند</option>
+                      <option>سوريا</option>
+                      <option>سورينام</option>
+                      <option>سويسرا</option>
+                      <option>سيراليون</option>
+                      <option>سيشل</option>
+                      <option>شيلي</option>
+                      <option>صربيا</option>
+                      <option>صربيا والجبل الأسود</option>
+                      <option>طاجكستان</option>
+                      <option>عمان</option>
+                      <option>غامبيا</option>
+                      <option>غانا</option>
+                      <option>غويانا</option>
+                      <option>غيانا</option>
+                      <option>غينيا</option>
+                      <option>غينيا الاستوائية</option>
+                      <option>غينيا بيساو</option>
+                      <option>فانواتو</option>
+                      <option>فرنسا</option>
+                      <option>فلسطين</option>
+                      <option>فنزويلا</option>
+                      <option>فنلندا</option>
+                      <option>فيتنام</option>
+                      <option>فيجي</option>
+                      <option>قبرص</option>
+                      <option>قرغيزستان</option>
+                      <option>قطر</option>
+                      <option>كازاخستان</option>
+                      <option>كاليدونيا الجديدة</option>
+                      <option>كرواتيا</option>
+                      <option>كمبوديا</option>
+                      <option>كندا</option>
+                      <option>كوبا</option>
+                      <option>كوريا الجنوبية</option>
+                      <option>كوريا الشمالية</option>
+                      <option>كوستاريكا</option>
+                      <option>كولومبيا</option>
+                      <option>كيريباتي</option>
+                      <option>كينيا</option>
+                      <option>لاتفيا</option>
+                      <option>لاوس</option>
+                      <option>لبنان</option>
+                      <option>لوكسمبورج</option>
+                      <option>ليبيا</option>
+                      <option>ليبيريا</option>
+                      <option>ليتوانيا</option>
+                      <option>ليختنشتاين</option>
+                      <option>ليسوتو</option>
+                      <option>مارتينيك</option>
+                      <option>ماكاو الصينية</option>
+                      <option>مالطا</option>
+                      <option>مالي</option>
+                      <option>ماليزيا</option>
+                      <option>مايوت</option>
+                      <option>مدغشقر</option>
+                      <option>مصر</option>
+                      <option>مقدونيا</option>
+                      <option>ملاوي</option>
+                      <option>منطقة غير معرفة</option>
+                      <option>منغوليا</option>
+                      <option>موريتانيا</option>
+                      <option>موريشيوس</option>
+                      <option>موزمبيق</option>
+                      <option>مولدافيا</option>
+                      <option>موناكو</option>
+                      <option>مونتسرات</option>
+                      <option>ميانمار</option>
+                      <option>ميكرونيزيا</option>
+                      <option>ناميبيا</option>
+                      <option>نورو</option>
+                      <option>نيبال</option>
+                      <option>نيجيريا</option>
+                      <option>نيكاراجوا</option>
+                      <option>نيوزيلاندا</option>
+                      <option>نيوي</option>
+                      <option>هايتي</option>
+                      <option>هندوراس</option>
+                      <option>هولندا</option>
+                      <option>هونج كونج الصينية</option>
+            </select>
+            <div id="nationalityValid" class="invalid-feedback">يرجى اختيار قيمة صحيحة</div>
+          </div>
+
+          <div style="flex:1 1 100%;text-align:center;color:#4f5966;font-weight:700;font-size:12.5px;">يرجى اختيار بريدك للتحقق منه</div>
+
+          <div class="oauth-icon-row">
+            <button type="button" id="googleSignInBtn" class="oauth-icon-btn" title="تحقّق سريع عبر جوجل" aria-label="تحقّق سريع عبر جوجل">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+              </svg>
+              <div id="googleSignInSpin" class="spinner-border spinner-border-sm text-secondary d-none" role="status"></div>
+            </button>
+            <button type="button" id="yahooSignInBtn" class="oauth-icon-btn" title="تحقّق سريع عبر ياهو" aria-label="تحقّق سريع عبر ياهو">
+              <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#6001D2" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/><path fill="#fff" d="M9.5 7l2 4.7L13.5 7H16l-3.4 7.3V17h-2.2v-2.7L7 7h2.5z"/></svg>
+              <div id="yahooSignInSpin" class="spinner-border spinner-border-sm text-secondary d-none" role="status"></div>
+            </button>
+            <button type="button" id="manualEmailToggleBtn" class="oauth-icon-btn" title="إدخال البريد يدويًا" aria-label="إدخال البريد يدويًا">
+              <i class="bi bi-envelope"></i>
+            </button>
+          </div>
+
+          <div id="googleVerifiedNote" class="google-verified-note d-none">
+            <span id="googleVerifiedText">✓ تم التحقق من <b id="googleVerifiedEmail"></b> تلقائيًا</span>
+            <button type="button" id="googleUndoBtn" class="google-undo-btn">تغيير البريد</button>
+          </div>
+
+          <!-- mailBox عمدًا بلا required: يبقى مخفيًا (manualEmailWrap) لمن يتحقق عبر OAuth بدل
+               الإدخال اليدوي، وتحقق المتصفح الأصلي (checkValidity/reportValidity) على حقل خفي
+               وفارغ كان يفشل بصمت (وأحيانًا يطبع "not focusable" في الكونسول). التحقق الفعلي من
+               تفعيل البريد يعتمد بالكامل على متغير mailCheck في submitNewRegInner بدل ذلك. -->
+          <div id="manualEmailWrap" class="manual-email-wrap d-none">
+            <div class="verify-row">
+              <div class="field">
+                <label for="mailBox">البريد الإلكتروني</label>
+                <input class="control" name="mailBox" type="email" id="mailBox">
+                <div class="hint" id="mailFieldHint">سيتم إرسال رمز تحقق إلى بريدك قبل إتمام التسجيل.</div>
+                <div id="emailValid" class="invalid-feedback">يرجى إدخال بريد إلكتروني صحيح</div>
+              </div>
+              <button class="mini-btn d-none" id="verMail" type="button">✉ إرسال رمز التحقق</button>
+            </div>
+
+            <div class="verify-code-row">
+              <div id="mailSpinner" class="d-flex align-items-center justify-content-center d-none" style="height:40px;">
+                <div class="spinner-border spinner-border-sm bg-secondary bg-opacity-25 text-light shadow-sm" role="status" aria-hidden="true"></div>
+              </div>
+              <input id="mailCode" name="mailCode" type="number" class="control d-none" style="max-width:260px;margin:0 auto;" pattern="^[0-9]{6}$" placeholder="أدخل رمز التحقق المرسَل إلى بريدك">
+            </div>
+          </div>
+
+          <div class="field field-phone">
+            <label for="phone">رقم النقال</label>
+            <span class="phone-country-badge" id="phoneCountryBadge">🇧🇭 (+973)</span>
+            <select class="control d-none" id="phoneCountry"></select>
+            <input class="control" name="phone" type="text" id="phone" required pattern="^[0-9]{8}$" style="direction:ltr;">
+            <div id="phoneValid" class="invalid-feedback">يرجى إدخال رقم هاتف صحيح</div>
+          </div>
+
+          <div id="blockAreaWrap" style="display:contents;">
+            <div class="field">
+              <label for="block">مجمع</label>
+              <input class="control" id="block" name="block" pattern="^[0-9]{3,4}$" required>
+            </div>
+
+            <div class="field">
+              <label for="area">
+                المنطقة
+                <span id="areaSpinner" class="d-none spinner-border spinner-border-sm text-danger ms-1" style="width:.75rem;height:.75rem;" role="status" aria-hidden="true"></span>
+              </label>
+              <input id="area" name="area" class="control" required>
+            </div>
+          </div>
+
+          <div class="field d-none" id="countryFieldWrap">
+            <label for="residencyCountry">دولة الإقامة</label>
+            <select class="control" id="residencyCountry"></select>
+          </div>
+
+          <div class="d-none">
+            <button class="mini-btn" type="button" id="verPhone">إرسال رمز التحقق</button>
+            <div id="phoneSpinner" class="d-none">
+              <div class="spinner-border bg-secondary bg-opacity-25 text-light shadow-sm" role="status" aria-hidden="true"></div>
+            </div>
+            <input id="phoneCode" name="phoneCode" type="number" class="control" pattern="^[0-9]{5}$">
+            <input name="phone2" type="number" class="control" id="phone2" pattern="^[0-9]{8}$">
+            <div id="phone2Valid" class="invalid-feedback">يرجى إدخال هاتف صحيح مكون من 8 أرقام</div>
+          </div>
+        </div>
+
+        <div id="pastWrapper" class="experience">
+          <div>
+            <strong>هل درست العلوم الشرعية من قبل؟</strong>
+          </div>
+          <div class="choice-group">
+            <input type="radio" class="btn-check" name="options-base" id="pastYes" value="yes" autocomplete="off">
+            <label class="regChoice" for="pastYes">نعم</label>
+
+            <input type="radio" class="btn-check" name="options-base" id="pastNo" value="no" autocomplete="off">
+            <label class="regChoice" for="pastNo">لا</label>
+          </div>
+        </div>
+
+        <div id="pastDiv" class="d-none">
+          <label for="pastStudies" class="mb-1 d-block fw-bold" style="font-size:12.5px;color:#4f5966;">العلوم التي سبق لك دراستها</label>
+          <textarea class="control" id="pastStudies" rows="3"></textarea>
+        </div>
+
+        <div class="actions">
+          <span class="note">سيتم مراجعة بياناتك ثم التواصل معك عبر البريد الإلكتروني حال قبول انضمامك.</span>
+          <button id="submitRegBtn" class="submit" type="submit">تسجيل البيانات</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>

@@ -1,0 +1,236 @@
+<div class="animate__animated animate__fadeIn">
+  
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top rounded-bottom-4">
+    <div class="container">
+      <a class="navbar-brand fw-bold text-danger" href="#">
+        <img src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&sz=w100" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 rounded-circle">
+        بصائر للعلوم الشرعية
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" href="#hero">الرئيسية</a></li>
+          <li class="nav-item"><a class="nav-link" href="#about">عن الأكاديمية</a></li>
+          <li class="nav-item"><a class="nav-link" href="#stats">الإحصائيات</a></li>
+          <li class="nav-item"><a class="nav-link" href="#contact">تواصل معنا</a></li>
+        </ul>
+        <button class="btn btn-danger rounded-pill px-4 ms-3" onclick="loadLogin()">تسجيل الدخول</button>
+      </div>
+    </div>
+  </nav>
+
+  <header id="hero" class="text-white text-center py-5 mb-5 rounded-4 mt-3 shadow position-relative overflow-hidden" 
+          style="background: linear-gradient(135deg, #df2336 0%, #a22a25 100%);">
+    <div class="container position-relative z-2">
+      <img src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&sz=w500" 
+           class="img-fluid rounded-circle shadow-lg mb-4 animate__animated animate__zoomIn" style="width: 150px; border: 4px solid white;">
+      <h1 class="display-4 fw-bold mb-3">أكاديمية بصائر للعلوم الشرعية</h1>
+      <p class="lead mb-4 w-75 mx-auto">منصة تعليمية رائدة تهدف إلى تأصيل العلم الشرعي وتقريب الفهم الصحيح للكتاب والسنة.</p>
+      <div class="d-flex justify-content-center gap-3">
+        <button class="btn btn-light text-danger btn-lg rounded-pill px-5 fw-bold shadow" onclick="showResidencyGateModal()">التحق بنا الآن</button>
+        <a href="#about" class="btn btn-outline-light btn-lg rounded-pill px-5">اقرأ المزيد</a>
+      </div>
+    </div>
+    <div class="position-absolute bottom-0 start-0 w-100 overflow-hidden" style="line-height: 0; opacity: 0.1;">
+      <svg viewBox="0 0 1200 120" preserveAspectRatio="none" style="width: 100%; height: 100px; fill: #ffffff;">
+        <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"></path>
+      </svg>
+    </div>
+  </header>
+
+  <section id="about" class="container mb-5">
+    <div class="row g-4 align-items-center">
+      <div class="col-md-6">
+        <div class="p-4 border rounded-4 shadow-sm bg-white h-100">
+          <h2 class="text-danger fw-bold mb-3 border-bottom pb-2" style="width:fit-content">من نحن؟</h2>
+          <p class="text-secondary fs-5" style="text-align: justify; line-height: 1.8;">
+            بصائر هي صرح علمي يسعى لنشر العلم الشرعي المؤصل وفق منهجية علمية رصينة، تجمع بين الأصالة والمعاصرة. 
+            نقدم برامج تعليمية متنوعة (تأهيلية، تأسيسية، وتأصيلية) تناسب مختلف المستويات، تحت إشراف نخبة من المشايخ وطلبة العلم.
+          </p>
+          <div class="row mt-4 text-center">
+            <div class="col-4">
+              <i class="fas fa-book-open fa-2x text-danger mb-2"></i>
+              <h6 class="fw-bold">متون علمية</h6>
+            </div>
+            <div class="col-4">
+              <i class="fas fa-chalkboard-teacher fa-2x text-danger mb-2"></i>
+              <h6 class="fw-bold">نخبة المشايخ</h6>
+            </div>
+            <div class="col-4">
+              <i class="fas fa-certificate fa-2x text-danger mb-2"></i>
+              <h6 class="fw-bold">شهادات معتمدة</h6>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 text-center">
+         <img src="https://drive.google.com/thumbnail?id=1KSSfvHTIAqNyIO849g95lEKq3VpUmv7z&sz=w800" class="img-fluid rounded-4 shadow" alt="About Us">
+      </div>
+    </div>
+  </section>
+
+  <section id="stats" class="container mb-5">
+    <div class="row text-center g-3">
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 py-4 h-100 bg-light">
+          <i class="fas fa-users fa-3x text-primary mb-3"></i>
+          <h2 class="fw-bold counter" id="count-students">0</h2>
+          <p class="text-muted mb-0">طالب وطالبة</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 py-4 h-100 bg-light">
+          <i class="fas fa-user-tie fa-3x text-success mb-3"></i>
+          <h2 class="fw-bold counter" id="count-staff">0</h2>
+          <p class="text-muted mb-0">شيخ ومعلم</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 py-4 h-100 bg-light">
+          <i class="fas fa-book fa-3x text-warning mb-3"></i>
+          <h2 class="fw-bold counter" id="count-courses">0</h2>
+          <p class="text-muted mb-0">درس ومقرر</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 py-4 h-100 bg-light">
+          <i class="fas fa-graduation-cap fa-3x text-info mb-3"></i>
+          <h2 class="fw-bold counter" id="count-grads">3</h2> <p class="text-muted mb-0">مراحل دراسية</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container mb-5">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="card border-0 shadow rounded-4 h-100">
+          <div class="card-header bg-white border-0 pt-4 px-4">
+            <h5 class="fw-bold"><i class="fas fa-chart-pie me-2 text-danger"></i>توزيع الطلاب (ذكور / إناث)</h5>
+          </div>
+          <div class="card-body d-flex justify-content-center align-items-center" style="height: 300px;">
+            <canvas id="genderChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow rounded-4 h-100">
+          <div class="card-header bg-white border-0 pt-4 px-4">
+            <h5 class="fw-bold"><i class="fas fa-chart-bar me-2 text-danger"></i>الطلاب حسب المراحل</h5>
+          </div>
+          <div class="card-body d-flex justify-content-center align-items-center" style="height: 300px;">
+            <canvas id="levelChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="contact" class="bg-dark text-white text-center py-4 rounded-top-4 mt-5">
+    <div class="container">
+      <div class="mb-3">
+        <h5 class="fw-bold">بصائر للعلوم الشرعية</h5>
+        <p class="small text-white-50">نورٌ للعقل .. وحياةٌ للقلب</p>
+      </div>
+      <div class="d-flex justify-content-center gap-4 mb-3">
+        <a href="https://wa.me/97334440790" target="_blank" class="text-white fs-4"><i class="fab fa-whatsapp"></i></a>
+        <a href="https://www.instagram.com/basaer.bh/" target="_blank" class="text-white fs-4"><i class="fab fa-instagram"></i></a>
+        <a href="https://www.youtube.com/@basaer_bh" target="_blank" class="text-white fs-4"><i class="fab fa-youtube"></i></a>
+      </div>
+      <div class="small text-white-50">
+        &copy; 2025 جميع الحقوق محفوظة لأكاديمية بصائر
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  // عند تحميل الصفحة، جلب البيانات ورسم المخططات
+  (function initHomePage() {
+    loadingStart(); // إظهار أيقونة التحميل من النظام الموجود
+    
+    google.script.run
+      .withSuccessHandler(function(stats) {
+        
+        // 1. تحديث العدادات (Animation)
+        animateValue("count-students", 0, stats.totalStudents, 2000);
+        animateValue("count-staff", 0, stats.staffCount, 2000);
+        animateValue("count-courses", 0, stats.coursesCount, 2000);
+
+        // 2. رسم مخطط الجنس (Pie Chart)
+        const ctxGender = document.getElementById('genderChart').getContext('2d');
+        new Chart(ctxGender, {
+          type: 'doughnut',
+          data: {
+            labels: ['ذكور', 'إناث'],
+            datasets: [{
+              data: [stats.males, stats.females],
+              backgroundColor: ['#0d6efd', '#d63384'], // أزرق وزهري
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' }
+            }
+          }
+        });
+
+        // 3. رسم مخطط المراحل (Bar Chart)
+        const ctxLevel = document.getElementById('levelChart').getContext('2d');
+        new Chart(ctxLevel, {
+          type: 'bar',
+          data: {
+            labels: ['التأهيلية', 'التأسيسية', 'التأصيلية', 'التحصيلية'],
+            datasets: [{
+              label: 'عدد الطلاب',
+              data: stats.levels,
+              backgroundColor: ['#ffc107', '#198754', '#dc3545', '#0d6efd'], // أصفر، أخضر، أحمر، أزرق
+              borderRadius: 5
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+
+        loadingEnd(); // إخفاء التحميل
+      })
+      .withFailureHandler(function(err) {
+        console.error(err);
+        loadingEnd();
+      })
+      .getPublicDashboardStats();
+  })();
+
+  // دالة تحريك الأرقام
+  function animateValue(id, start, end, duration) {
+    if (start === end) return;
+    var range = end - start;
+    var current = start;
+    var increment = end > start ? 1 : -1;
+    var stepTime = Math.abs(Math.floor(duration / range));
+    var obj = document.getElementById(id);
+    var timer = setInterval(function() {
+      current += increment;
+      obj.innerHTML = current;
+      if (current == end) {
+        clearInterval(timer);
+      }
+    }, stepTime);
+  }
+</script>

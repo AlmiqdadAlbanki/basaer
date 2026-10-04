@@ -1,0 +1,180 @@
+<!-- صفحة "أداء الاختبار" — منقولة حرفيًا (بنية HTML وتصميم CSS وسلوك JS) من معاينة التصميم
+     المعتمدة: basair-student-exam/index.html (+styles.css +app.js)، بحسب طلب المستخدم الصريح
+     "خذ التصميم من هنا بكل تفاصيله". الانحرافات الوحيدة عن المرجع، وكلها مقصودة:
+     - شعار الأكاديمية: نفس رابط Drive المستخدم فعليًا بالشريط الجانبي (sp-brand بـstudent.html)
+       بدل assets/logo-color.png المحلي غير الموجود بهذا المشروع.
+     - حُذفت نقوش assets/pattern.png الزخرفية الخفيفة (خلفية intro/aside) لعدم توفر الأصل، بلا أثر
+       يُذكر بصريًا (كانت شفافيتها 2.5%-4.5% فقط).
+     - التوست الخاص بالمرجع (.toast) استُبدل بـalertMSG()/#gToast الموحّد للمشروع (قاعدة مشروع
+       قائمة من قبل، طُبِّقت بنفس المنطق على صفحة الملف الشخصي سابقًا).
+     - حجم خط عنوان السؤال وخط الإجابة كُبِّر عمدًا عن المرجع (طلب صريح إضافي).
+     - كل بيانات المرجع (أسئلة وهمية، عدّاد ثابت 30 دقيقة) استُبدلت بالبيانات والمنطق الحقيقيين
+       القائمين فعليًا بالمشروع (جلسة اختبار خادمية عبر getQuestions/submitAnswerData، تصحيح ودرجة
+       من الخادم بالكامل، حفظ تلقائي محلي، تسليم قسري عند انتهاء الوقت، إلخ — جميعها من تحديث سابق
+       بنفس الجلسة). راجع funcs-js.html لكامل منطق setQuestionsData/setExamBody وما يليهما.
+     - مُضمَّنة في #studentPortal.sp-embedded كبقية الصفحات المستقلة (loadPage يستبدل #app بالكامل).
+-->
+<div id="studentPortal" class="sp-embedded">
+<div class="sp-exam-app">
+
+  <header class="sp-exam-header">
+    <div class="sp-exam-header-inner">
+      <a class="sp-exam-brand" href="#" onclick="return false" aria-label="أكاديمية بصائر">
+        <img src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&amp;sz=w1000" alt="بصائر">
+      </a>
+
+      <div class="sp-exam-copy text-end">
+        <span id="spExamLevelLabel"></span>
+        <strong id="spExamNameLabel"></strong>
+      </div>
+
+      <div class="sp-exam-header-status">
+        <div class="sp-exam-mobile-timer" aria-label="الوقت المتبقي">
+          <i class="bi bi-clock"></i>
+          <strong id="spExamMobileTimer">00:00</strong>
+        </div>
+        <div class="sp-exam-student-chip" title="الطالب الحالي">
+          <span id="spExamStudentInitial"></span>
+          <div>
+            <small>الطالب</small>
+            <strong id="spExamStudentName"></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="sp-exam-intro">
+      <div class="sp-exam-intro-inner text-end">
+        <div>
+          <span class="sp-exam-eyebrow"><i></i>اختبار المقرر</span>
+          <h1 id="spExamTitle"></h1>
+          <p>اقرأ كل سؤال بهدوء، ثم اختر إجابة واحدة. يمكنك الرجوع إلى أي سؤال قبل التسليم النهائي.</p>
+        </div>
+        <dl class="sp-exam-facts">
+          <div><dt><i class="bi bi-ui-checks"></i>الأسئلة</dt><dd id="spExamFactCount">—</dd></div>
+          <div><dt><i class="bi bi-hourglass-split"></i>المدة</dt><dd id="spExamFactDuration">—</dd></div>
+          <div><dt><i class="bi bi-send-check"></i>المحاولة</dt><dd>مرة واحدة</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <div class="sp-exam-layout">
+      <aside class="sp-exam-overview sp-exam-loading" id="spExamOverview" aria-label="ملخص الاختبار">
+        <div class="sp-exam-overview-heading text-end">
+          <div>
+            <span>متابعة الاختبار</span>
+            <h2>ملخص الإجابات</h2>
+          </div>
+          <i class="bi bi-clipboard-check"></i>
+        </div>
+
+        <div class="sp-exam-timer-block">
+          <div class="sp-exam-timer-ring" id="spExamTimerRing" style="--sp-exam-timer-progress:100%">
+            <div>
+              <span>الوقت المتبقي</span>
+              <strong id="spExamTimerValue">00:00</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-exam-progress-block">
+          <div class="sp-exam-progress-copy">
+            <span>أجبت عن</span>
+            <strong><b id="spExamAnsweredCount">0</b> من <b id="spExamTotalCount">0</b></strong>
+          </div>
+          <div class="sp-exam-progress-track" aria-hidden="true"><i id="spExamProgressBar"></i></div>
+        </div>
+
+        <div class="sp-exam-navigator-block">
+          <div class="sp-exam-navigator-heading">
+            <span>انتقل إلى سؤال</span>
+            <button class="sp-exam-icon-btn" id="spExamFirstUnanswered" type="button" title="أول سؤال غير مجاب">
+              <i class="bi bi-arrow-down-circle"></i>
+            </button>
+          </div>
+          <div class="sp-exam-question-map" id="spExamQuestionMap" aria-label="خريطة الأسئلة"></div>
+          <div class="sp-exam-map-legend" aria-label="دليل الحالات">
+            <span><i class="sp-exam-legend-answered"></i>تمت الإجابة</span>
+            <span><i class="sp-exam-legend-review"></i>للمراجعة</span>
+            <span><i></i>لم يُجب</span>
+          </div>
+        </div>
+
+        <p class="sp-exam-submission-note"><i class="bi bi-shield-check"></i>لن تُرسل إجاباتك إلا بعد التأكيد النهائي.</p>
+
+        <button class="sp-exam-submit-btn" id="spExamSubmitBtn" type="button">
+          <i class="bi bi-check2-square"></i>
+          <span>إنهاء وتسليم الاختبار</span>
+        </button>
+      </aside>
+
+      <section class="sp-exam-questions-region" aria-labelledby="spExamQuestionsHeading">
+        <div class="sp-exam-questions-heading text-end">
+          <div>
+            <span class="sp-exam-section-kicker">نموذج الأسئلة</span>
+            <h2 id="spExamQuestionsHeading">أجب عن جميع الأسئلة</h2>
+          </div>
+          <span class="sp-exam-completion-copy" id="spExamCompletionCopy">جارٍ التحميل…</span>
+        </div>
+
+        <div class="sp-exam-validation-alert" id="spExamValidationAlert" role="alert" hidden>
+          <i class="bi bi-exclamation-triangle"></i>
+          <span></span>
+        </div>
+
+        <div id="examEmptyState" class="sp-panel d-none" style="text-align:center;">
+          <i class="bi bi-inbox" style="font-size:28px;color:var(--sp-basair);display:block;margin-bottom:8px;"></i>
+          لا توجد أسئلة متاحة لهذا الاختبار حاليًا، يرجى التواصل مع الإدارة.
+        </div>
+
+        <form id="setAnswer" onsubmit="return false">
+          <div class="sp-exam-questions-list" id="examDiv"></div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <div class="sp-exam-modal-backdrop" id="spExamModal" hidden>
+    <section class="sp-exam-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="spExamConfirmTitle">
+      <button class="sp-exam-dialog-close sp-exam-icon-btn" type="button" id="spExamModalClose" title="إغلاق">
+        <i class="bi bi-x-lg"></i>
+      </button>
+      <div class="sp-exam-dialog-icon"><i class="bi bi-send-check" id="spExamDialogIcon"></i></div>
+      <span class="sp-exam-dialog-kicker" id="spExamDialogKicker">التسليم النهائي</span>
+      <h2 id="spExamConfirmTitle">هل أنت مستعد لتسليم الاختبار؟</h2>
+      <p id="spExamConfirmMessage">بعد التسليم لن تتمكن من تعديل إجاباتك.</p>
+      <div class="sp-exam-dialog-summary" id="spExamDialogSummary">
+        <span>الأسئلة المجابة <strong id="spExamModalAnswered">0 من 0</strong></span>
+        <span>الوقت المتبقي <strong id="spExamModalTime">00:00</strong></span>
+      </div>
+      <div class="sp-exam-dialog-actions" id="spExamDialogActions">
+        <button class="sp-exam-secondary-btn" type="button" id="spExamModalCancel">العودة للمراجعة</button>
+        <button class="sp-exam-primary-btn" type="button" id="spExamModalConfirm"><i class="bi bi-check2"></i>تأكيد التسليم</button>
+      </div>
+    </section>
+  </div>
+
+</div>
+</div>
+
+<template id="quesCardTemp">
+  <article class="sp-exam-question-card">
+    <div class="sp-exam-question-head">
+      <span class="sp-exam-question-number"><b></b><span class="sp-exam-question-number-text"></span></span>
+      <button class="sp-exam-review-btn" type="button" aria-pressed="false" title="وضع علامة للمراجعة">
+        <i class="bi bi-bookmark"></i><span>وضع علامة للمراجعة</span>
+      </button>
+    </div>
+    <h3 class="quesTitle sp-exam-question-title"></h3>
+    <div class="sp-exam-answers-list answerDiv"></div>
+  </article>
+</template>
+
+<template id="radiosTemp">
+  <label class="sp-exam-answer-option">
+    <input type="radio" name="" id="" value="" required>
+    <span></span>
+  </label>
+</template>

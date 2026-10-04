@@ -1,0 +1,341 @@
+<button class="btn shadow-sm btn-outline-danger fs-4 px-4 backEmp" title="عودة للصفحة الرئيسية"><i class="bi bi-arrow-right"></i></button>
+
+
+<div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 px-0 sidebar d-none d-md-block">
+                <div class="p-3">
+                    <h5 class="mb-4"><i class="fas fa-cog me-2"></i> الإعدادات</h5>
+                    <nav class="nav flex-column">
+                        <a class="nav-link active" href="#account" data-bs-toggle="pill">
+                            <i class="fas fa-user me-2"></i> الحساب
+                        </a>
+                        <a class="nav-link" href="#password" data-bs-toggle="pill">
+                            <i class="fas fa-lock me-2"></i> كلمة المرور
+                        </a>
+                        <a class="nav-link" href="#notifications" data-bs-toggle="pill">
+                            <i class="fas fa-bell me-2"></i> الإشعارات
+                        </a>
+                        <a class="nav-link" href="#privacy" data-bs-toggle="pill">
+                            <i class="fas fa-shield-alt me-2"></i> الخصوصية
+                        </a>
+                        <a class="nav-link" href="#preferences" data-bs-toggle="pill">
+                            <i class="fas fa-sliders-h me-2"></i> التفضيلات
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 content-wrapper">
+                <!-- Header -->
+                <nav class="d-none" aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="#" class="text-decoration-none backEmp">الرئيسية</a></li>
+                    </ol>
+                </nav>
+                <h1 class="page-title">الإعدادات</h1>
+                <p class="text-muted mb-4">إدارة إعدادات حسابك وتفضيلاتك</p>
+
+                <!-- Mobile Navigation -->
+                <div class="d-md-none mb-4">
+                    <select class="form-select" id="mobileNav">
+                        <option value="account" selected>الحساب</option>
+                        <option value="password">كلمة المرور</option>
+                        <option value="notifications">الإشعارات</option>
+                        <option value="privacy">الخصوصية</option>
+                        <option value="preferences">التفضيلات</option>
+                    </select>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Account Tab -->
+                    <div class="tab-pane fade show active" id="account">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">المعلومات الشخصية</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="avatar-upload">
+                                        <div class="avatar-preview" id="avatarPreview"></div>
+                                        <input type="file" id="avatarUpload" accept="image/*">
+                                        <label for="avatarUpload">
+                                            <i class="fas fa-camera"></i>
+                                        </label>
+                                    </div>
+                                </div>
+                                <form>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">الاسم الأول</label>
+                                            <input type="text" class="form-control" value="أحمد">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">اسم العائلة</label>
+                                            <input type="text" class="form-control" value="محمد">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">البريد الإلكتروني</label>
+                                        <input type="email" class="form-control" value="ahmed@example.com">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">رقم الهاتف</label>
+                                        <div class="d-flex gap-2" style="direction:ltr;">
+                                            <select id="phoneCountry" class="form-select" style="flex:0 0 auto;width:auto;"></select>
+                                            <input type="tel" class="form-control" id="phone" placeholder="12345678" style="flex:1;">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">نبذة عنك</label>
+                                        <textarea class="form-control" rows="4" placeholder="اكتب نبذة مختصرة عنك..."></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">المدينة</label>
+                                        <input type="text" class="form-control" value="الرفاع">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">الدولة</label>
+                                        <select class="form-select">
+                                            <option selected>البحرين</option>
+                                            <option>السعودية</option>
+                                            <option>الإمارات</option>
+                                            <option>الكويت</option>
+                                        </select>
+                                    </div>
+                                    <div class="text-start">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i> حفظ التغييرات
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password Tab -->
+                    <div class="tab-pane fade" id="password">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">تغيير كلمة المرور</h5>
+                            </div>
+                            <div class="card-body">
+                                <form>
+                                    <div class="mb-3">
+                                        <label class="form-label">كلمة المرور الحالية</label>
+                                        <input type="password" class="form-control">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">كلمة المرور الجديدة</label>
+                                        <input type="password" class="form-control">
+                                        <div class="form-text">يجب أن تحتوي على 8 أحرف على الأقل</div>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">تأكيد كلمة المرور</label>
+                                        <input type="password" class="form-control">
+                                    </div>
+                                    <div class="text-start">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-key me-2"></i> تحديث كلمة المرور
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">المصادقة الثنائية</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">قم بتفعيل المصادقة الثنائية لحماية إضافية لحسابك</p>
+                                <button class="btn btn-outline-primary">
+                                    <i class="fas fa-mobile-alt me-2"></i> تفعيل المصادقة الثنائية
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notifications Tab -->
+                    <div class="tab-pane fade" id="notifications">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">إعدادات الإشعارات</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إشعارات البريد الإلكتروني</label>
+                                        <div class="text-muted small">تلقي التحديثات عبر البريد</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="emailNotif" checked>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إشعارات الرسائل</label>
+                                        <div class="text-muted small">إشعار عند وصول رسائل جديدة</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="messageNotif" checked>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إشعارات التطبيق</label>
+                                        <div class="text-muted small">إشعارات داخل التطبيق</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="appNotif" checked>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">التحديثات الأسبوعية</label>
+                                        <div class="text-muted small">ملخص أسبوعي للنشاطات</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="weeklyNotif">
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إشعارات الصوت</label>
+                                        <div class="text-muted small">تشغيل صوت مع الإشعارات</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="soundNotif" checked>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Privacy Tab -->
+                    <div class="tab-pane fade" id="privacy">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">إعدادات الخصوصية</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إظهار الملف الشخصي</label>
+                                        <div class="text-muted small">السماح للآخرين برؤية ملفك</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="profileVisible" checked>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">إظهار حالة النشاط</label>
+                                        <div class="text-muted small">عرض حالتك متصل/غير متصل</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="activityStatus" checked>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3">
+                                    <label class="form-label">من يمكنه مراسلتك</label>
+                                    <select class="form-select">
+                                        <option selected>الجميع</option>
+                                        <option>الأصدقاء فقط</option>
+                                        <option>لا أحد</option>
+                                    </select>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">فهرسة محركات البحث</label>
+                                        <div class="text-muted small">السماح لمحركات البحث بفهرسة ملفك</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="searchIndex">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">منطقة الخطر</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="text-danger">حذف الحساب</h6>
+                                <p class="text-muted">بمجرد حذف حسابك، لا يمكن التراجع عن هذا الإجراء. يرجى التأكد من رغبتك في ذلك.</p>
+                                <button class="btn btn-danger">
+                                    <i class="fas fa-trash-alt me-2"></i> حذف الحساب
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div class="tab-pane fade" id="preferences">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">التفضيلات العامة</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">اللغة</label>
+                                    <select class="form-select">
+                                        <option selected>العربية</option>
+                                        <option>English</option>
+                                        <option>Français</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">المنطقة الزمنية</label>
+                                    <select class="form-select">
+                                        <option selected>Asia/Bahrain (GMT+3)</option>
+                                        <option>Asia/Dubai (GMT+4)</option>
+                                        <option>Asia/Riyadh (GMT+3)</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">تنسيق التاريخ</label>
+                                    <select class="form-select">
+                                        <option selected>DD/MM/YYYY</option>
+                                        <option>MM/DD/YYYY</option>
+                                        <option>YYYY-MM-DD</option>
+                                    </select>
+                                </div>
+                                <hr>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">الوضع الداكن</label>
+                                        <div class="text-muted small">تفعيل المظهر الداكن</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="darkMode">
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="form-label mb-0">الوضع المضغوط</label>
+                                        <div class="text-muted small">تقليل المسافات في الواجهة</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="compactMode">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>

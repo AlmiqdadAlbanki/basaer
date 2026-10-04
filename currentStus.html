@@ -1,0 +1,470 @@
+<div class="curstu-page">
+  <style>
+    .curstu-page { max-width: 1100px; margin: 0 auto; padding: 20px 18px; }
+    .curstu-back-row { margin-bottom: 14px; }
+    .curstu-gender-group { display: flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: #f7f9fa; }
+    .curstu-gender-group input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .curstu-gender-group label { min-height: 29px; display: flex; align-items: center; padding: 5px 12px; border-radius: 5px; cursor: pointer; color: #687481; font-size: calc(11px + var(--font-adjust)); white-space: nowrap; }
+    .curstu-gender-group input:checked + label { color: #fff; background: var(--primary); font-weight: 600; box-shadow: 0 1px 4px rgba(23,32,40,.08); }
+  </style>
+
+  <div class="curstu-back-row">
+    <button type="button" class="secondary-button backEmp" title="عودة للصفحة الرئيسية"><i data-icon="arrow-right"></i>عودة</button>
+  </div>
+
+  <header class="page-heading">
+    <div><span class="eyebrow">التقييم والمتابعة</span><h1>متابعة التسميع</h1><p>راجع سجلات تسميع الطلاب الحاليين حسب المرحلة، أو أرسل رسالة واتساب جماعية لمجموعة منهم.</p></div>
+    <div class="heading-actions">
+      <button id="sendWhatsMSG" type="button" class="whatsapp-button"><i data-icon="message-circle"></i>إرسال رسالة واتساب</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="table-toolbar">
+      <div class="segmented" id="curStuStageGroup">
+        <button class="curstu-stage-btn active" type="button" data-action="reg00">طلاب التأهيلية</button>
+        <button class="curstu-stage-btn" type="button" data-action="reg01">طلاب التأسيسية</button>
+        <button class="curstu-stage-btn" type="button" data-action="reg02">طلاب التأصيلية</button>
+        <button class="curstu-stage-btn" type="button" data-action="reg03">طلاب التحصيلية</button>
+      </div>
+      <div class="curstu-gender-group">
+        <input type="radio" name="countCurrStu" id="Count" autocomplete="off" checked>
+        <label for="Count" id="CountL"></label>
+        <input type="radio" name="countCurrStu" id="mCount" autocomplete="off">
+        <label for="mCount" id="mCountL"></label>
+        <input type="radio" name="countCurrStu" id="fCount" autocomplete="off">
+        <label for="fCount" id="fCountL"></label>
+      </div>
+    </div>
+    <div class="responsive-table">
+      <table id="usersTable">
+        <thead>
+          <tr>
+            <th scope="col" style="width:44px;">#</th>
+            <th scope="col">الاسم</th>
+            <th scope="col">الجنس</th>
+            <th scope="col">الهاتف</th>
+            <th scope="col">سجلات التسميع</th>
+          </tr>
+        </thead>
+        <tbody id="usersContainer">
+
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-----===============================================----->
+  <template id="usersRow">
+    <tr class="userRow">
+      <th class="num align-middle"></th>
+      <td class="name align-middle"></td>
+      <td class="gender align-middle"></td>
+      <td class="stuPhone align-middle" dir="ltr"></td>
+      <td class="align-middle d-none"><button type="button" class="icon-button chMatn" data-bs-toggle="modal" data-bs-target="#dectationModal" title="عرض سجلات التسميع"></button></td>
+      <td class="align-middle d-none"><button type="button" class="btn btn-outline-danger refuseNewStu "><i class="bi bi-person-fill-slash"></i></button></td>
+    </tr>
+  </template>
+
+  <!-----===============================================----->
+</div>
+<!-- /.curstu-page -->
+
+<div class="modal fade" id="newStuModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="newStuModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="newStuModalLabel">قبول طالب جديد</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+    <div class="tab p-sm-3 pb-3 fs-6 text-secondary">
+
+      <div class="row mb-3 p-0">
+        <label for="timeBox" class="col-md-4 col-lg-3 col-form-label">تاريخ التسجيل</label>
+        <div class="col-md-8 col-lg-9">
+          <input name="timeBox" type="text" class=" form-control form-control-lg text-secondary text-center" id="timeBox" readonly>
+        </div>
+      </div>
+      <div class="row mb-3 p-0">
+        <label for="cprBox" class="col-md-4 col-lg-3 col-form-label">الرقم الشخصي</label>
+        <div class="col-md-8 col-lg-9">
+          <input name="cprBox" type="text" class=" form-control form-control-lg text-secondary text-center" id="cprBox" pattern="^[0-9]{9}$" readonly>
+        </div>
+      </div>
+      <div class="row mb-3 p-0">
+        <label for="userNameBox" class="col-md-4 col-lg-3 col-form-label">الاسم كاملا</label>
+        <div class="col-md-8 col-lg-9">
+          <input name="userNameBox" type="text" class=" form-control form-control-lg text-secondary text-center" id="userNameBox" pattern="^[ء-ي\s a-zA-Z\s]+$" required>
+          <div id="userNameBoxValid" class="invalid-feedback">يرجى كتابة الاسم كما هو بالبطاقة السكانية دون أن يحتوي على
+            أي رموز</div>
+        </div>
+      </div>
+      <div class="row mb-3 p-0">
+        <label for="dobReg" class="col-md-4 col-lg-3 col-form-label">تاريح الميلاد</label>
+        <div class="col-md-8 col-lg-9">
+          <input name="dobReg" type="date" class=" form-control form-control-lg text-secondary text-center" id="dobReg" required>
+          <div id="dobRegValid" class="invalid-feedback">يرجى إدخال تاريخ الميلاد بشكل صحيح</div>
+        </div>
+      </div>
+      <div class="row mb-3 p-0">
+        <label for="ageReg" class="col-md-4 col-lg-3 col-form-label">العمر</label>
+        <div class="col-md-8 col-lg-9">
+          <input name="ageReg" type="text" class=" form-control form-control-lg text-secondary text-center" id="ageReg" readonly>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="gender" class="col-md-4 col-lg-3 col-form-label">الجنس</label>
+        <div class="col-md-8 col-lg-9">
+          <select id="gender" class="form-select form-select-lg  text-secondary text-center mb-3" aria-label=".form-select-lg " required>
+              <option></option>
+              <option>ذكر</option>
+              <option>أنثى</option>
+          </select>
+          <div id="genderValid" class="invalid-feedback">يرجى اختيار قيمة صحيحة</div>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="nationality" class="col-md-4 col-lg-3 col-form-label">الجنسية</label>
+        <div class="col-md-8 col-lg-9">
+          <select id="nationality" class="form-select form-select-lg  text-secondary text-center mb-3" aria-label=".form-select-lg " aria-readonly="true">
+                      <option></option>
+                      <option>البحرين</option>
+                      <option>أذربيجان</option>
+                      <option>أرمينيا</option>
+                      <option>أسبانيا</option>
+                      <option>أستراليا</option>
+                      <option>أفغانستان</option>
+                      <option>ألبانيا</option>
+                      <option>ألمانيا</option>
+                      <option>أنتيجوا وبربودا</option>
+                      <option>أنجولا</option>
+                      <option>أنجويلا</option>
+                      <option>أندورا</option>
+                      <option>أورجواي</option>
+                      <option>أوزبكستان</option>
+                      <option>أوغندا</option>
+                      <option>أوكرانيا</option>
+                      <option>أيرلندا</option>
+                      <option>أيسلندا</option>
+                      <option>اثيوبيا</option>
+                      <option>اريتريا</option>
+                      <option>استونيا</option>
+                      <option>الأرجنتين</option>
+                      <option>الأردن</option>
+                      <option>الاكوادور</option>
+                      <option>الامارات العربية المتحدة</option>
+                      <option>الباهاما</option>
+                      <option>البرازيل</option>
+                      <option>البرتغال</option>
+                      <option>البوسنة والهرسك</option>
+                      <option>الجابون</option>
+                      <option>الجبل الأسود</option>
+                      <option>الجزائر</option>
+                      <option>الدانمرك</option>
+                      <option>الرأس الأخضر</option>
+                      <option>السلفادور</option>
+                      <option>السنغال</option>
+                      <option>السودان</option>
+                      <option>السويد</option>
+                      <option>الصحراء الغربية</option>
+                      <option>الصومال</option>
+                      <option>الصين</option>
+                      <option>العراق</option>
+                      <option>الفاتيكان</option>
+                      <option>الفيلبين</option>
+                      <option>القطب الجنوبي</option>
+                      <option>الكاميرون</option>
+                      <option>الكونغو - برازافيل</option>
+                      <option>الكويت</option>
+                      <option>المجر</option>
+                      <option>المحيط الهندي البريطاني</option>
+                      <option>المغرب</option>
+                      <option>المقاطعات الجنوبية الفرنسية</option>
+                      <option>المكسيك</option>
+                      <option>المملكة العربية السعودية</option>
+                      <option>المملكة المتحدة</option>
+                      <option>النرويج</option>
+                      <option>النمسا</option>
+                      <option>النيجر</option>
+                      <option>الهند</option>
+                      <option>الولايات المتحدة الأمريكية</option>
+                      <option>اليابان</option>
+                      <option>اليمن</option>
+                      <option>اليونان</option>
+                      <option>اندونيسيا</option>
+                      <option>ايران</option>
+                      <option>ايطاليا</option>
+                      <option>بابوا غينيا الجديدة</option>
+                      <option>باراجواي</option>
+                      <option>باكستان</option>
+                      <option>بالاو</option>
+                      <option>بتسوانا</option>
+                      <option>بتكايرن</option>
+                      <option>بربادوس</option>
+                      <option>برمودا</option>
+                      <option>بروناي</option>
+                      <option>بلجيكا</option>
+                      <option>بلغاريا</option>
+                      <option>بليز</option>
+                      <option>بنجلاديش</option>
+                      <option>بنما</option>
+                      <option>بنين</option>
+                      <option>بوتان</option>
+                      <option>بورتوريكو</option>
+                      <option>بوركينا فاسو</option>
+                      <option>بوروندي</option>
+                      <option>بولندا</option>
+                      <option>بوليفيا</option>
+                      <option>بولينيزيا الفرنسية</option>
+                      <option>بيرو</option>
+                      <option>تانزانيا</option>
+                      <option>تايلند</option>
+                      <option>تايوان</option>
+                      <option>تركمانستان</option>
+                      <option>تركيا</option>
+                      <option>ترينيداد وتوباغو</option>
+                      <option>تشاد</option>
+                      <option>توجو</option>
+                      <option>توفالو</option>
+                      <option>توكيلو</option>
+                      <option>تونجا</option>
+                      <option>تونس</option>
+                      <option>تيمور الشرقية</option>
+                      <option>جامايكا</option>
+                      <option>جبل طارق</option>
+                      <option>جرينادا</option>
+                      <option>جرينلاند</option>
+                      <option>جزر أولان</option>
+                      <option>جزر الأنتيل الهولندية</option>
+                      <option>جزر الترك وجايكوس</option>
+                      <option>جزر القمر</option>
+                      <option>جزر الكايمن</option>
+                      <option>جزر المارشال</option>
+                      <option>جزر الملديف</option>
+                      <option>جزر الولايات المتحدة البعيدة الصغيرة</option>
+                      <option>جزر سليمان</option>
+                      <option>جزر فارو</option>
+                      <option>جزر فرجين الأمريكية</option>
+                      <option>جزر فرجين البريطانية</option>
+                      <option>جزر فوكلاند</option>
+                      <option>جزر كوك</option>
+                      <option>جزر كوكوس</option>
+                      <option>جزر ماريانا الشمالية</option>
+                      <option>جزر والس وفوتونا</option>
+                      <option>جزيرة الكريسماس</option>
+                      <option>جزيرة بوفيه</option>
+                      <option>جزيرة مان</option>
+                      <option>جزيرة نورفوك</option>
+                      <option>جزيرة هيرد وماكدونالد</option>
+                      <option>جمهورية افريقيا الوسطى</option>
+                      <option>جمهورية التشيك</option>
+                      <option>جمهورية الدومينيك</option>
+                      <option>جمهورية الكونغو الديمقراطية</option>
+                      <option>جمهورية جنوب افريقيا</option>
+                      <option>جواتيمالا</option>
+                      <option>جوادلوب</option>
+                      <option>جوام</option>
+                      <option>جورجيا</option>
+                      <option>جورجيا الجنوبية وجزر ساندويتش الجنوبية</option>
+                      <option>جيبوتي</option>
+                      <option>جيرسي</option>
+                      <option>دومينيكا</option>
+                      <option>رواندا</option>
+                      <option>روسيا</option>
+                      <option>روسيا البيضاء</option>
+                      <option>رومانيا</option>
+                      <option>روينيون</option>
+                      <option>زامبيا</option>
+                      <option>زيمبابوي</option>
+                      <option>ساحل العاج</option>
+                      <option>ساموا</option>
+                      <option>ساموا الأمريكية</option>
+                      <option>سان مارينو</option>
+                      <option>سانت بيير وميكولون</option>
+                      <option>سانت فنسنت وغرنادين</option>
+                      <option>سانت كيتس ونيفيس</option>
+                      <option>سانت لوسيا</option>
+                      <option>سانت مارتين</option>
+                      <option>سانت هيلنا</option>
+                      <option>ساو تومي وبرينسيبي</option>
+                      <option>سريلانكا</option>
+                      <option>سفالبارد وجان مايان</option>
+                      <option>سلوفاكيا</option>
+                      <option>سلوفينيا</option>
+                      <option>سنغافورة</option>
+                      <option>سوازيلاند</option>
+                      <option>سوريا</option>
+                      <option>سورينام</option>
+                      <option>سويسرا</option>
+                      <option>سيراليون</option>
+                      <option>سيشل</option>
+                      <option>شيلي</option>
+                      <option>صربيا</option>
+                      <option>صربيا والجبل الأسود</option>
+                      <option>طاجكستان</option>
+                      <option>عمان</option>
+                      <option>غامبيا</option>
+                      <option>غانا</option>
+                      <option>غويانا</option>
+                      <option>غيانا</option>
+                      <option>غينيا</option>
+                      <option>غينيا الاستوائية</option>
+                      <option>غينيا بيساو</option>
+                      <option>فانواتو</option>
+                      <option>فرنسا</option>
+                      <option>فلسطين</option>
+                      <option>فنزويلا</option>
+                      <option>فنلندا</option>
+                      <option>فيتنام</option>
+                      <option>فيجي</option>
+                      <option>قبرص</option>
+                      <option>قرغيزستان</option>
+                      <option>قطر</option>
+                      <option>كازاخستان</option>
+                      <option>كاليدونيا الجديدة</option>
+                      <option>كرواتيا</option>
+                      <option>كمبوديا</option>
+                      <option>كندا</option>
+                      <option>كوبا</option>
+                      <option>كوريا الجنوبية</option>
+                      <option>كوريا الشمالية</option>
+                      <option>كوستاريكا</option>
+                      <option>كولومبيا</option>
+                      <option>كيريباتي</option>
+                      <option>كينيا</option>
+                      <option>لاتفيا</option>
+                      <option>لاوس</option>
+                      <option>لبنان</option>
+                      <option>لوكسمبورج</option>
+                      <option>ليبيا</option>
+                      <option>ليبيريا</option>
+                      <option>ليتوانيا</option>
+                      <option>ليختنشتاين</option>
+                      <option>ليسوتو</option>
+                      <option>مارتينيك</option>
+                      <option>ماكاو الصينية</option>
+                      <option>مالطا</option>
+                      <option>مالي</option>
+                      <option>ماليزيا</option>
+                      <option>مايوت</option>
+                      <option>مدغشقر</option>
+                      <option>مصر</option>
+                      <option>مقدونيا</option>
+                      <option>ملاوي</option>
+                      <option>منطقة غير معرفة</option>
+                      <option>منغوليا</option>
+                      <option>موريتانيا</option>
+                      <option>موريشيوس</option>
+                      <option>موزمبيق</option>
+                      <option>مولدافيا</option>
+                      <option>موناكو</option>
+                      <option>مونتسرات</option>
+                      <option>ميانمار</option>
+                      <option>ميكرونيزيا</option>
+                      <option>ناميبيا</option>
+                      <option>نورو</option>
+                      <option>نيبال</option>
+                      <option>نيجيريا</option>
+                      <option>نيكاراجوا</option>
+                      <option>نيوزيلاندا</option>
+                      <option>نيوي</option>
+                      <option>هايتي</option>
+                      <option>هندوراس</option>
+                      <option>هولندا</option>
+                      <option>هونج كونج الصينية</option>
+          </select>
+          <div id="nationalityValid" class="invalid-feedback">يرجى اختيار قيمة صحيحة</div>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="mailBox" class="col-md-4 col-lg-3 col-form-label">البريد الإلكتروني</label>
+        <div class="col-md-9 my-auto mb-2">
+          <input name="mailBox" type="email" class=" form-control form-control-lg text-secondary text-center" id="mailBox" readonly>
+          <div id="emailValid" class="invalid-feedback">يرجى إدخال بريد إلكتروني صحيح</div>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="phone" class="col-md-3  col-form-label">رقم النقال</label>
+        <div class="col-md-9 my-auto mb-2">
+          <input name="phone" type="text" class=" form-control form-control-lg text-secondary text-center" id="phone" readonly >
+          <div id="phoneValid" class="invalid-feedback">يرجى إدخال هاتف صحيح مكون من 8 أرقام</div>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="block" class="col-md-4 col-lg-3 col-form-label">مجمع</label>
+        <div class="col-md-8 col-lg-9">
+          <input id="block" name="block" type="text" class=" form-control form-control-lg text-secondary text-center" pattern="^[0-9]{3,4}$" readonly>
+        </div>
+      </div>
+
+      <div class="row mb-3 p-0">
+        <label for="area" class="col-md-4 col-lg-3 col-form-label">المنطقة</label>
+        <div class="col-md-8 col-lg-9 position-relative">
+          <div id="areaSpinner" class="d-flex align-items-center position-absolute text-center h-100 pr-5 d-none"
+            style="top: 0; left: 1rem;">
+            <div class="spinner-border bg-danger bg-opacity-25  text-light shadow-sm ms-auto" role="status"
+              aria-hidden="true"></div>
+          </div>
+          <input id="area" name="area" type="text" class=" form-control form-control-lg text-secondary text-center" readonly required>
+        </div>
+      </div>
+
+        <div id="pastDiv" class="mb-3 p-3 alert alert-warning ">
+          <label for="pastStudies" class="form-label">العلوم التي سبق لك دراستها</label>
+          <textarea class="form-control" id="pastStudies" rows="3" readonly></textarea>
+        </div>
+
+    </div>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button id="acceptNewStu" type="button" class=" btn btn-success col-3">قبول</button>
+        <button id="refuseNewStu" type="button" class=" btn btn-danger col-3" >رفض</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- dectationModal -->
+<div class="modal fade" id="dectationModal" tabindex="-1" aria-labelledby="dectationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-light">
+        <h1 class="modal-title fs-5" id="dectationModalLabel">سجلات التسميع</h1>
+        <button type="button" class="btn-close white-close fs-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+            <div class="row table-responsive px-4 my-3">
+              <table id="dec_Table" class="table table-hover mt-3 mx-auto">
+                <thead class="sticky-top bg-main text-light shadow-sm" style="top:1rem; z-index:1000;">
+                  <tr class="table-secondary">
+                    <th scope="col">#</th>
+                    <th scope="col">المتن</th>
+                    <th scope="col">الورد</th>
+                    <th scope="col">الدرجة</th>
+                    <th scope="col">المُسمّع</th>
+                  </tr>
+                </thead>
+                <tbody id="stuDectationTable">
+
+                </tbody>
+              </table>
+            </div>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-lg btn-danger w-25" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+  <!-----===============================================----->

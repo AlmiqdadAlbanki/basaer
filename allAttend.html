@@ -1,0 +1,43 @@
+<!-- زر عودة: ظاهر افتراضيًا لأن هذه الصفحة تُحمَّل أيضًا خارج لوحة الإدارة الجديدة (بطاقة "حضور
+     الطلاب" في تبويب emp.html)؛ عند التحميل داخل لوحة الإدارة يُخفى صراحةً من loadAttendanceView(). -->
+<div class="regBackRow" id="allAttendBackRow">
+  <button type="button" class="regBackBtn"
+    onclick="(document.getElementById('appAdmin') && document.getElementById('appAdmin').contains(this)) ? adminGoBack() : loadEmp()">
+    <i class="bi bi-arrow-right fs-5"></i> عودة
+  </button>
+</div>
+
+<div class="table-toolbar">
+  <label class="table-search">
+    <i data-icon="calendar-check-2"></i>
+    <input id="attendDateFilter" type="text" placeholder="كل الأيام" readonly style="cursor:pointer;">
+    <button type="button" id="attendDateClearBtn" class="icon-button" style="display:none;" title="عرض كل الأيام"><i data-icon="x"></i></button>
+  </label>
+  <label class="table-search"><i data-icon="search"></i><input id="attendSearchInput" type="search" placeholder="ابحث بالاسم أو الرقم الشخصي..."></label>
+</div>
+
+<div class="responsive-table">
+  <table id="attendTable">
+    <thead>
+      <tr>
+        <th style="width:44px;">#</th>
+        <th data-sort="name">الطالب</th>
+        <th>المرحلة</th>
+        <th data-sort="date">وقت الحضور</th>
+        <th>طريقة التسجيل</th>
+        <th>المسجل بواسطة</th>
+        <th>الإجراءات</th>
+      </tr>
+    </thead>
+    <tbody id="attendRowsContainer">
+    </tbody>
+  </table>
+</div>
+<footer class="table-footer">
+  <span>عدد النتائج المعروضة: <b id="attend-visible-count">0</b></span>
+  <div class="page-size">
+    <label for="attendPageSize">عدد الصفوف</label>
+    <select id="attendPageSize"><option value="50">50</option><option value="100">100</option></select>
+  </div>
+  <div class="pagination" id="attendPagination"></div>
+</footer>

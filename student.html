@@ -1,0 +1,653 @@
+
+<div id="studentPortal">
+
+  <div class="sp-admin-preview-bar d-none" id="spAdminPreviewBar">
+    <i class="bi bi-eye"></i>
+    <span>وضع معاينة الإدارة — تُعرَض الآن صفحة الطالب: <strong id="spAdminPreviewName"></strong></span>
+    <button type="button" id="spAdminPreviewExitBtn"><i class="bi bi-box-arrow-left"></i> العودة إلى لوحة الإدارة</button>
+  </div>
+
+  <div class="sp-sidebar-overlay" id="spSidebarOverlay"></div>
+
+  <aside class="sp-sidebar" id="spSidebar">
+    <div class="sp-brand">
+      <img src="https://drive.google.com/thumbnail?id=1zgseX_0_TPsyQlCjiTjKzxJ4dR5lZ1_7&amp;sz=w1000" alt="بصائر">
+    </div>
+
+    <div class="sp-student-mini d-none">
+      <div class="sp-avatar"><img id="stuImage" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&amp;sz=w500" alt="Avatar"></div>
+      <div>
+        <strong id="stuNameTit"></strong>
+        <span>طالب بصائر</span>
+      </div>
+    </div>
+
+    <nav class="sp-nav navbar-nav list-group" role="tablist">
+      <a class="sp-nav-item nav-item nav-link active" role="tab" aria-current="page" data-bs-toggle="tab" data-bs-target="#home-tab-pane" aria-selected="true">
+        <i class="bi bi-house"></i><span>الرئيسية</span>
+      </a>
+      <a class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#moqarar-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-journal-bookmark"></i><span>المقررات</span>
+      </a>
+      <a id="attendNav" class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#attend-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-calendar-check"></i><span>الحضور والانضباط</span>
+      </a>
+      <a id="dectationNav" class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#dectation-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-mic"></i><span>التسميع والأوراد</span>
+      </a>
+      <a id="examsNav" class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#exams-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-clipboard2-check"></i><span>الاختبارات والشهادات</span>
+      </a>
+      <a id="mazhabNav" class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#mazhab-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-signpost-2"></i><span>المذهب الفقهي</span>
+      </a>
+      <a class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#ads-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-megaphone"></i><span>الإعلانات</span>
+      </a>
+
+      <span style="display:block;margin:14px 12px 4px;color:rgba(255,255,255,.48);font-size:11px;font-weight:600;">الحساب</span>
+      <a id="profileNav" class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-person-gear"></i><span>الملف الشخصي</span>
+      </a>
+      <a class="sp-nav-item nav-item nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#contact-tab-pane" aria-selected="false" tabindex="-1">
+        <i class="bi bi-headset"></i><span>المساعدة والدعم</span>
+      </a>
+    </nav>
+
+    <div class="text-center mt-2 mb-2 px-3">
+      <div class="d-inline-block bg-white rounded-3 p-2 shadow-sm">
+        <img class="lvlLogo" style="max-width:90px;width:100%;" src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&amp;sz=w1000.png">
+      </div>
+    </div>
+
+    <div class="sp-sidebar-footer">
+      <div class="sp-footer-card">
+        <div class="sp-avatar"><img id="stuImageFooter" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&amp;sz=w500" alt="Avatar"></div>
+        <div class="sp-footer-info">
+          <strong id="stuNameFooter"></strong>
+          <span id="spFooterStageName">—</span>
+        </div>
+        <button type="button" class="sp-footer-logout" onclick="logout()" title="تسجيل الخروج" aria-label="تسجيل الخروج">
+          <i class="bi bi-box-arrow-left"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="sp-app-shell">
+    <header class="sp-topbar">
+      <div class="sp-topbar-start">
+        <button type="button" class="sp-icon-btn sp-mobile-menu" id="spMobileMenuBtn" aria-label="فتح القائمة">
+          <i class="bi bi-list"></i>
+        </button>
+        <div class="sp-breadcrumb" id="spPageTitle">الرئيسية</div>
+      </div>
+
+      <div class="sp-topbar-actions">
+        <button type="button" class="sp-icon-btn sp-notification-btn" id="spNotifBtn" aria-label="الإشعارات">
+          <i class="bi bi-bell"></i>
+        </button>
+        <div class="sp-popover sp-notification-popover" id="spNotifPopover" hidden>
+          <div class="sp-popover-head"><strong>الإشعارات</strong></div>
+          <div class="sp-notification-empty"><i class="bi bi-bell-slash"></i><span>لا توجد إشعارات حاليًا</span></div>
+        </div>
+
+        <button type="button" class="sp-user-trigger" id="spUserTrigger">
+          <div class="sp-avatar"><img id="stuImageTop" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&amp;sz=w500" alt=""></div>
+          <div><strong id="stuNameTop"></strong><span>طالب</span></div>
+          <i class="bi bi-chevron-down"></i>
+        </button>
+        <div class="sp-popover sp-user-popover" id="spUserPopover" hidden>
+          <a class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane"><i class="bi bi-person-gear"></i>الملف الشخصي</a>
+          <button type="button" id="spGoAdminBtn" class="d-none" onclick="loadDashboard()"><i class="bi bi-speedometer2"></i>لوحة الإدارة</button>
+          <button type="button" onclick="logout()"><i class="bi bi-box-arrow-left"></i>تسجيل الخروج</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="sp-main">
+      <div class="tab-content pt-0 tabsContDiv">
+        <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
+
+          <section class="sp-page-heading">
+            <div>
+              <div class="sp-eyebrow"><span class="sp-live-dot"></span><span id="spTodayDate"></span></div>
+            </div>
+            <div class="sp-heading-actions">
+              <span class="sp-stage-badge"><span class="sp-stage-symbol" id="spStageSymbol">1</span><span id="spStageName">—</span></span>
+              <a id="spShowCardBtn" class="sp-btn-secondary" target="_blank" data-issued-file><i class="bi bi-qr-code"></i>بطاقة الحضور</a>
+            </div>
+          </section>
+
+          <div class="msgAlert sp-sticky-alert col-sm-5 mx-auto alert alert-warning alert-dismissible rounded-5 p-4 fade show d-none" role="alert"></div>
+          <div class="loginAlert sp-sticky-alert alert alert-warning d-none" role="alert"></div>
+
+          <!-- ملاحظة: محتوى بطاقة "خطوتك التالية" أدناه تجريبي (من التصميم المرجعي)، بانتظار
+               إضافة نموذج بيانات تقدّم الطالب درسًا بدرس — انظر design-guidelines.md -->
+          <section class="sp-focus-layout" aria-label="ملخص اليوم">
+            <article class="sp-panel sp-next-action">
+              <div class="sp-next-action-copy">
+                <span class="sp-panel-kicker"><i class="bi bi-play-circle"></i>خطوتك التالية</span>
+                <h2>دلالات الألفاظ وأثرها في استنباط الأحكام</h2>
+                <p>المحاضرة السابعة من مقرر أصول الفقه مع فضيلة الشيخ د. عبدالله السلمي.</p>
+                <div class="sp-lesson-meta">
+                  <span><i class="bi bi-clock"></i>42 دقيقة</span>
+                  <span><i class="bi bi-bookmark-check"></i>المقرر 3 من 4</span>
+                  <span><i class="bi bi-calendar-event"></i>اليوم، 7:30 مساءً</span>
+                </div>
+                <div class="sp-action-row">
+                  <button type="button" class="sp-btn-primary"><i class="bi bi-play-fill"></i>متابعة الدرس</button>
+                  <button type="button" class="sp-btn-text light">تفاصيل المقرر<i class="bi bi-arrow-left"></i></button>
+                </div>
+              </div>
+              <div class="sp-lesson-progress" aria-label="نسبة إكمال المقرر 68 بالمئة">
+                <div class="sp-progress-ring" style="--sp-progress:68;"><span><strong>68%</strong><small>مكتمل</small></span></div>
+                <div class="sp-progress-caption"><strong>18 من 26 درسًا</strong><span>تبقى 8 دروس</span></div>
+              </div>
+              <div class="sp-coming-soon-overlay">
+                <i class="bi bi-hourglass-split"></i>
+                <span>جاري التحضير ..... قريبًا</span>
+              </div>
+            </article>
+
+            <article class="sp-panel" id="spJourneyPanel">
+              <div class="sp-panel-heading">
+                <div><span class="sp-section-kicker">مسارك الحالي</span><h2>رحلتي العلمية</h2></div>
+                <button type="button" class="sp-icon-btn" id="spJourneyDetailsBtn" aria-label="تفاصيل المراحل" title="تفاصيل المراحل"><i class="bi bi-arrow-up-left"></i></button>
+              </div>
+              <ol class="sp-stage-timeline" id="spStageTimeline"></ol>
+            </article>
+          </section>
+
+          <!-- ملاحظة: بطاقة "الدروس المكتملة" أدناه تجريبية بانتظار نفس نموذج البيانات -->
+          <section class="sp-metrics-grid" id="spMetricsGrid" aria-label="إحصاءات الطالب">
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon attendance"><i class="bi bi-calendar2-check"></i></span>
+              <div><small>نسبة الحضور</small><strong id="spMetricAttendance">—</strong><span id="spMetricAttendanceSub">منذ بداية الدورة</span></div>
+            </article>
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon lesson"><i class="bi bi-book-half"></i></span>
+              <div><small>الدروس المكتملة</small><strong>قريبًا</strong><span>&nbsp;</span></div>
+            </article>
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon recitation"><i class="bi bi-mic"></i></span>
+              <div><small>الأوراد المسمّعة</small><strong id="spMetricRecitation">—</strong><span>في المرحلة الحالية</span></div>
+            </article>
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon exam"><i class="bi bi-clipboard2-check"></i></span>
+              <div><small>الاختبارات الناجحة</small><strong id="spMetricExams">—</strong><span>في المرحلة الحالية</span></div>
+            </article>
+          </section>
+
+          <div id="congratesCard" class="card rounded-5 mx-auto d-none" style="max-width: 600px !important;box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+            <div class="position-relative w-100">
+              <img src="https://drive.google.com/thumbnail?id=1X_j-eUotY8W4jHaDaGYe_AQttOr1RXQb&amp;sz=w1000" class="card-img-top rounded-top-5 p-2 border-bottom w-100" alt="">
+
+              <h5 id="cardStName" class="card-title position-absolute text-light w-100 text-center m-0"
+                  style="bottom: 20%; left: 50%; transform: translateX(-50%); font-size: clamp(1.2rem, 4.5vw, 1.8rem); text-shadow: 1px 1px 4px rgba(0,0,0,0.6);">
+              </h5>
+            </div>
+
+            <div class="card-body p-5 text-center">
+
+              <p class="card-text text-secondary fs-6" style="text-align: justify;">
+                يمكنك الحصول على البطاقة كما هي أعلاه من خلال الضغط على المفتاح بالأسفل.
+                <br>
+                كما يمكنك تعديل اسمك الذي سيظهر بالبطاقة بالحقل أسفل هذا النص
+              </p>
+
+              <div class="form-floating mb-3">
+                <input type="text" class="form-control text-center fw-bold fs-4 rounded-5" id="nameEdited">
+                <label for="nameEdited">الاسم</label>
+              </div>
+
+              <a id="getCardViaMail" class="btn btn-lg btn-outline-danger rounded-5 mb-2 fs-6 shadow-sm">الحصول على البطاقة عبر البريد الإلكتروني</a>
+              <br>
+              <a id="viewMail" class="text-secondary fs-6">your Email</a>
+
+            </div>
+          </div>
+
+          <!-- الصورتان أدناه مخفيتان مؤقتًا بطلب من الإدارة -->
+          <div class="row g-2 d-none">
+            <div class="col-sm-5 mx-auto text-center rounded-5 animate__animated animate__zoomIn" style=" box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+              <img id="logo" src="https://drive.google.com/thumbnail?id=1KSSfvHTIAqNyIO849g95lEKq3VpUmv7z&amp;sz=w2000" class="rounded-5" style="width: 100%;height:auto;align-content: center;">
+            </div>
+
+            <div class="col-sm-5 mx-auto text-center rounded-5 animate__animated animate__zoomIn" style=" box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+              <img id="logo" src="https://drive.google.com/thumbnail?id=17F-fipgOdpcBnX5uohhjnYxOyt1od0Sb&amp;sz=w2000" class="rounded-5" style="width: 100%;height:auto;align-content: center;">
+            </div>
+          </div>
+
+
+        </div>
+
+        <div class="tab-pane fade" id="ads-tab-pane" role="tabpanel" aria-labelledby="ads-tab" tabindex="0">
+          <h6 class="mb-4 d-inline-block px-4 py-2 bg-danger text-light rounded-pill shadow-sm">الإعلانات</h6>
+            <div class="container mt-4">
+
+              <div id="carouselِAnnounce" class="carousel slide col-sm-6 mx-auto  carousel-fade" data-bs-ride="carousel">
+                <div class="carousel-indicators bg-dark w-100 mx-auto mb-5 bg-opacity-50">
+                  <button type="button" data-bs-target="#carouselِAnnounce" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                  <button type="button" data-bs-target="#carouselِAnnounce" data-bs-slide-to="1" aria-label="Slide 2"></button>
+                  <button type="button" data-bs-target="#carouselِAnnounce" data-bs-slide-to="2" aria-label="Slide 3"></button>
+                </div>
+                <div class="carousel-inner rounded-5" style="box-shadow: 0 2px 20px 0 rgba(67, 89, 113, 0.45);">
+                  <div class="carousel-item active">
+                    <img src="https://drive.google.com/thumbnail?id=1fEYJ7Sh7xceJrMPSwTxXMipoSsHMKlO5&amp;sz=w2000" class="d-block w-100" alt="...">
+                  </div>
+                  <div class="carousel-item">
+                    <img src="https://drive.google.com/thumbnail?id=1qRumOpJTlu41nTfsJiPBdRamygjk4k4y&amp;sz=w2000" class="d-block w-100" alt="...">
+                  </div>
+                  <div class="carousel-item">
+                    <img src="https://drive.google.com/thumbnail?id=1MyOKRoEci_XXXBwA5vVcZI043J7HqCUi&amp;sz=w2000" class="d-block w-100" alt="...">
+                  </div>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#carouselِAnnounce" data-bs-slide="prev">
+                  <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                  <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#carouselِAnnounce" data-bs-slide="next">
+                  <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                  <span class="visually-hidden">Next</span>
+                </button>
+              </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="tab-pane fade" id="moqarar-tab-pane" role="tabpanel" aria-labelledby="moqarar-tab" tabindex="0">
+          <div class="sp-page-heading">
+            <div>
+              <span class="sp-section-kicker">حقيبتك العلمية</span>
+              <h1 class="text-end">المقررات والمواد التعليمية</h1>
+              <p>كل ما تحتاجه للدراسة مرتب حسب المقرر، مع وصول مباشر لملفاتك على Google Drive.</p>
+            </div>
+            <div class="containerStworks sp-heading-actions">
+              <button type="button" class="sp-btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-upload"></i>رفع أعمال الطالب
+              </button>
+            </div>
+          </div>
+
+          <div class="sp-library-summary">
+            <div class="sp-summary-copy">
+              <span class="sp-summary-symbol"><i class="bi bi-journal-bookmark"></i></span>
+              <div>
+                <small>حقيبتك العلمية</small>
+                <h2 id="curriculumSummaryText">جارٍ التحميل...</h2>
+                <p>يُحدَّث تلقائيًا من ملفاتك على Google Drive</p>
+              </div>
+            </div>
+            <div class="sp-storage-note">
+              <i class="bi bi-cloud-check"></i>
+              <span><strong>متزامن مع Google Drive</strong><small>تُحدَّث الملفات تلقائيًا</small></span>
+            </div>
+          </div>
+
+          <div class="sp-library-toolbar">
+            <label class="sp-library-search">
+              <i class="bi bi-search"></i>
+              <input type="text" id="courseSearchTop" placeholder="ابحث باسم المقرر أو الملف...">
+              <button type="button" id="courseSearchClear" class="sp-search-clear d-none" aria-label="مسح البحث"><i class="bi bi-x-circle-fill"></i></button>
+            </label>
+            <div class="sp-filter-group" role="group" aria-label="تصفية المقررات">
+              <button type="button" class="active" data-course-filter="all">جميع المقررات</button>
+              <button type="button" data-course-filter="active">قيد الدراسة</button>
+              <button type="button" data-course-filter="complete">مكتمل</button>
+            </div>
+            <div class="sp-view-switch" role="group" aria-label="طريقة العرض">
+              <button type="button" class="active" data-course-view="grid" title="عرض شبكي"><i class="bi bi-grid-3x3-gap"></i></button>
+              <button type="button" data-course-view="list" title="عرض قائمة"><i class="bi bi-list-ul"></i></button>
+            </div>
+          </div>
+
+          <div class="sp-section-title-line">
+            <div><h2>مقرراتك الحالية</h2><span id="curriculumCountBadge">0 مقررات</span></div>
+            <p>اضغط على أي مقرر لاستعراض ملفاته</p>
+          </div>
+
+          <div id="curriculumLoading" class="text-center text-secondary py-5">
+            <div class="spinner-border" role="status"></div>
+          </div>
+          <div id="curriculumEmpty" class="text-center text-secondary py-5 d-none">لا يوجد محتوى بعد</div>
+          <div id="curriculumGrid" class="curriculum-grid"></div>
+
+          <!-- نتائج البحث الشامل (المجلد الرئيسي وكل ما تحته)، تحل محل الشبكة أثناء البحث -->
+          <div id="curriculumSearchResults" class="material-list d-none"></div>
+        </div>
+
+        <!-- درج عرض محتويات المقرر (يفتح من كارت في curriculumGrid) -->
+        <div id="courseDrawerOverlay" class="course-drawer-overlay d-none"></div>
+        <aside id="courseDrawer" class="course-drawer">
+          <div class="course-drawer-head">
+            <button type="button" id="courseDrawerClose" class="course-drawer-close" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="course-drawer-course-head">
+            <span class="course-drawer-icon" id="courseDrawerIcon"></span>
+            <h3 id="courseDrawerTitle"></h3>
+          </div>
+          <div class="course-drawer-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="courseDrawerSearch" placeholder="ابحث داخل المقرر...">
+          </div>
+          <div class="course-drawer-body" id="courseDrawerBody"></div>
+        </aside>
+
+        <!-- معاينة الملفات الصوتية والمرئية -->
+        <div class="modal fade" id="courseMediaModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="courseMediaModalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+              </div>
+              <div class="modal-body p-0">
+                <div class="ratio ratio-16x9">
+                  <iframe id="courseMediaFrame" src="" allow="autoplay" allowfullscreen></iframe>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <div class="tab-pane fade" id="mazhab-tab-pane" role="tabpanel" aria-labelledby="mazhab-tab" tabindex="0">
+          <div class="sp-page-heading">
+            <div>
+              <span class="sp-section-kicker">الحساب الفقهي</span>
+              <h1 class="text-end">المذهب الفقهي</h1>
+              <p id="mazhabPageSubtitle">اختر المذهب الفقهي الذي ستدرس عليه طوال مراحلك الدراسية، ويمكنك تغيير اختيارك لاحقًا من هذه الصفحة نفسها.</p>
+            </div>
+          </div>
+
+          <div class="loginAlert sp-sticky-alert alert alert-warning d-none" role="alert"></div>
+
+          <div class="sp-readonly-note" style="margin-bottom:16px;"><i class="bi bi-info-circle"></i>اختيارك للمذهب الفقهي يُبنى على ما استمعت إليه من محاضرة <strong>(المدخل إلى علم الفقه)</strong>، أو استشارتك لمشايخ متخصصين.</div>
+
+          <!-- تظهر فقط لطالب اختار مذهبه بالفعل وتغيير المذهب مغلق حاليًا (allowMazhabChange
+               بشيت main) — renderMazhabSelection بfuncs-js.html. -->
+          <div class="sp-readonly-note d-none" id="mazhabLockedNote" style="margin-bottom:16px;"><i class="bi bi-lock-fill"></i>اخترت مذهبك الفقهي بالفعل، وتغييره غير متاح حاليًا — تواصل مع الإدارة إن كنت بحاجة لذلك.</div>
+
+          <div class="sp-section-title-line">
+            <div><h2>المذاهب المتاحة</h2></div>
+          </div>
+
+          <!-- تُبنى البطاقات ديناميكيًا (renderMazhabSelection بfuncs-js.html) من قائمة المذاهب
+               الفعلية بإدارة المواد، مُصفَّاة إلى مذاهب مرحلة الطالب الحالية فقط — لا بطاقات
+               ثابتة بعد الآن. -->
+          <div class="sp-mazhab-cards-grid mazhabCard"></div>
+        </div>
+
+        <div class="tab-pane fade" id="attend-tab-pane" role="tabpanel" aria-labelledby="attend-tab" tabindex="0">
+          <div class="sp-page-heading">
+            <div>
+              <span class="sp-section-kicker">المتابعة اليومية</span>
+              <h1 class="text-end">الحضور والانضباط</h1>
+              <p>سجل أيام حضورك الفعلية منذ التسجيل.</p>
+            </div>
+            <div class="sp-heading-actions">
+              <a id="showAttQrCard" target="_blank" data-issued-file class="sp-btn-secondary"><i class="bi bi-qr-code"></i>بطاقة الحضور</a>
+              <button type="button" id="requestAttendBtn" class="sp-btn-primary"><i class="bi bi-calendar-plus"></i>طلب إضافة حضور</button>
+            </div>
+          </div>
+
+          <div class="sp-recitation-overview sp-cols-1">
+            <div><strong id="attendCountStat">0</strong><span>يوم حضور</span></div>
+          </div>
+
+          <div class="sp-section-title-line">
+            <div><h2>سجل أيام الحضور</h2></div>
+          </div>
+
+          <div id="attendEmpty" class="text-center text-secondary py-5 d-none">لا يوجد أيام حضور مسجّلة بعد</div>
+          <div class="sp-task-list" id="spAttendList"></div>
+        </div>
+
+        <div class="tab-pane fade" id="dectation-tab-pane" role="tabpanel" aria-labelledby="dectation-tab" tabindex="0">
+          <div class="sp-page-heading">
+            <div>
+              <span class="sp-section-kicker">الحفظ والمتابعة</span>
+              <h1 class="text-end">التسميع والأوراد</h1>
+              <p>سجل الأوراد المسموعة في مرحلتك الحالية، مع تقييم كل ورد وتاريخ تسميعه.</p>
+            </div>
+          </div>
+
+          <div class="sp-recitation-overview">
+            <div><strong id="recitationCountStat">0</strong><span>وردًا مسموعًا</span></div>
+            <div><strong id="recitationAvgStat">—</strong><span>متوسط التقييم</span></div>
+            <div><strong id="recitationStreakStat">0</strong><span>أسابيع متتالية</span></div>
+          </div>
+
+          <div class="sp-section-title-line">
+            <div><h2>سجل الأوراد</h2></div>
+          </div>
+
+          <div id="dectationEmpty" class="text-center text-secondary py-5 d-none">لا توجد أوراد مسموعة بعد في مرحلتك الحالية</div>
+          <div class="sp-task-list" id="spDectationList"></div>
+        </div>
+
+        <div class="tab-pane fade" id="exams-tab-pane" role="tabpanel" aria-labelledby="exams-tab" tabindex="0">
+          <div class="sp-page-heading">
+            <div>
+              <span class="sp-section-kicker">التقييم</span>
+              <h1 class="text-end">الاختبارات والشهادات</h1>
+              <p>تابع اختباراتك المتاحة ونتائجك في مرحلتك الحالية وما قبلها.</p>
+            </div>
+          </div>
+
+          <article class="sp-panel sp-exam-featured d-none" id="examFeaturedCard">
+            <span class="sp-panel-kicker"><i class="bi bi-clipboard2-pulse"></i>متاح الآن</span>
+            <h2 id="examFeaturedName">—</h2>
+            <p>هذا الاختبار متاح الآن لمرحلتك الحالية.</p>
+            <div class="sp-lesson-meta"><span><i class="bi bi-clock"></i><span id="examFeaturedDuration">—</span> دقيقة</span></div>
+            <button type="button" class="sp-btn-primary sp-exam-start-btn" id="examFeaturedStartBtn"><i class="bi bi-play-fill"></i>بدء الاختبار</button>
+          </article>
+
+          <section class="sp-metrics-grid sp-cols-3" id="examsStatsGrid" aria-label="إحصاءات الاختبارات">
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon exam"><i class="bi bi-clipboard2-check"></i></span>
+              <div><small>اختبارات تم اجتيازها</small><strong id="examsPassedStat">0</strong><span>في مرحلتك الحالية</span></div>
+            </article>
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon recitation"><i class="bi bi-graph-up"></i></span>
+              <div><small>متوسط درجات النجاح</small><strong id="examsAvgStat">—</strong><span>بين الاختبارات الناجحة</span></div>
+            </article>
+            <article class="sp-panel sp-metric-card">
+              <span class="sp-metric-icon attendance"><i class="bi bi-pie-chart"></i></span>
+              <div><small>إجمالي نسبة الاجتياز</small><strong id="examsRateStat">—</strong><span id="examsRateSub">—</span></div>
+            </article>
+          </section>
+
+          <div class="sp-section-title-line">
+            <div><h2>جميع الاختبارات</h2></div>
+          </div>
+
+          <div id="examsEmpty" class="text-center text-secondary py-5 d-none">لا يوجد اختبارات</div>
+          <div class="sp-exam-cards-grid" id="pastExamsList"></div>
+        </div>
+
+        <div class="tab-pane fade" id="contact-tab-pane" role="tabpanel" aria-labelledby="contact-tab" tabindex="0">
+          <h6 class="mb-4 d-inline-block px-4 py-2 bg-danger text-light rounded-pill shadow-sm">التواصل</h6>
+
+            <!-- أيقونات التواصل الاجتماعي -->
+            <div class="d-flex justify-content-center gap-3 mt-3 mx-auto rounded-5 p-2">
+
+              <a href="https://wa.me/97334440790" target="_blank" class="btn btn-outline-success border-0 d-flex align-items-center gap-2 rounded-pill">
+                <i class="fab fa-whatsapp fs-1"></i></a>
+
+
+              <a href="https://www.instagram.com/basaer.bh/" target="_blank" class="btn btn-outline-danger border-0 d-flex align-items-center gap-2 rounded-pill">
+                <i class="fab fa-instagram fs-1"></i></a>
+            </div>
+
+
+        </div>
+
+
+        <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+
+          <!-- نسخ مطابق حرفيًا لمرجع profile.html (basair-student-portal) — نفس الهيكل والأصناف
+               (بادئة sp- لتفادي تعارض مع admin-css.html)، نفس القيم بالبكسل. التعديل الوحيد
+               المقصود: مكتبة الأيقونات (Bootstrap Icons بدل Lucide). الاستثناءات الوظيفية أدناه
+               مُقرَّرة صراحة في مناقشات.md (وليست تعديلًا من عندنا): قسم "الأجهزة النشطة" مخفي
+               بالكامل (d-none)، تبويب "الإشعارات" خلف طبقة "قريبًا" (نفس أسلوب بطاقة "خطوتك
+               التالية" بالرئيسية)، شارة رمز الدولة تعرض 🇧🇭 +973 (نمط المشروع الحقيقي). لا اتصال
+               فعلي بالخادم بعد — راجع design-guidelines.md (المرحلة 4) قبل أي تعديل إضافي. -->
+
+          <section class="sp-profile-page-heading">
+            <div>
+              <span class="sp-section-kicker">إدارة الحساب</span>
+              <h1>الملف الشخصي</h1>
+              <p>حدّث معلوماتك ووسائل التواصل وإعدادات الأمان من مكان واحد.</p>
+            </div>
+            <div class="sp-save-state" id="pfSaveState"><span></span><strong>جميع التغييرات محفوظة</strong></div>
+          </section>
+
+          <section class="sp-identity-banner">
+            <div class="sp-profile-avatar-wrap">
+              <div class="sp-profile-avatar" id="pfProfileAvatar"><img id="pfAvatarPreview" alt="الصورة الشخصية" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&amp;sz=w500"></div>
+              <label class="sp-avatar-edit" for="pfAvatarInput" title="تغيير الصورة"><i class="bi bi-camera-fill"></i><input id="pfAvatarInput" type="file" accept="image/png,image/jpeg" hidden></label>
+            </div>
+            <div class="sp-identity-copy">
+              <div class="sp-identity-name"><h2 id="pfDisplayName">—</h2><span class="sp-verified-badge"><i class="bi bi-patch-check-fill"></i>حساب موثّق</span></div>
+              <p id="pfIdentitySub">طالب · —</p>
+              <div class="sp-identity-tags"><span><i class="bi bi-geo-alt"></i>مملكة البحرين</span><span><i class="bi bi-calendar-week"></i>عضو في أكاديمية بصائر</span></div>
+            </div>
+            <div class="sp-completion-block">
+              <div><span>اكتمال الملف</span><strong id="pfCompletionPercent">0%</strong></div>
+              <div class="sp-linear-progress"><span id="pfCompletionBar" style="width:0%"></span></div>
+              <small id="pfCompletionHint">أضف صورة شخصية ورقم هاتف بديل</small>
+            </div>
+          </section>
+
+          <section class="sp-settings-layout">
+            <aside class="sp-settings-tabs" aria-label="أقسام إعدادات الحساب">
+              <button class="sp-settings-tab active" type="button" data-tab="personal"><span class="sp-tab-icon"><i class="bi bi-person-vcard"></i></span><span><strong>البيانات الشخصية</strong><small>الهوية والمعلومات الأساسية</small></span><i class="bi bi-chevron-left"></i></button>
+              <button class="sp-settings-tab" type="button" data-tab="contact"><span class="sp-tab-icon"><i class="bi bi-at"></i></span><span><strong>التواصل والعنوان</strong><small>البريد والهاتف ومكان السكن</small></span><i class="bi bi-chevron-left"></i></button>
+              <button class="sp-settings-tab" type="button" data-tab="security"><span class="sp-tab-icon"><i class="bi bi-shield-check"></i></span><span><strong>الأمان والدخول</strong><small>كلمة المرور وطرق الدخول</small></span><i class="bi bi-chevron-left"></i></button>
+              <button class="sp-settings-tab" type="button" data-tab="notifications"><span class="sp-tab-icon"><i class="bi bi-bell"></i></span><span><strong>الإشعارات</strong><small>اختر ما تريد استلامه</small></span><i class="bi bi-chevron-left"></i></button>
+              <div class="sp-settings-help"><span><i class="bi bi-headset"></i></span><div><strong>تحتاج إلى مساعدة؟</strong><p>فريق بصائر جاهز لمساعدتك في تحديث بياناتك.</p><button type="button" id="pfHelpBtn">تواصل مع الدعم</button></div></div>
+            </aside>
+
+            <form class="sp-settings-content" id="profileForm" novalidate>
+              <section class="sp-settings-panel active" data-panel="personal" aria-labelledby="pfPersonalTitle">
+                <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">المعلومات الأساسية</span><h2 id="pfPersonalTitle">بياناتك الشخصية</h2><p>يُرجى مطابقة الاسم وتاريخ الميلاد مع البطاقة السكانية.</p></div><span class="sp-panel-status"><i class="bi bi-check-circle"></i>مكتمل</span></div>
+                <div class="sp-form-grid">
+                  <label class="sp-form-field sp-span-2"><span>الاسم كاملًا</span><div class="sp-input-wrap"><i class="bi bi-person"></i><input id="fullName" name="fullName" type="text" required minlength="6"><i class="sp-field-check bi bi-check"></i></div><small class="sp-field-message">اكتب الاسم كما يظهر في البطاقة السكانية</small></label>
+                  <label class="sp-form-field"><span>الرقم الشخصي</span><div class="sp-input-wrap sp-readonly"><i class="bi bi-credit-card-2-front"></i><input id="cpr" name="cpr" type="text" readonly><i class="bi bi-lock"></i></div><small class="sp-field-message">لا يمكن تعديل الرقم الشخصي</small></label>
+                  <label class="sp-form-field"><span>تاريخ الميلاد</span><div class="sp-input-wrap"><i class="bi bi-calendar3"></i><input id="dob" name="dob" type="date"></div></label>
+                  <label class="sp-form-field"><span>الجنس</span><div class="sp-input-wrap"><i class="bi bi-people"></i><select id="gender" name="gender"><option value="">— اختر —</option><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select><i class="bi bi-chevron-down"></i></div></label>
+                  <label class="sp-form-field"><span>الجنسية</span><div class="sp-input-wrap"><i class="bi bi-flag"></i><select id="nationality" name="nationality"><option value="">— اختر —</option><option>البحرين</option><option>أذربيجان</option><option>أرمينيا</option><option>أسبانيا</option><option>أستراليا</option><option>أفغانستان</option><option>ألبانيا</option><option>ألمانيا</option><option>أنتيجوا وبربودا</option><option>أنجولا</option><option>أنجويلا</option><option>أندورا</option><option>أورجواي</option><option>أوزبكستان</option><option>أوغندا</option><option>أوكرانيا</option><option>أيرلندا</option><option>أيسلندا</option><option>اثيوبيا</option><option>اريتريا</option><option>استونيا</option><option>الأرجنتين</option><option>الأردن</option><option>الاكوادور</option><option>الامارات العربية المتحدة</option><option>الباهاما</option><option>البرازيل</option><option>البرتغال</option><option>البوسنة والهرسك</option><option>الجابون</option><option>الجبل الأسود</option><option>الجزائر</option><option>الدانمرك</option><option>الرأس الأخضر</option><option>السلفادور</option><option>السنغال</option><option>السودان</option><option>السويد</option><option>الصحراء الغربية</option><option>الصومال</option><option>الصين</option><option>العراق</option><option>الفاتيكان</option><option>الفيلبين</option><option>القطب الجنوبي</option><option>الكاميرون</option><option>الكونغو - برازافيل</option><option>الكويت</option><option>المجر</option><option>المحيط الهندي البريطاني</option><option>المغرب</option><option>المقاطعات الجنوبية الفرنسية</option><option>المكسيك</option><option>المملكة العربية السعودية</option><option>المملكة المتحدة</option><option>النرويج</option><option>النمسا</option><option>النيجر</option><option>الهند</option><option>الولايات المتحدة الأمريكية</option><option>اليابان</option><option>اليمن</option><option>اليونان</option><option>اندونيسيا</option><option>ايران</option><option>ايطاليا</option><option>بابوا غينيا الجديدة</option><option>باراجواي</option><option>باكستان</option><option>بالاو</option><option>بتسوانا</option><option>بتكايرن</option><option>بربادوس</option><option>برمودا</option><option>بروناي</option><option>بلجيكا</option><option>بلغاريا</option><option>بليز</option><option>بنجلاديش</option><option>بنما</option><option>بنين</option><option>بوتان</option><option>بورتوريكو</option><option>بوركينا فاسو</option><option>بوروندي</option><option>بولندا</option><option>بوليفيا</option><option>بولينيزيا الفرنسية</option><option>بيرو</option><option>تانزانيا</option><option>تايلند</option><option>تايوان</option><option>تركمانستان</option><option>تركيا</option><option>ترينيداد وتوباغو</option><option>تشاد</option><option>توجو</option><option>توفالو</option><option>توكيلو</option><option>تونجا</option><option>تونس</option><option>تيمور الشرقية</option><option>جامايكا</option><option>جبل طارق</option><option>جرينادا</option><option>جرينلاند</option><option>جزر أولان</option><option>جزر الأنتيل الهولندية</option><option>جزر الترك وجايكوس</option><option>جزر القمر</option><option>جزر الكايمن</option><option>جزر المارشال</option><option>جزر الملديف</option><option>جزر الولايات المتحدة البعيدة الصغيرة</option><option>جزر سليمان</option><option>جزر فارو</option><option>جزر فرجين الأمريكية</option><option>جزر فرجين البريطانية</option><option>جزر فوكلاند</option><option>جزر كوك</option><option>جزر كوكوس</option><option>جزر ماريانا الشمالية</option><option>جزر والس وفوتونا</option><option>جزيرة الكريسماس</option><option>جزيرة بوفيه</option><option>جزيرة مان</option><option>جزيرة نورفوك</option><option>جزيرة هيرد وماكدونالد</option><option>جمهورية افريقيا الوسطى</option><option>جمهورية التشيك</option><option>جمهورية الدومينيك</option><option>جمهورية الكونغو الديمقراطية</option><option>جمهورية جنوب افريقيا</option><option>جواتيمالا</option><option>جوادلوب</option><option>جوام</option><option>جورجيا</option><option>جورجيا الجنوبية وجزر ساندويتش الجنوبية</option><option>جيبوتي</option><option>جيرسي</option><option>دومينيكا</option><option>رواندا</option><option>روسيا</option><option>روسيا البيضاء</option><option>رومانيا</option><option>روينيون</option><option>زامبيا</option><option>زيمبابوي</option><option>ساحل العاج</option><option>ساموا</option><option>ساموا الأمريكية</option><option>سان مارينو</option><option>سانت بيير وميكولون</option><option>سانت فنسنت وغرنادين</option><option>سانت كيتس ونيفيس</option><option>سانت لوسيا</option><option>سانت مارتين</option><option>سانت هيلنا</option><option>ساو تومي وبرينسيبي</option><option>سريلانكا</option><option>سفالبارد وجان مايان</option><option>سلوفاكيا</option><option>سلوفينيا</option><option>سنغافورة</option><option>سوازيلاند</option><option>سوريا</option><option>سورينام</option><option>سويسرا</option><option>سيراليون</option><option>سيشل</option><option>شيلي</option><option>صربيا</option><option>صربيا والجبل الأسود</option><option>طاجكستان</option><option>عمان</option><option>غامبيا</option><option>غانا</option><option>غويانا</option><option>غيانا</option><option>غينيا</option><option>غينيا الاستوائية</option><option>غينيا بيساو</option><option>فانواتو</option><option>فرنسا</option><option>فلسطين</option><option>فنزويلا</option><option>فنلندا</option><option>فيتنام</option><option>فيجي</option><option>قبرص</option><option>قرغيزستان</option><option>قطر</option><option>كازاخستان</option><option>كاليدونيا الجديدة</option><option>كرواتيا</option><option>كمبوديا</option><option>كندا</option><option>كوبا</option><option>كوريا الجنوبية</option><option>كوريا الشمالية</option><option>كوستاريكا</option><option>كولومبيا</option><option>كيريباتي</option><option>كينيا</option><option>لاتفيا</option><option>لاوس</option><option>لبنان</option><option>لوكسمبورج</option><option>ليبيا</option><option>ليبيريا</option><option>ليتوانيا</option><option>ليختنشتاين</option><option>ليسوتو</option><option>مارتينيك</option><option>ماكاو الصينية</option><option>مالطا</option><option>مالي</option><option>ماليزيا</option><option>مايوت</option><option>مدغشقر</option><option>مصر</option><option>مقدونيا</option><option>ملاوي</option><option>منطقة غير معرفة</option><option>منغوليا</option><option>موريتانيا</option><option>موريشيوس</option><option>موزمبيق</option><option>مولدافيا</option><option>موناكو</option><option>مونتسرات</option><option>ميانمار</option><option>ميكرونيزيا</option><option>ناميبيا</option><option>نورو</option><option>نيبال</option><option>نيجيريا</option><option>نيكاراجوا</option><option>نيوزيلاندا</option><option>نيوي</option><option>هايتي</option><option>هندوراس</option><option>هولندا</option><option>هونج كونج الصينية</option></select><i class="bi bi-chevron-down"></i></div></label>
+                </div>
+                <div class="sp-academic-summary">
+                  <div class="sp-academic-icon"><i class="bi bi-mortarboard"></i></div>
+                  <div><span>البيانات الأكاديمية</span><h3 id="pfAcademicSummary">—</h3><p>تُحدّث المرحلة والحالة الأكاديمية تلقائيًا بواسطة إدارة الأكاديمية.</p></div>
+                  <button class="sp-btn-text" type="button" id="pfViewJourneyBtn">عرض رحلتي<i class="bi bi-arrow-left"></i></button>
+                </div>
+              </section>
+
+              <section class="sp-settings-panel" data-panel="contact" aria-labelledby="pfContactTitle" hidden>
+                <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">الوصول إليك</span><h2 id="pfContactTitle">التواصل والعنوان</h2><p>نستخدم هذه البيانات للتنبيهات المهمة وإصدار البطاقات.</p></div><span class="sp-panel-status"><i class="bi bi-shield-check"></i>بيانات محمية</span></div>
+                <div class="sp-form-grid">
+                  <div class="sp-email-verification sp-span-2">
+                    <div class="sp-email-verification-head">
+                      <div><span>البريد الإلكتروني</span><small>اختر طريقة إضافة البريد والتحقق منه</small></div>
+                      <span class="sp-email-status unverified" id="emailStatus"><i class="bi bi-exclamation-circle"></i><b>غير متحقق</b></span>
+                    </div>
+                    <div class="sp-email-method-picker" role="tablist" aria-label="طريقة التحقق من البريد">
+                      <button class="sp-email-method" type="button" data-email-method="google" role="tab" aria-selected="false"><span class="sp-provider-mark sp-google-mark">G</span><span><strong>Google</strong><small>استخدام حساب Google</small></span><i class="bi bi-chevron-left"></i></button>
+                      <button class="sp-email-method" type="button" data-email-method="yahoo" role="tab" aria-selected="false"><span class="sp-provider-mark sp-yahoo-mark">Y!</span><span><strong>Yahoo</strong><small>استخدام حساب Yahoo</small></span><i class="bi bi-chevron-left"></i></button>
+                      <button class="sp-email-method active" type="button" data-email-method="manual" role="tab" aria-selected="true"><span class="sp-provider-mark sp-manual-mark"><i class="bi bi-envelope"></i></span><span><strong>إدخال يدوي</strong><small>التحقق بواسطة رمز</small></span><i class="bi bi-chevron-left"></i></button>
+                    </div>
+                    <div class="sp-provider-email-panel" id="providerEmailPanel" hidden>
+                      <span class="sp-provider-connected-icon sp-google-mark" id="providerConnectedIcon">G</span>
+                      <div><small id="providerLabel">حساب Google المرتبط</small><strong id="providerEmailText">—</strong></div>
+                      <button class="sp-btn-secondary" id="switchProviderAccount" type="button">تغيير الحساب</button>
+                    </div>
+                    <div class="sp-manual-email-panel" id="manualEmailPanel">
+                      <label class="sp-form-field"><span>اكتب البريد الإلكتروني</span><div class="sp-input-wrap" id="emailInputWrap"><i class="bi bi-envelope"></i><input id="email" name="email" type="email" required autocomplete="email" placeholder="name@example.com"><i class="sp-field-check bi bi-patch-check-fill"></i></div><small class="sp-field-message" id="emailMessage">سنرسل رمز تحقق مكوّنًا من 6 أرقام</small></label>
+                      <button class="sp-btn-secondary sp-send-code-button" id="sendEmailCode" type="button"><i class="bi bi-send"></i><span>إرسال رمز التحقق</span></button>
+                      <div class="sp-verification-code-area" id="verificationCodeArea" hidden>
+                        <label class="sp-form-field"><span>رمز التحقق</span><div class="sp-input-wrap sp-code-input"><i class="bi bi-key"></i><input id="emailVerificationCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="— — — — — —" aria-describedby="codeHint"></div><small class="sp-field-message" id="codeHint">للمعاينة استخدم الرمز 123456</small></label>
+                        <button class="sp-btn-primary sp-verify-code-button" id="verifyEmailCode" type="button"><i class="bi bi-shield-check"></i>تأكيد الرمز</button>
+                        <button class="sp-btn-text sp-resend-code-button" id="resendEmailCode" type="button" disabled>إعادة الإرسال بعد <b id="codeCountdown">30</b> ثانية</button>
+                      </div>
+                    </div>
+                    <input id="emailVerificationMethod" name="emailVerificationMethod" type="hidden" value="manual">
+                    <input id="emailVerifiedState" name="emailVerifiedState" type="hidden" value="false">
+                  </div>
+                  <label class="sp-form-field"><span>رقم الهاتف</span><div class="sp-input-wrap"><select class="sp-phone-country-select" id="phoneCountrySelect" aria-label="مفتاح الدولة"></select><input id="phone" name="phone" type="tel" inputmode="numeric" pattern="[0-9]{8}" required style="direction:ltr;"></div></label>
+                  <label class="sp-form-field"><span>هاتف بديل</span><div class="sp-input-wrap"><select class="sp-phone-country-select" id="phone2CountrySelect" aria-label="مفتاح الدولة"></select><input id="phone2" name="phone2" type="tel" placeholder="أدخل رقمًا بديلًا" inputmode="numeric" pattern="[0-9]{8}" style="direction:ltr;"></div><small class="sp-field-message">اختياري، ويساعدنا في الحالات العاجلة</small></label>
+                  <label class="sp-form-field"><span>المجمع</span><div class="sp-input-wrap sp-readonly"><i class="bi bi-geo"></i><input id="block" name="block" type="text" readonly></div></label>
+                  <label class="sp-form-field"><span>المنطقة</span><div class="sp-input-wrap sp-readonly"><i class="bi bi-geo-alt"></i><input id="area" name="area" type="text" readonly></div></label>
+                </div>
+                <div class="sp-preference-box"><span class="sp-preference-icon"><i class="bi bi-chat-dots"></i></span><div><strong>وسيلة التواصل المفضلة</strong><p>اختر الطريقة التي تفضل وصول التنبيهات المهمة من خلالها.</p></div><div class="sp-choice-buttons" role="radiogroup" aria-label="وسيلة التواصل المفضلة"><button type="button" data-contact-choice="whatsapp"><i class="bi bi-whatsapp"></i>واتساب</button><button class="active" type="button" data-contact-choice="email"><i class="bi bi-envelope"></i>البريد</button></div><input id="contactPreference" type="hidden" name="contactPreference" value="email"></div>
+              </section>
+
+              <section class="sp-settings-panel" data-panel="security" aria-labelledby="pfSecurityTitle" hidden>
+                <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">حماية الحساب</span><h2 id="pfSecurityTitle">الأمان وتسجيل الدخول</h2><p>استخدم كلمة مرور قوية وراجع طرق الدخول المرتبطة بحسابك.</p></div><span class="sp-security-score"><i class="bi bi-shield-check"></i><span><strong id="pfSecurityScoreText">غير مُفعّلة</strong><small>مستوى الأمان</small></span></span></div>
+                <div class="sp-security-section">
+                  <div class="sp-subsection-heading"><div><h3>تغيير كلمة المرور</h3><p>يجب ألا تقل كلمة المرور الجديدة عن 6 أحرف.</p></div></div>
+                  <div class="sp-form-grid">
+                    <label class="sp-form-field sp-span-2"><span>كلمة المرور الحالية</span><div class="sp-input-wrap"><i class="bi bi-lock"></i><input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" placeholder="أدخل كلمة المرور الحالية"><button class="sp-input-action" type="button" data-toggle-password="currentPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div></label>
+                    <label class="sp-form-field"><span>كلمة المرور الجديدة</span><div class="sp-input-wrap"><i class="bi bi-key"></i><input id="newPassword" name="newPassword" type="password" autocomplete="new-password" placeholder="6 أحرف على الأقل" minlength="6"><button class="sp-input-action" type="button" data-toggle-password="newPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><div class="sp-password-strength"><span></span><span></span><span></span><span></span><small id="passwordStrengthText">لم تُدخل كلمة مرور</small></div></label>
+                    <label class="sp-form-field"><span>تأكيد كلمة المرور</span><div class="sp-input-wrap"><i class="bi bi-key-fill"></i><input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور"><button class="sp-input-action" type="button" data-toggle-password="confirmPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><small class="sp-field-message" id="passwordMatch"></small></label>
+                  </div>
+                </div>
+                <div class="sp-security-section">
+                  <div class="sp-subsection-heading"><div><h3>طرق تسجيل الدخول</h3><p>الطرق المرتبطة حاليًا بحسابك.</p></div></div>
+                  <div class="sp-login-methods">
+                    <article><span class="sp-method-icon sp-email-method-icon"><i class="bi bi-key-fill"></i></span><div><strong>الرقم الشخصي وكلمة المرور</strong><small>الدخول الأساسي باستخدام رقمك الشخصي</small></div><span class="sp-status-pill warning">غير مُفعّلة</span></article>
+                    <article><span class="sp-method-icon sp-google-method-icon">G</span><div><strong>حساب Google</strong><small>غير مرتبط بعد</small></div><button class="sp-btn-secondary" type="button" data-action="disconnect" disabled>عبر الإيميل</button></article>
+                  </div>
+                </div>
+                <div class="sp-security-section sp-sessions-section d-none">
+                  <div class="sp-subsection-heading"><div><h3>الأجهزة النشطة</h3><p>راجع الأجهزة التي تستخدم حسابك الآن.</p></div><button class="sp-btn-text" type="button" data-action="signout-all">تسجيل الخروج من الكل</button></div>
+                  <div class="sp-session-list">
+                    <article><span class="sp-session-icon"><i class="bi bi-laptop"></i></span><div><strong>Chrome على Windows</strong><small>المنامة، البحرين · هذا الجهاز</small></div><span class="sp-current-device"><i></i>نشط الآن</span></article>
+                    <article><span class="sp-session-icon"><i class="bi bi-phone"></i></span><div><strong>Safari على iPhone</strong><small>المحرق، البحرين · منذ يومين</small></div><button class="sp-icon-btn" type="button" aria-label="إنهاء جلسة الهاتف" title="إنهاء الجلسة" data-action="end-session"><i class="bi bi-box-arrow-left"></i></button></article>
+                  </div>
+                </div>
+              </section>
+
+              <section class="sp-settings-panel" data-panel="notifications" aria-labelledby="pfNotificationsTitle" hidden>
+                <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">ابق على اطلاع</span><h2 id="pfNotificationsTitle">إعدادات الإشعارات</h2><p>حدد التنبيهات التي تهمك والطريقة المناسبة لاستلامها.</p></div></div>
+                <div style="position:relative;">
+                  <div style="filter:blur(5px);pointer-events:none;user-select:none;">
+                    <div class="sp-notification-channel-grid">
+                      <article class="sp-channel-card active"><span class="sp-channel-icon whatsapp"><i class="bi bi-whatsapp"></i></span><div><strong>واتساب</strong><small>على رقمك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" name="channelWhatsapp" checked><span></span></label></article>
+                      <article class="sp-channel-card active"><span class="sp-channel-icon email"><i class="bi bi-envelope"></i></span><div><strong>البريد الإلكتروني</strong><small>بريدك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" name="channelEmail" checked><span></span></label></article>
+                    </div>
+                    <div class="sp-notification-settings">
+                      <div class="sp-notification-group-title"><h3>تنبيهات الدراسة</h3><p>المواعيد والتحديثات المرتبطة برحلتك العلمية.</p></div>
+                      <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-alarm"></i></span><span><strong>تذكير المحاضرات</strong><small>قبل موعد المحاضرة بساعتين</small></span><span class="sp-channel-pills"><em>واتساب</em><em>البريد</em></span><span class="sp-switch"><input type="checkbox" name="notifyLectures" checked><span></span></span></label>
+                      <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-clipboard2-check"></i></span><span><strong>الاختبارات والنتائج</strong><small>عند فتح اختبار أو صدور نتيجة جديدة</small></span><span class="sp-channel-pills"><em>واتساب</em><em>البريد</em></span><span class="sp-switch"><input type="checkbox" name="notifyExams" checked><span></span></span></label>
+                      <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-mic"></i></span><span><strong>مواعيد التسميع</strong><small>تنبيه بالورد المطلوب وموعد المجلس</small></span><span class="sp-channel-pills"><em>واتساب</em></span><span class="sp-switch"><input type="checkbox" name="notifyRecitation" checked><span></span></span></label>
+                      <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-megaphone"></i></span><span><strong>إعلانات الأكاديمية</strong><small>التعاميم والمجالس العلمية المهمة</small></span><span class="sp-channel-pills"><em>البريد</em></span><span class="sp-switch"><input type="checkbox" name="notifyAnnouncements" checked><span></span></span></label>
+                      <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-graph-up"></i></span><span><strong>الملخص الأسبوعي</strong><small>ملخص التقدم والحضور مساء كل خميس</small></span><span class="sp-channel-pills"><em>البريد</em></span><span class="sp-switch"><input type="checkbox" name="notifyWeekly"><span></span></span></label>
+                    </div>
+                    <div class="sp-quiet-hours"><span class="sp-quiet-icon"><i class="bi bi-moon-stars"></i></span><div><strong>ساعات الهدوء</strong><p>لن نرسل إشعارات غير عاجلة خلال هذه الفترة.</p></div><label><span>من</span><input name="quietFrom" type="time" value="22:00"></label><label><span>إلى</span><input name="quietTo" type="time" value="07:00"></label></div>
+                  </div>
+                  <div class="sp-coming-soon-overlay" style="border-radius:8px;"><i class="bi bi-bell-slash"></i><span>تفضيلات الإشعارات — قريبًا</span></div>
+                </div>
+              </section>
+
+              <div class="sp-settings-actions">
+                <div class="sp-unsaved-indicator" id="unsavedIndicator"><span></span><p><strong>لا توجد تغييرات غير محفوظة</strong><small>لم يُحفظ شيء بعد في هذه الجلسة</small></p></div>
+                <div><button class="sp-btn-secondary" id="discardButton" type="button" disabled>تراجع</button><button class="sp-btn-primary" id="saveButton" type="submit" disabled><i class="bi bi-check-lg"></i>حفظ التغييرات</button></div>
+              </div>
+            </form>
+          </section>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</div>
+
+

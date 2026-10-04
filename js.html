@@ -1,0 +1,4240 @@
+<script>
+
+  if (window.location.search.includes('logout=1')) {
+    sessionStorage.clear();
+    localStorage.clear();
+    // امسح الـ parameter من الـ URL
+    const cleanUrl = window.location.href.split('?')[0];
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  // الصورة الافتراضية الموحّدة لأي شخص (طالب/موظف/إداري) بلا صورة شخصية مرفوعة — تُستخدم
+  // في كل مكان بدل ترك الافتراضي القديم (أيقونة flaticon) أو الاكتفاء بحرف أول كنص.
+  var DEFAULT_AVATAR_URL_ = 'https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&sz=w500';
+
+  var newRegCpr, newStuRegData, mailCheck = false, mailVerifiedDeferred = false;
+  var pendingRegistrationResidency_ = null; // 'abroad'/'bahrain' — يُقرأ مرة واحدة في forNewReg، راجع showResidencyGateModal
+  var blockLookupTimer, blockLookupToken = 0;
+  var courseSearchTimer_ = null;
+  var adminPreviewActive_ = false; // true أثناء معاينة الإدارة لصفحة طالب (adminPreviewStudentPage)
+  var dectationDataPromise_ = null; // آخر طلب جلب dectationData قيد التنفيذ/المكتمل، راجع getDectationDataRef
+  // بيانات دخول الإداري الفعلي نفسه (userData الأصلية وقت تسجيل الدخول بصلاحية manage=true) —
+  // تُحفَظ هنا لأن adminPreviewStaffPage/adminPreviewStudentPage تستبدل userData/studentData
+  // مؤقتًا ببيانات الشخص المُعايَن، فنحتاج نسخة أصلية نعيدها عند "العودة إلى لوحة الإدارة"
+  // حتى يظهر اسم الإداري نفسه من جديد لا اسم آخر شخص عايَنه. راجع loadLoginDataForAuthedUser
+  // (auth-js.html) للضبط الأولي، وprepareEmpPreviewBar/adminGoBack للاستعادة.
+  var adminOwnUserData_ = null;
+
+  // اسم مختصر (الأول + الأخير) للعرض بالقائمتين الجانبية/العلوية (طالبًا كان أو موظفًا) —
+  // بدل الاسم الرباعي كاملًا. أي زوج "عبد" + كلمة تالية تبدأ بـ"ال" (عبد الرحمن/عبد الله/
+  // عبد الرازق/...) يُدمَج بلا مسافة (عبدالرحمن/عبدالله/عبدالرازق) — يُفحَص الزوج الأول
+  // (بداية الاسم) والزوج الأخير (نهايته) معًا، حتى لا يظهر أي منهما ناقصًا/بلا معنى عند
+  // الاختصار (مثال: "عبد الله محمد سعيد عبد الرازق" ← "عبدالله عبدالرازق"، وليس
+  // "عبدالله الرازق").
+  function shortDisplayName(fullName){
+    var parts = String(fullName == null ? '' : fullName).trim().split(/\s+/).filter(Boolean);
+    var n = parts.length;
+    if(n === 0) return '';
+
+    function isAbdPair(i){ return parts[i] === 'عبد' && parts[i+1] && parts[i+1].indexOf('ال') === 0; }
+
+    var frontLen = isAbdPair(0) ? 2 : 1;
+    var first = parts.slice(0, frontLen).join('');
+    if(frontLen >= n) return first;
+
+    var lastLen = (n - 2 >= frontLen && isAbdPair(n - 2)) ? 2 : 1;
+    var last = parts.slice(n - lastLen).join('');
+
+    return first === last ? first : (first + ' ' + last);
+  }
+
+  // نظير firstNameOnly_ في code.js (الخادم) — الاسم الأول فقط، مع معاملة "عبد"+كلمة تالية
+  // تبدأ بـ"ال" كاسم واحد (بمسافة طبيعية، لا دمج مضغوط كـshortDisplayName أعلاه). يُستخدم
+  // لمعاينة نص الرسالة الشخصية بالواجهة قبل الإرسال الفعلي — الإرسال نفسه يحدث بالخادم.
+  function firstNameOnly(fullName){
+    var parts = String(fullName == null ? '' : fullName).trim().split(/\s+/).filter(Boolean);
+    if(parts.length === 0) return '';
+    var isAbdPair = parts[0] === 'عبد' && parts[1] && parts[1].indexOf('ال') === 0;
+    return isAbdPair ? (parts[0] + ' ' + parts[1]) : parts[0];
+  }
+
+  // نظير toInternationalWhatsAppNumber في code.js (الخادم) — يبني رقمًا دوليًا كاملًا صالحًا
+  // لروابط wa.me من أي قيمة مخزَّنة في عمود phone، قديمة (8 خانات بحرينية بلا كود دولة) أو
+  // جديدة (دولية كاملة). راجع code.js للتفاصيل الكاملة؛ يجب إبقاء المنطق مطابقًا هنا وهناك.
+  function toInternationalWhatsAppNumber(rawPhone){
+    var digits = String(rawPhone == null ? '' : rawPhone).replace(/\D+/g, '');
+    if(!digits) return '';
+    if(digits.indexOf('00') === 0) digits = digits.substring(2);
+    while(digits.charAt(0) === '0' && digits.length > 8) digits = digits.substring(1);
+    if(digits.length === 8) digits = '973' + digits;
+    return digits;
+  }
+
+  // نفس قائمة "الجنسية" في فورم التسجيل بالضبط (نفس الأسماء والترتيب) — كل عنصر: [الاسم
+  // العربي، رمز الدولة ISO لحساب العلم، كود الاتصال الدولي]. بعض الأقاليم غير المأهولة (القطب
+  // الجنوبي وغيره) لا كود اتصال حقيقي لها فتُستبعد من قائمة كود الهاتف تحديدًا (كود فارغ '')،
+  // لكنها تبقى في قائمة "دولة الإقامة" لأنها يجب أن تطابق قائمة الجنسية تمامًا.
+  var COUNTRY_LIST_ = [
+    ['البحرين','BH','973'], ['أذربيجان','AZ','994'], ['أرمينيا','AM','374'], ['أسبانيا','ES','34'],
+    ['أستراليا','AU','61'], ['أفغانستان','AF','93'], ['ألبانيا','AL','355'], ['ألمانيا','DE','49'],
+    ['أنتيجوا وبربودا','AG','1268'], ['أنجولا','AO','244'], ['أنجويلا','AI','1264'], ['أندورا','AD','376'],
+    ['أورجواي','UY','598'], ['أوزبكستان','UZ','998'], ['أوغندا','UG','256'], ['أوكرانيا','UA','380'],
+    ['أيرلندا','IE','353'], ['أيسلندا','IS','354'], ['اثيوبيا','ET','251'], ['اريتريا','ER','291'],
+    ['استونيا','EE','372'], ['الأرجنتين','AR','54'], ['الأردن','JO','962'], ['الاكوادور','EC','593'],
+    ['الامارات العربية المتحدة','AE','971'], ['الباهاما','BS','1242'], ['البرازيل','BR','55'], ['البرتغال','PT','351'],
+    ['البوسنة والهرسك','BA','387'], ['الجابون','GA','241'], ['الجبل الأسود','ME','382'], ['الجزائر','DZ','213'],
+    ['الدانمرك','DK','45'], ['الرأس الأخضر','CV','238'], ['السلفادور','SV','503'], ['السنغال','SN','221'],
+    ['السودان','SD','249'], ['السويد','SE','46'], ['الصحراء الغربية','EH','212'], ['الصومال','SO','252'],
+    ['الصين','CN','86'], ['العراق','IQ','964'], ['الفاتيكان','VA','379'], ['الفيلبين','PH','63'],
+    ['القطب الجنوبي','AQ',''], ['الكاميرون','CM','237'], ['الكونغو - برازافيل','CG','242'], ['الكويت','KW','965'],
+    ['المجر','HU','36'], ['المحيط الهندي البريطاني','IO','246'], ['المغرب','MA','212'], ['المقاطعات الجنوبية الفرنسية','TF',''],
+    ['المكسيك','MX','52'], ['المملكة العربية السعودية','SA','966'], ['المملكة المتحدة','GB','44'], ['النرويج','NO','47'],
+    ['النمسا','AT','43'], ['النيجر','NE','227'], ['الهند','IN','91'], ['الولايات المتحدة الأمريكية','US','1'],
+    ['اليابان','JP','81'], ['اليمن','YE','967'], ['اليونان','GR','30'], ['اندونيسيا','ID','62'],
+    ['ايران','IR','98'], ['ايطاليا','IT','39'], ['بابوا غينيا الجديدة','PG','675'], ['باراجواي','PY','595'],
+    ['باكستان','PK','92'], ['بالاو','PW','680'], ['بتسوانا','BW','267'], ['بتكايرن','PN','64'],
+    ['بربادوس','BB','1246'], ['برمودا','BM','1441'], ['بروناي','BN','673'], ['بلجيكا','BE','32'],
+    ['بلغاريا','BG','359'], ['بليز','BZ','501'], ['بنجلاديش','BD','880'], ['بنما','PA','507'],
+    ['بنين','BJ','229'], ['بوتان','BT','975'], ['بورتوريكو','PR','1787'], ['بوركينا فاسو','BF','226'],
+    ['بوروندي','BI','257'], ['بولندا','PL','48'], ['بوليفيا','BO','591'], ['بولينيزيا الفرنسية','PF','689'],
+    ['بيرو','PE','51'], ['تانزانيا','TZ','255'], ['تايلند','TH','66'], ['تايوان','TW','886'],
+    ['تركمانستان','TM','993'], ['تركيا','TR','90'], ['ترينيداد وتوباغو','TT','1868'], ['تشاد','TD','235'],
+    ['توجو','TG','228'], ['توفالو','TV','688'], ['توكيلو','TK','690'], ['تونجا','TO','676'],
+    ['تونس','TN','216'], ['تيمور الشرقية','TL','670'], ['جامايكا','JM','1876'], ['جبل طارق','GI','350'],
+    ['جرينادا','GD','1473'], ['جرينلاند','GL','299'], ['جزر أولان','AX','358'], ['جزر الأنتيل الهولندية','AN','599'],
+    ['جزر الترك وجايكوس','TC','1649'], ['جزر القمر','KM','269'], ['جزر الكايمن','KY','1345'], ['جزر المارشال','MH','692'],
+    ['جزر الملديف','MV','960'], ['جزر الولايات المتحدة البعيدة الصغيرة','UM',''], ['جزر سليمان','SB','677'], ['جزر فارو','FO','298'],
+    ['جزر فرجين الأمريكية','VI','1340'], ['جزر فرجين البريطانية','VG','1284'], ['جزر فوكلاند','FK','500'], ['جزر كوك','CK','682'],
+    ['جزر كوكوس','CC','61'], ['جزر ماريانا الشمالية','MP','1670'], ['جزر والس وفوتونا','WF','681'], ['جزيرة الكريسماس','CX','61'],
+    ['جزيرة بوفيه','BV',''], ['جزيرة مان','IM','44'], ['جزيرة نورفوك','NF','672'], ['جزيرة هيرد وماكدونالد','HM',''],
+    ['جمهورية افريقيا الوسطى','CF','236'], ['جمهورية التشيك','CZ','420'], ['جمهورية الدومينيك','DO','1809'], ['جمهورية الكونغو الديمقراطية','CD','243'],
+    ['جمهورية جنوب افريقيا','ZA','27'], ['جواتيمالا','GT','502'], ['جوادلوب','GP','590'], ['جوام','GU','1671'],
+    ['جورجيا','GE','995'], ['جورجيا الجنوبية وجزر ساندويتش الجنوبية','GS',''], ['جيبوتي','DJ','253'], ['جيرسي','JE','44'],
+    ['دومينيكا','DM','1767'], ['رواندا','RW','250'], ['روسيا','RU','7'], ['روسيا البيضاء','BY','375'],
+    ['رومانيا','RO','40'], ['روينيون','RE','262'], ['زامبيا','ZM','260'], ['زيمبابوي','ZW','263'],
+    ['ساحل العاج','CI','225'], ['ساموا','WS','685'], ['ساموا الأمريكية','AS','1684'], ['سان مارينو','SM','378'],
+    ['سانت بيير وميكولون','PM','508'], ['سانت فنسنت وغرنادين','VC','1784'], ['سانت كيتس ونيفيس','KN','1869'], ['سانت لوسيا','LC','1758'],
+    ['سانت مارتين','MF','590'], ['سانت هيلنا','SH','290'], ['ساو تومي وبرينسيبي','ST','239'], ['سريلانكا','LK','94'],
+    ['سفالبارد وجان مايان','SJ','47'], ['سلوفاكيا','SK','421'], ['سلوفينيا','SI','386'], ['سنغافورة','SG','65'],
+    ['سوازيلاند','SZ','268'], ['سوريا','SY','963'], ['سورينام','SR','597'], ['سويسرا','CH','41'],
+    ['سيراليون','SL','232'], ['سيشل','SC','248'], ['شيلي','CL','56'], ['صربيا','RS','381'],
+    ['صربيا والجبل الأسود','CS',''], ['طاجكستان','TJ','992'], ['عمان','OM','968'], ['غامبيا','GM','220'],
+    ['غانا','GH','233'], ['غويانا','GF','594'], ['غيانا','GY','592'], ['غينيا','GN','224'],
+    ['غينيا الاستوائية','GQ','240'], ['غينيا بيساو','GW','245'], ['فانواتو','VU','678'], ['فرنسا','FR','33'],
+    ['فلسطين','PS','970'], ['فنزويلا','VE','58'], ['فنلندا','FI','358'], ['فيتنام','VN','84'],
+    ['فيجي','FJ','679'], ['قبرص','CY','357'], ['قرغيزستان','KG','996'], ['قطر','QA','974'],
+    ['كازاخستان','KZ','7'], ['كاليدونيا الجديدة','NC','687'], ['كرواتيا','HR','385'], ['كمبوديا','KH','855'],
+    ['كندا','CA','1'], ['كوبا','CU','53'], ['كوريا الجنوبية','KR','82'], ['كوريا الشمالية','KP','850'],
+    ['كوستاريكا','CR','506'], ['كولومبيا','CO','57'], ['كيريباتي','KI','686'], ['كينيا','KE','254'],
+    ['لاتفيا','LV','371'], ['لاوس','LA','856'], ['لبنان','LB','961'], ['لوكسمبورج','LU','352'],
+    ['ليبيا','LY','218'], ['ليبيريا','LR','231'], ['ليتوانيا','LT','370'], ['ليختنشتاين','LI','423'],
+    ['ليسوتو','LS','266'], ['مارتينيك','MQ','596'], ['ماكاو الصينية','MO','853'], ['مالطا','MT','356'],
+    ['مالي','ML','223'], ['ماليزيا','MY','60'], ['مايوت','YT','262'], ['مدغشقر','MG','261'],
+    ['مصر','EG','20'], ['مقدونيا','MK','389'], ['ملاوي','MW','265'], ['منطقة غير معرفة','',''],
+    ['منغوليا','MN','976'], ['موريتانيا','MR','222'], ['موريشيوس','MU','230'], ['موزمبيق','MZ','258'],
+    ['مولدافيا','MD','373'], ['موناكو','MC','377'], ['مونتسرات','MS','1664'], ['ميانمار','MM','95'],
+    ['ميكرونيزيا','FM','691'], ['ناميبيا','NA','264'], ['نورو','NR','674'], ['نيبال','NP','977'],
+    ['نيجيريا','NG','234'], ['نيكاراجوا','NI','505'], ['نيوزيلاندا','NZ','64'], ['نيوي','NU','683'],
+    ['هايتي','HT','509'], ['هندوراس','HN','504'], ['هولندا','NL','31'], ['هونج كونج الصينية','HK','852']
+  ];
+
+  // يحسب علم الدولة من رمزها الدولي ISO-2 عبر رموز Unicode "regional indicator" — يوفّر كتابة
+  // 200+ رمز علم يدويًا.
+  function isoToFlag(iso){
+    if(!iso || iso.length !== 2) return '🏳️';
+    var points = iso.toUpperCase().split('').map(function(c){ return 127397 + c.charCodeAt(0); });
+    return String.fromCodePoint.apply(null, points);
+  }
+
+  // يملأ select كود هاتف دولي (قيمة كل خيار = الكود بلا +) — البحرين مبدئيًا محدَّدة دائمًا.
+  function populatePhoneCountrySelect(selectEl){
+    if(!selectEl) return;
+    selectEl.innerHTML = COUNTRY_LIST_
+      .filter(function(c){ return c[2]; }) // نستبعد الأقاليم بلا كود اتصال حقيقي
+      .map(function(c){ return '<option value="'+c[2]+'">'+isoToFlag(c[1])+' '+c[0]+' (+'+c[2]+')</option>'; })
+      .join('');
+    selectEl.value = '973';
+  }
+
+  // يملأ select "دولة الإقامة" بنفس قائمة "الجنسية" حرفيًا (نفس الأسماء والترتيب)، مباشرةً من
+  // عناصر <option> الفعلية في حقل الجنسية إن وُجد — يضمن تطابقًا تامًا بلا ازدواج صيانة القائمة.
+  function populateResidencyCountrySelect(selectEl){
+    if(!selectEl) return;
+    var nationalitySel = document.getElementById('nationality');
+    if(nationalitySel){
+      selectEl.innerHTML = nationalitySel.innerHTML;
+    }else{
+      selectEl.innerHTML = '<option></option>' + COUNTRY_LIST_.map(function(c){ return '<option>'+c[0]+'</option>'; }).join('');
+    }
+  }
+  var mainData, statusData, userData, questions, studentData, attendData, timesData, allExams, matnsRef, announcesRef, dectationData=[], current=0;
+  var allMadhabs = []; // قائمة المذاهب الفعلية (إدارة المواد) — setMazhabsList، تُستخدَم فقط في renderMazhabSelection (funcs-js.html)
+  var lecAttend;
+  var allCert, examsForStu, allStWrks;
+  //var branch = 'لامية ابن الوردي';
+  let didYou = "";
+  let newRegAproval = "";
+  let stopProcessing = false;
+  var showCurrentStus, thisPage, phonesForWhatsApp=[], msgGender;
+  var allEmpData;
+
+// تحليل معلومات الجهاز
+const parser = new UAParser();
+const result = parser.getResult();
+
+//console.log(result);
+
+
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
+  document.addEventListener("DOMContentLoaded",loadStartData);
+  document.addEventListener("click",clickEvent,true);
+  document.addEventListener("input",inputEvent);
+  document.addEventListener("change",changeEvent);
+  document.addEventListener("dragover",dragoverEvent);
+  document.addEventListener("dragleave",dragleaveEvent);
+  document.addEventListener("drop",dropEvent);
+  document.addEventListener("submit",submitEvent);
+  // إيقاف تشغيل الملف الصوتي/المرئي فورًا عند إغلاق مودال معاينة ملفات المقررات (بأي طريقة:
+  // زر الإغلاق، الضغط خارج المودال، أو مفتاح Escape)، بدل بقائه يعمل في الخلفية.
+  document.addEventListener("hidden.bs.modal", function(e){
+    if(e.target && e.target.id === 'courseMediaModal'){
+      var mf = document.getElementById('courseMediaFrame');
+      if(mf) mf.src = '';
+    }
+  });
+/*
+  document.addEventListener("mouseover",hoverEvent);
+  document.addEventListener("dblclick",dblclickEvent);
+*/
+window.addEventListener("beforeunload", function(e){
+   //alert('Do something');
+}, false);
+
+window.onbeforeunload = function(){
+  //alert('Do something');
+  return 'festek';
+};
+///////////////////////////////////////////////////////////////
+function setMainData(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    mainData = dr;
+    loadingEnd();
+  }).withFailureHandler(function(e){
+    swal.fire('خطأ','لم يتم تحميل بيانات البرامج الدراسية بشكل صحيح - '+e,'error');
+    loadingEnd();
+  }).getMainData();
+}
+///////////////////////////////////////////////////////////////
+function setMainStatus(){
+  google.script.run.withSuccessHandler(function(dr){
+    statusData = dr;
+  }).withFailureHandler(function(e){
+    swal.fire('خطأ','لم يتم تحميل بيانات البرامج الدراسية بشكل صحيح - '+e,'error');
+  }).getMainStatus();
+}
+///////////////////////////////////////////////////////////////
+// قائمة المذاهب الفعلية (إدارة المواد، تبويب "المذاهب") — تُبنى منها بطاقات صفحة "المذهب
+// الفقهي" ديناميكيًا (renderMazhabSelection بfuncs-js.html)، مُفلترة إلى مرحلة الطالب الحالية.
+// تُعيد رسم البطاقات فور الوصول (بدل انتظار فتح التبويب) لأن ترتيب الوصول بين هذا النداء
+// وبيانات الطالب نفسها غير مضمون.
+function setMazhabsList(){
+  google.script.run.withSuccessHandler(function(dr){
+    allMadhabs = Array.isArray(dr) ? dr : [];
+    if(typeof renderMazhabSelection === 'function') renderMazhabSelection();
+  }).withFailureHandler(function(){
+    allMadhabs = [];
+  }).getMadhabsList();
+}
+///////////////////////////////////////////////////////////////
+async function getExamsCertiData(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    examsForStu = dr;
+    //alert(examsForStu)
+    loadingEnd();
+/*     examsForStu == 0 || examsForStu.length < 1 ? 
+    document.getElementById('pastExamsCard').innerHTML = '<span class="fs-5 fw-normal">لا يوجد اختبارات سابقة</span>' :  */
+    setPastExams();
+  }).withFailureHandler(function(){
+    swal.fire('خطأ','لم يتم تحميل بيانات الاختبارات بشكل صحيح','error');
+    loadingEnd();
+  }).getAnswersData(studentData[0].cpr)
+}
+///////////////////////////////////////////////////////////////
+async function getAllCertiData(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    allCert = dr;
+    loadingEnd();
+    allCert == 0 || allCert.length < 1 ? 
+    swal.fire('تنبيه !!!','لا يوجد بيانات','info') : 
+    showCertiManageData();
+  }).withFailureHandler(function(){
+    swal.fire('خطأ','لم يتم تحميل البيانات بشكل صحيح','error');
+    loadingEnd();
+  }).getAnswersData()
+}
+///////////////////////////////////////////////////////////////
+async function getAllStWrksData(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    allStWrks = JSON.parse(dr);
+    loadingEnd();
+    //alert(allStWrks)
+    allStWrks == 0 || allStWrks.length < 1 ? 
+    swal.fire('تنبيه !!!','لا يوجد بيانات','info') : 
+    showStWrksManageData();
+  }).withFailureHandler(function(){
+    swal.fire('خطأ','لم يتم تحميل البيانات بشكل صحيح','error');
+    loadingEnd();
+  }).getAllStWrks()
+}
+///////////////////////////////////////////////////////////////
+function getNewStuRegData(){
+  loadingStart();
+  // تُحمَّل قائمة المراحل المفتوحة حاليًا بالتوازي فقط عند عرض "طلبات التسجيل" (لا "قائمة
+  // الطلاب")، لأنها ضرورية لخانة اختيار المرحلة اليدوية لمن سجّل دون اختيار مرحلة، راجع
+  // renderStagelessStageSelect في funcs-js.html.
+  var needStages = !showCurrentStus;
+  var personsLoaded = false, stagesLoaded = !needStages;
+  function maybeRenderRegData(){
+    if(!personsLoaded || !stagesLoaded) return;
+    loadingEnd();
+    showCurrentStus ? setAllStudentsRow(): setNewRegStudentsRow(regKind || 'all');
+    closeAllSwal();
+  }
+
+  google.script.run.withSuccessHandler(function(dr){
+    // getPersons() يعيد 0 تاريخيًا عند خلو الشيت؛ نطبّعه لمصفوفة حتى تعمل حالة الصفحة الفارغة.
+    newStuRegData = Array.isArray(dr) ? dr : [];
+    personsLoaded = true;
+    maybeRenderRegData();
+
+    /* document.querySelectorAll("*").forEach(el => {
+      if (el.getBoundingClientRect().width > window.innerWidth) {
+        console.log("عنصر بيسبب overflow:", el);
+        el.style.border = "2px solid red";
+      }
+    }); */
+
+  }).withFailureHandler(function(){
+    swal.fire('خطأ','لم يتم تحميل البيانات بشكل صحيح','error');
+    loadingEnd();
+  }).getPersons()
+
+  if(needStages){
+    google.script.run.withSuccessHandler(function(stages){
+      regOpenStagesCache_ = Array.isArray(stages) ? stages : [];
+      stagesLoaded = true;
+      maybeRenderRegData();
+    }).withFailureHandler(function(){
+      regOpenStagesCache_ = [];
+      stagesLoaded = true;
+      maybeRenderRegData();
+    }).getStagesList();
+  }
+}
+///////////////////////////////////////////////////////////////
+function loadPage(options){
+  var id = typeof options.id === "undefined" ? "app" : options.id;
+  var cb = typeof options.callback === "undefined" ? function(){} : options.callback;
+
+  //loadingStart();
+  google.script.run.withSuccessHandler(function(html){
+  document.getElementById(id).innerHTML = html;
+  //loadingEnd();
+    // صفحات حُقنت هنا بمكونات النظام الجديد (data-icon) تحتاج هذا النداء لتتحول الأيقونات
+    // فعليًا لكلاسات Font Awesome حقيقية — بلا تأثير على الصفحات القديمة بلا data-icon إطلاقًا.
+    if(typeof refreshIcons === 'function') refreshIcons();
+    typeof options.params === "undefined" ? cb() : cb(options.params);
+  })[options.func]();
+}
+///////////////////////////////////////////////////////////////
+function loadAdminPage(options){
+  var id = typeof options.id === "undefined" ? "appAdmin" : options.id;
+  var cb = typeof options.callback === "undefined" ? function(){} : options.callback;
+
+  //loadingStart();
+  google.script.run.withSuccessHandler(function(html){
+  document.getElementById(id).innerHTML = html;
+  //loadingEnd();
+    // صفحات حُقنت هنا بمكونات النظام الجديد (data-icon) تحتاج هذا النداء لتتحول الأيقونات
+    // فعليًا لكلاسات Font Awesome حقيقية — بلا تأثير على الصفحات القديمة بلا data-icon إطلاقًا.
+    if(typeof refreshIcons === 'function') refreshIcons();
+    typeof options.params === "undefined" ? cb() : cb(options.params);
+  })[options.func]();
+}
+///////////////////////////////////////////////////////////////
+function loadRegistration(){
+  loadPage({func: "loadPageRegistration" ,callback: forNewReg});
+}
+
+function loadLogin(){
+  loadPage({func: "loadPageLogin" ,callback: forLogin});
+}
+
+function loadStudent(){
+  loadPage({func: "loadPageStudent" ,callback: setStudentDash});
+}
+
+async function loadEmp(){
+  await loadPage({func: "loadPageEmp" ,callback: setEmpDash});
+}
+
+function loadAttendReg(){
+  loadPage({func: "loadPageAttending" ,callback: startProg });
+}
+
+function loadNewRegCheck(){
+  loadPage({func: "loadPageNewStuReg" ,callback: getNewStuRegData });
+}
+
+function loadCurrentStus(){
+  // loadPage (تستهدف #app) لا loadAdminPage (تستهدف #appAdmin) — #appAdmin عنصر خاص بغلاف
+  // adminDashboard.html فقط (لوحة الإدارة الكاملة)، غير موجود إطلاقًا داخل emp.html، وكل
+  // من يستدعي هذه الدالة فعليًا (بطاقة "الطلاب الحاليون" بقسم الإدارة، زر "متابعة التسميع")
+  // يعمل من داخل emp.html حصرًا. كانت تفشل بصمت (مؤشر تحميل يظهر ويختفي بلا أي نتيجة).
+  loadPage({func: "loadPageCurrentStus" ,callback: getNewStuRegData });
+}
+
+function loadEmpManag(){
+  loadPage({func: "loadPageEmpManag" ,callback: loadEmpData });
+}
+
+function loadAllAttend(){
+  loadAdminPage({func: "loadPagellAttend" ,callback: setAttendData });
+}
+
+function loadIqrar(){
+  loadingStart();
+  loadPage({func: "loadPageIqrar" , callback: setIqrarData });
+}
+
+function loadQuestions(){
+  loadingStart();
+  loadPage({func: "loadPageQuestions" , callback: setQuestionsData });
+}
+
+function loadProfile(){
+  //loadPage({func: "loadPageProfile" , callback: prepareProfile });
+}
+
+function loadDashboard() {
+  loadPage({
+    func: "loadPageAdminDashboard",
+    callback: function() {
+
+      // #app بأكمله استُبدل للتو بمحتوى إداري جديد (عناصر DOM جديدة تمامًا بلا أي مستمعي
+      // أحداث)، لكن أعلام "تم الربط مسبقًا" الخاصة بدوال setup*Controls بـadmin-js.html
+      // (متغيرات JS ثابتة تعيش طول الجلسة، غير مرتبطة بعنصر DOM بعينه) تبقى true من أول
+      // زيارة سابقة لكل صفحة، فتمنع أي دالة setup لاحقة من إعادة ربط الأحداث بالعناصر
+      // الجديدة — مربعات البحث/أزرار الفلترة تظهر لكن بلا أي استجابة فعلية. أوضح سيناريو
+      // لحدوث هذا: العودة من "معاينة صفحة طالب/متعاون" (adminPreviewStudentPage/
+      // adminPreviewStaffPage تستدعيان loadDashboard() نفسها للعودة)، لكنه ينطبق على أي
+      // استدعاء لاحق لـloadDashboard() بعد أول تحميل. إعادة ضبط كل الأعلام هنا يضمن إعادة
+      // الربط الصحيح فور فتح أي صفحة إدارية من جديد بعد هذا الاستبدال.
+      if (typeof areaFilterControlsBound_ !== 'undefined') areaFilterControlsBound_ = false;
+      if (typeof ageFilterControlsBound_ !== 'undefined') ageFilterControlsBound_ = false;
+      if (typeof studentsFilterSetupDone !== 'undefined') studentsFilterSetupDone = false;
+      if (typeof staffFilterSetupDone !== 'undefined') staffFilterSetupDone = false;
+      if (typeof lecturesFilterSetupDone_ !== 'undefined') lecturesFilterSetupDone_ = false;
+      if (typeof curriculumControlsBound_ !== 'undefined') curriculumControlsBound_ = false;
+      if (typeof examsControlsBound_ !== 'undefined') examsControlsBound_ = false;
+      if (typeof reportsControlsBound_ !== 'undefined') reportsControlsBound_ = false;
+
+      var attempts = 0;
+      var maxAttempts = 100; // <--- زدنا الرقم هنا (كان 20) ليصبر 5 ثوانٍ
+      
+      var interval = setInterval(function() {
+        attempts++;
+        
+        if (typeof prepareDashboardPage === 'function' && typeof loadDashboardData === 'function') {
+            
+            var isReady = prepareDashboardPage(); 
+            
+            if (isReady) {
+                clearInterval(interval); 
+                loadDashboardData();     
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            console.error("فشل تحميل عناصر الداشبورد. انتهت المهلة.");
+            // استدعاء دالة الطوارئ لطباعة سبب الفشل
+            prepareDashboardPage(true); 
+        }
+        
+      }, 50); 
+    }
+  });
+}
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+// نظام التنبيهات الموحّد للمشروع بالكامل: توست منبثق من أعلى الصفحة (بدل نافذة
+// SweetAlert2 المركزية القديمة)، بنفس تصميم بوابة الطالب الجديدة. لم يتغيّر
+// توقيع الدالة عمدًا حتى تعمل كل نقاط الاستدعاء الحالية (67 موضعًا) دون تعديل.
+/////////////////////////////////////////////////////////////////////////////
+var gToastTimer_;
+function alertMSG(msg,myIcon){
+  var toastEl = document.getElementById('gToast');
+  if(!toastEl) return;
+
+  var iconMap = {
+    success: 'bi-check-circle-fill',
+    error: 'bi-x-circle-fill',
+    warning: 'bi-exclamation-triangle-fill',
+    info: 'bi-info-circle-fill'
+  };
+  var kind = iconMap[myIcon] ? myIcon : 'info';
+
+  toastEl.className = 'gToast gToast-' + kind;
+  toastEl.querySelector('i').className = 'bi ' + iconMap[kind];
+  toastEl.querySelector('span').innerHTML = msg;
+
+  requestAnimationFrame(function(){ toastEl.classList.add('show'); });
+  clearTimeout(gToastTimer_);
+  gToastTimer_ = setTimeout(function(){
+    toastEl.classList.remove('show');
+  }, 4000);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// قارئ QR الخارجي (website/qr-scan-relay.html على basaerbh.com، خارج Apps Script تمامًا) —
+// getUserMedia للكاميرا يفشل دومًا (NotAllowedError) من داخل صفحة Apps Script نفسها، لأنها
+// مُغلَّفة داخل iframe لا يملك المطوّر أي تحكم في سياسة أذوناته (قيد موثَّق من جوجل، غير قابل
+// للإصلاح من هذا المشروع). نفس فكرة basaer-oauth-relay الموجودة أصلًا (auth-js.html) لتسجيل
+// الدخول بجوجل: صفحة مستقلة تُفتح كنافذة منبثقة، وتُرسل النتيجة عبر postMessage بدل استدعاء
+// الخادم مباشرة (لا يوجد جسر google.script.run خارج صفحات Apps Script). هنا نستدعي setAttendQr
+// كالمعتاد بنفس جلسة الدخول الموثوقة، ثم نُعيد النتيجة لنافذة الماسح لعرضها هناك فورًا — لأن
+// المستخدم غالبًا ناظر لنافذة الكاميرا تلك، لا التبويب الأصلي.
+/////////////////////////////////////////////////////////////////////////////
+var QR_SCAN_RELAY_URL_ = 'https://basaerbh.com/qr-scan-relay';
+var qrScanPopup_ = null;
+// تغيير معماري: كانت الصفحة الوسيطة (qr-scan-relay.html) تُرسل postMessage لهذا التبويب في كل
+// مسح، وهذا التبويب هو من يستدعي setAttendQr فعليًا — أثبت الاستخدام الفعلي على الجوال أن هذا
+// غير موثوق إطلاقًا: تبويب لوحة الإدارة يبقى بالخلفية طوال جلسة المسح (المستخدم ناظر لنافذة
+// الكاميرا فقط)، ومتصفحات الجوال تُعلّق تنفيذ الجافاسكربت في أي تبويب بالخلفية — فتصل الرسالة
+// أحيانًا دون أن يُنفَّذ أي كود مستقبِل لها إطلاقًا (طالب واحد فقط يُسجَّل ثم تتعطل الجلسة).
+// الآن: الصفحة الوسيطة تتصل بالخادم مباشرة (fetch إلى doPost)، فهذا التبويب لم يعد ضروريًا
+// لإتمام أي تسجيل — فقط لحظة فتح القارئ، حين يُولَّد token قصير الصلاحية (startQrSession، بينما
+// هذا التبويب لا يزال نشطًا ومُصادَقًا فعليًا) ويُرفَق مع رابط الصفحة الوسيطة.
+function openQrScannerPage() {
+  // window.open يجب أن يُستدعى فورًا ضمن حدث الضغط نفسه بلا أي انتظار غير متزامن قبله، وإلا
+  // تحجبه متصفحات الجوال كنافذة منبثقة — نفس الدرس المستفاد سابقًا مع نافذة تسجيل الدخول عبر
+  // جوجل. لذا نفتح نافذة فارغة فورًا، ثم نُوجِّهها لاحقًا بعد وصول بطاقة الجلسة من الخادم.
+  qrScanPopup_ = window.open('', 'basaerQrScan', 'width=480,height=720');
+  if (!qrScanPopup_) {
+    alertMSG('يرجى السماح بالنوافذ المنبثقة (Pop-ups) لهذا الموقع، ثم إعادة المحاولة', 'error');
+    return;
+  }
+  try { qrScanPopup_.focus(); } catch (e) {}
+
+  google.script.run.withSuccessHandler(function (token) {
+    // رابط يحمل طابعًا زمنيًا مختلفًا في كل مرة (cache-busting) فتُجبَر النافذة على إعادة الجلب
+    // الفعلي من الخادم بدل أي نسخة مخبَّأة محليًا، بالإضافة لبطاقة الجلسة الجديدة.
+    var freshUrl = QR_SCAN_RELAY_URL_ + '?t=' + Date.now() + '&session=' + encodeURIComponent(token);
+    try { qrScanPopup_.location.href = freshUrl; } catch (e) {}
+  }).withFailureHandler(function (err) {
+    try { qrScanPopup_.close(); } catch (e) {}
+    alertMSG('تعذّر بدء جلسة قارئ QR: ' + err, 'error');
+  }).startQrSession((typeof userData !== 'undefined' && userData && userData[0] && userData[0].name) || '');
+}
+
+///////////////////////////////////////////////////////////////
+// forLogin() now lives in auth-js.html (new CPR/email login flow).
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
+
+function loadingStart(){
+  document.getElementById("loading").classList.remove("invisible");
+}
+
+function loadingEnd(){
+  document.getElementById("loading").classList.add("invisible");
+}
+
+///////////////////////////////////////////////////////////////
+
+function submitEvent(e){
+  e.target.id == 'setAnswer' ? submitAnswers() :
+  e.target.id == 'dectationForm' ? submitDectation(e.target) :
+  e.target.id == 'regForm' ? submitNewReg(e.target) : null;
+}
+///////////////////////////////////////////////////////////////
+
+function loadEmpData(){
+  //loadAttendReg();
+  try{
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    dr.shift();
+    allEmpData = dr;
+    loadingEnd();
+    setEmpsRow();
+    //alert(thisPage)
+  }).withFailureHandler(function(err){
+    swal.fire("خطأ في تحميل البيانات", "يرجى التواصل مع القائمين على البرنامج" +err, "error");
+    loadingEnd();
+  }).loginData('all');
+  }
+  catch(err){
+    swal.fire("خطأ في تحميل البيانات", "يرجى التواصل مع القائمين على البرنامج" +err, "error");
+    loadingEnd();
+  }
+}
+/////////////////////////////////////////////////////////////////////////////
+function checkStLogin(cprSt){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    allStuData = dr;
+    //alert(allStuData.length);
+    const student = allStuData.filter(e=> e.cpr == cprSt);
+    //alert(student)
+    if(student.length > 0){
+      studentData = student;
+      getMatnsRef();
+      getDectationDataRef();
+      loadStudent();
+      loadingEnd();
+
+      }else{
+        if(!statusData.registration){
+          alertMSG('بارك الله فيك .. نعتذر منك جدًا، فقد انتهى وقت التسجيل.<br>نراك بإذن الله في الدورات القادمة، تابع حسابنا على (انستقرام)','info')
+        }else{
+          if(cprSt.length == 9){
+            swal.fire({
+              title: 'غير مسجل',
+              text: "هل تود الانضمام إلى بصائر ؟!!",
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#3085d6',
+              cancelButtonColor: '#d33',
+              confirmButtonText: 'نعم، أودّ التسجيل',
+              cancelButtonText: 'لا، شكرًا'
+            }).then((result) => {
+              if (result.isConfirmed) {
+                //alertMSG('يرجى التحقق من بيانات الدخول','error');
+                newRegCpr = cprSt;
+                loadRegistration();
+                //showModal('newReg');
+
+              }
+            })
+          }else{
+            alertMSG('يرجى التحقق من بيانات الدخول','error');
+          }          
+        }
+
+      loadingEnd()
+    };
+  }).getPersons();  
+}
+/////////////////////////////////////////////////////////////////////////////
+function checkStlecAttend(cprSt){
+  google.script.run.withSuccessHandler(function(dr){
+    lecAttend = dr;
+    //alert(lecAttend);
+
+  }).getLecAttend(cprSt);
+}
+/////////////////////////////////////////////////////////////////////////////
+// مودال "مقيم بالبحرين؟ / خارج البحرين؟" يظهر عند الضغط على "إنشاء حساب جديد" من صفحة تسجيل
+// الدخول مباشرة (بدون المرور بخطوة كتابة رقم شخصي أولًا). داخل البحرين: نُبقيه في صفحة الدخول
+// ليكتب رقمه (فرقم الدخول عندنا أصلًا يعرض "غير مسجَّل، هل تود الانضمام؟" بنفسه لو لم يوجد —
+// هذا هو المسار السليم لأصحاب الرقم الشخصي). خارج البحرين: ننتقل لصفحة التسجيل مباشرةً بحالة
+// "خارج البحرين" مفعّلة سلفًا (بدل الانتقال بحقل رقم شخصي فارغ/"undefined" معطَّل بلا فائدة).
+/////////////////////////////////////////////////////////////////////////////
+function showResidencyGateModal(){
+  Swal.fire({
+    title: 'مكان الإقامة',
+    html:
+      '<style>' +
+      '.residencyGateChoice{display:flex;gap:8px;background:#fff;padding:5px;border:1px solid #e3e7eb;border-radius:14px;margin-top:12px;}' +
+      '.residencyGateBtn{flex:1;border:0;border-radius:10px;padding:11px 10px;background:transparent;color:#596474;font-weight:800;cursor:pointer;font-size:13.5px;transition:.15s;}' +
+      '.residencyGateBtn.active{background:linear-gradient(135deg,#8d1d22,#b5262c);color:#fff;box-shadow:0 10px 22px rgba(181,38,44,.2);}' +
+      '</style>' +
+      '<p class="text-muted small mb-0">هل أنت مقيم بالبحرين، أم خارجها وتودّ الدراسة عن بُعد؟</p>' +
+      '<div class="residencyGateChoice">' +
+        '<button type="button" class="residencyGateBtn active" id="residencyGateBahrain">مقيم بالبحرين</button>' +
+        '<button type="button" class="residencyGateBtn" id="residencyGateAbroad">خارج البحرين</button>' +
+      '</div>',
+    showConfirmButton: true,
+    confirmButtonText: 'متابعة',
+    confirmButtonColor: '#b5262c',
+    showCancelButton: true,
+    cancelButtonText: 'إلغاء',
+    didOpen: function(){
+      var bBtn = document.getElementById('residencyGateBahrain');
+      var aBtn = document.getElementById('residencyGateAbroad');
+      bBtn?.addEventListener('click', function(){ bBtn.classList.add('active'); aBtn?.classList.remove('active'); });
+      aBtn?.addEventListener('click', function(){ aBtn.classList.add('active'); bBtn?.classList.remove('active'); });
+    },
+    preConfirm: function(){
+      return document.getElementById('residencyGateAbroad')?.classList.contains('active') ? 'abroad' : 'bahrain';
+    }
+  }).then(function(result){
+    if(!result.isConfirmed) return;
+    if(result.value === 'abroad'){
+      pendingRegistrationResidency_ = 'abroad';
+      alertMSG('جاري الانتقال إلى صفحة التسجيل...', 'info');
+      loadRegistration();
+    }else{
+      alertMSG('يرجى كتابة الرقم الشخصي في الحقل المخصص', 'info');
+      document.getElementById('userId')?.focus();
+    }
+  });
+}
+/////////////////////////////////////////////////////////////////////////////
+function forNewReg(){
+  var cprBox = document.getElementById('cprBox');
+  cprBox.value = newRegCpr;
+  cprBox.disabled = true;
+
+  populatePhoneCountrySelect(document.getElementById('phoneCountry'));
+  populateResidencyCountrySelect(document.getElementById('residencyCountry'));
+  applyDobAgeLimit(document.getElementById('dobReg'));
+
+  // القيمة الافتراضية "بحريني" إلا لو جاء المستخدم لتوّه من مودال اختيار الإقامة في صفحة
+  // الدخول وهو مختار "خارج البحرين" (راجع showResidencyGateModal) — تُقرأ مرة واحدة فقط.
+  var initialChoice = pendingRegistrationResidency_ || 'bahrain';
+  pendingRegistrationResidency_ = null;
+  var initialRadio = document.getElementById(initialChoice === 'abroad' ? 'residencyAbroad' : 'residencyBahrain');
+  if(initialRadio) initialRadio.checked = true;
+  applyResidencyChoice(initialChoice);
+}
+
+// يُطبَّق عند تغيير اختيار "مقيم بالبحرين؟ / خارج البحرين؟" في فورم التسجيل — يُظهر/يُخفي
+// الحقول ذات الصلة، ويضبط required/disabled عليها حتى لا يمنع HTML5 الإرسالَ بحقل مخفي فارغ.
+function applyResidencyChoice(choice){
+  var isAbroad = choice === 'abroad';
+
+  var cprWrap = document.getElementById('cprFieldWrap');
+  var remoteStudyNote = document.getElementById('remoteStudyNote');
+  var blockAreaWrap = document.getElementById('blockAreaWrap');
+  var countryWrap = document.getElementById('countryFieldWrap');
+  var blockInp = document.getElementById('block');
+  var areaInp = document.getElementById('area');
+  var countryInp = document.getElementById('residencyCountry');
+  var phoneCountrySel = document.getElementById('phoneCountry');
+  var phoneCountryBadge = document.getElementById('phoneCountryBadge');
+
+  cprWrap?.classList.toggle('d-none', isAbroad);
+  remoteStudyNote?.classList.toggle('d-none', !isAbroad);
+  blockAreaWrap?.classList.toggle('d-none', isAbroad);
+  countryWrap?.classList.toggle('d-none', !isAbroad);
+
+  if(blockInp){ blockInp.required = !isAbroad; blockInp.disabled = isAbroad; }
+  if(areaInp){ areaInp.required = !isAbroad; areaInp.disabled = isAbroad; }
+  if(countryInp){
+    countryInp.required = isAbroad;
+    countryInp.disabled = !isAbroad;
+    // افتراضيًا نفس الدولة المختارة في الجنسية (تسهيلًا فقط، يبقى بإمكان الطالب تغييرها).
+    if(isAbroad) syncResidencyCountryFromNationality();
+  }
+
+  // داخل البحرين: لا داعي لإظهار قائمة اختيار دولة أصلًا (شارة ثابتة 🇧🇭 +973 بدلًا منها).
+  // خارج البحرين: القائمة الفعلية تظهر، حرّة الاختيار.
+  if(phoneCountrySel){
+    phoneCountrySel.classList.toggle('d-none', !isAbroad);
+    phoneCountrySel.disabled = !isAbroad;
+    if(!isAbroad) phoneCountrySel.value = '973';
+  }
+  phoneCountryBadge?.classList.toggle('d-none', isAbroad);
+  updatePhonePattern();
+}
+
+// يضبط "دولة الإقامة" لتطابق "الجنسية" الحالية (لو كانت خانة الجنسية مُختارة بالفعل) — قيمة
+// افتراضية فقط، الطالب حرّ في تغييرها بعد ذلك لو دولة إقامته تختلف عن جنسيته.
+function syncResidencyCountryFromNationality(){
+  var nationalitySel = document.getElementById('nationality');
+  var countryInp = document.getElementById('residencyCountry');
+  if(!nationalitySel || !countryInp || !nationalitySel.value) return;
+  countryInp.value = nationalitySel.value;
+}
+
+// طول رقم الهاتف المحلي يختلف من دولة لأخرى؛ 8 أرقام بالضبط للبحرين (كالسابق تمامًا)، ونطاق
+// أوسع لباقي الدول بدل رفض أي رقم دولي مشروع لمجرد أنه ليس 8 أرقام.
+function updatePhonePattern(){
+  var phoneCountrySel = document.getElementById('phoneCountry');
+  var phoneInp = document.getElementById('phone');
+  if(!phoneInp) return;
+  phoneInp.pattern = (phoneCountrySel && phoneCountrySel.value === '973') ? '^[0-9]{8}$' : '^[0-9]{4,14}$';
+}
+/////////////////////////////////////////////////////////////////////////////
+async function setAttendData(){
+  //alert(studentData)
+  // لوحة الإدارة الجديدة: إن كان جدول الحضور الإداري معروضًا حاليًا فهذا يعني بالتأكيد أننا
+  // في سياق إداري (وليس صفحة طالب)، حتى لو تبقّت قيمة قديمة في studentData من استخدام سابق
+  // لميزة "معاينة صفحة الطالب" (لا تُصفَّر تلقائيًا عند العودة للوحة الإدارة).
+  var isAdminAttendanceTable = !!document.getElementById('attendRowsContainer');
+  if(!isAdminAttendanceTable && studentData && studentData.length > 0){
+    stuCpr = studentData[0].cpr;
+    const stuAttendCard = document.querySelector('#showAttQrCard');
+    const homeCardBtn = document.querySelector('#spShowCardBtn');
+
+    if(stuAttendCard){
+      studentData[0].cardUrl !== '' ?
+      stuAttendCard.setAttribute('href',studentData[0].cardUrl)
+     : stuAttendCard.classList.add('d-none');
+    }
+    if(homeCardBtn){
+      studentData[0].cardUrl !== '' ?
+      homeCardBtn.setAttribute('href',studentData[0].cardUrl)
+     : homeCardBtn.classList.add('d-none');
+    }
+
+    // زر "طلب إضافة حضور" يظهر فقط لو الإدارة مفعِّلة الميزة حاليًا (مفتاح "طلبات الحضور"
+    // بصفحة الحضور بلوحة الإدارة، نفس فكرة فتح/إغلاق التسجيل).
+    var requestAttendBtnEl = document.getElementById('requestAttendBtn');
+    if(requestAttendBtnEl){
+      google.script.run.withSuccessHandler(function(dr){
+        requestAttendBtnEl.classList.toggle('d-none', !(dr && dr.attendanceRequestsOpen));
+      }).withFailureHandler(function(){
+        requestAttendBtnEl.classList.add('d-none');
+      }).getMainStatus();
+    }
+  }else{
+    stuCpr = null;
+  }
+  google.script.run.withSuccessHandler(function(dr){
+    // نستبعد سجلات "طلب" (resp='request') لسه ما اتقبلتش — مش حضور فعلي بعد، فمش المفروض
+    // تظهر لا في قائمة الطالب ولا في جدول الإدارة الرئيسي ولا إحصائياته. تُعرَض فقط عبر
+    // مودال "طلبات الحضور" المخصَّص (getAttendanceRequests).
+    attendData = (Array.isArray(dr) ? dr : []).filter(function(e){ return e.resp !== 'request'; });
+
+    // لوحة الإدارة الجديدة: جدول "سجل الحضور" الفعلي يُرسم من هنا (كان هذا الاستدعاء مفقودًا
+    // تمامًا سابقًا فيما عدا مسار الطالب أعلاه — الجدول كان يبقى فارغًا دائمًا لأي زائر إداري).
+    if (typeof renderAttendanceAdminTable === 'function' && document.getElementById('attendRowsContainer')) {
+      renderAttendanceAdminTable();
+    }
+
+    var seen = {};
+    var uniqueData = Array.isArray(attendData) ? attendData.filter(function(e) {
+      // نحول التاريخ لصيغة يوم/شهر/سنة فقط
+      var d = new Date(e.date);
+      if (isNaN(d.getTime())) return false;
+      var dateStr =  d.getFullYear()+ '-' + (d.getMonth() + 1) + '-' + d.getDate();
+
+      var key = e.cpr + '_' + dateStr;
+      if (seen[key]) return false;
+      seen[key] = true;
+
+      // نخزن النسخة المنسقة في العنصر نفسه لاستخدامها لاحقًا
+      e._formattedDate = dateStr;
+      return true;
+    }) : [];
+
+    renderStudentAttendanceList(uniqueData);
+
+    loadingEnd();
+  }).getAttendance(stuCpr);
+}
+/////////////////////////////////////////////////////////////////////////////
+// تبويب "الحضور والانضباط": يعرض أيام الحضور مباشرة كقائمة (بلا مفتاح/مودال منفصل)،
+// بنفس أسلوب قائمة "التسميع والأوراد" (sp-task-list). uniqueData مُصفّاة سلفًا (يوم واحد
+// لكل تاريخ) من setAttendData أعلاه.
+/////////////////////////////////////////////////////////////////////////////
+function renderStudentAttendanceList(list){
+  var container = document.getElementById('spAttendList');
+  if(!container) return;
+
+  var countEl = document.getElementById('attendCountStat');
+  if(countEl) countEl.textContent = list.length;
+
+  var emptyEl = document.getElementById('attendEmpty');
+  if(!list.length){
+    container.innerHTML = '';
+    if(emptyEl) emptyEl.classList.remove('d-none');
+    return;
+  }
+  if(emptyEl) emptyEl.classList.add('d-none');
+
+  var sorted = list.slice().sort(function(a,b){ return new Date(b.date).getTime() - new Date(a.date).getTime(); });
+
+  container.innerHTML = sorted.map(function(e){
+    var d = new Date(e.date);
+    var dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString('ar-BH', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '';
+    var timeStr = !isNaN(d.getTime()) ? d.toLocaleTimeString('ar-BH', {hour:'numeric', minute:'2-digit'}) : '';
+    return '<article class="sp-task-item">' +
+      '<span class="sp-task-number"><i class="bi bi-check-lg"></i></span>' +
+      '<div><strong>' + escapeHtmlSp(dateStr) + '</strong></div>' +
+      (timeStr ? '<span class="sp-rating"><i class="bi bi-clock"></i>' + escapeHtmlSp(timeStr) + '</span>' : '') +
+    '</article>';
+  }).join('');
+}
+/////////////////////////////////////////////////////////////////////////////
+// طلب الطالب إضافة يوم حضور (تاريخ اليوم أو لاحق فقط + سبب إلزامي) — يُسجَّل على الخادم
+// بحالة "طلب" (resp = 'request') بانتظار قبول الإدارة، وليس كحضور فعلي مباشرة.
+/////////////////////////////////////////////////////////////////////////////
+function requestAttendanceFlow(){
+  if(!studentData || !studentData.length){ alertMSG('تعذّر التعرّف على بيانات الطالب', 'error'); return; }
+  var cpr = studentData[0].cpr;
+  var name = studentData[0].name;
+  var todayStr = new Date().toISOString().slice(0,10);
+
+  Swal.fire({
+    title: 'طلب إضافة حضور',
+    html:
+      '<label class="form-label text-end d-block">التاريخ:</label>' +
+      '<input type="date" id="swal-request-date" class="form-control mb-3" value="' + todayStr + '" max="' + todayStr + '">' +
+      '<label class="form-label text-end d-block">سبب الإضافة:</label>' +
+      '<textarea id="swal-request-reason" class="form-control" rows="3" placeholder="اذكر سبب طلب إضافة الحضور"></textarea>',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonColor: '#b5262c',
+    confirmButtonText: 'إرسال الطلب',
+    cancelButtonText: 'إلغاء',
+    preConfirm: function(){
+      var date = document.getElementById('swal-request-date').value;
+      var reason = document.getElementById('swal-request-reason').value.trim();
+      if(!date){ Swal.showValidationMessage('الرجاء اختيار تاريخ'); return false; }
+      if(date > todayStr){ Swal.showValidationMessage('لا يمكن اختيار تاريخ مستقبلي'); return false; }
+      if(!reason){ Swal.showValidationMessage('الرجاء ذكر سبب الإضافة'); return false; }
+      return { date: date, reason: reason };
+    }
+  }).then(function(result){
+    if(!result.isConfirmed) return;
+
+    Swal.fire({ title:'جاري الإرسال...', didOpen: function(){ Swal.showLoading(); }, allowOutsideClick:false });
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.ok){
+          Swal.fire({ icon:'success', title:'تم إرسال الطلب', text:'سيُراجع طلبك من إدارة الأكاديمية قريبًا', timer:2200, showConfirmButton:false });
+        }else{
+          Swal.fire({ icon:'warning', title:'لم يتم إرسال الطلب', text:(res && res.message) ? res.message : 'حدث خطأ غير معروف' });
+        }
+      })
+      .withFailureHandler(function(err){
+        Swal.fire({ icon:'error', title:'فشل', text: String(err && err.message || err) });
+      })
+      .requestAttendance({ cpr: cpr, name: name, date: result.value.date, reason: result.value.reason });
+  });
+}
+/////////////////////////////////////////////////////////////////////////////
+// إضافة يوم حضور يدوي لطالب معيّن (نافذة اختيار تاريخ + استدعاء الخادم)، مُعاد استخدامها من
+// أكثر من صفحة (سجل الحضور، وتفاصيل الطالب في لوحة الإدارة). onSuccess(dateStr) اختيارية،
+// لتحديث كل صفحة لواجهتها المحلية بالطريقة المناسبة لها بعد نجاح الإضافة.
+/////////////////////////////////////////////////////////////////////////////
+function addManualAttendanceFlow(cpr, name, onSuccess){
+  var todayStr = new Date().toISOString().slice(0,10);
+
+  Swal.fire({
+    title: 'إضافة يوم حضور',
+    html:
+      '<div class="text-end mb-2"><strong>' + escapeHtml(name) + '</strong>' +
+      ' <span class="text-muted small">(CPR: ' + escapeHtml(cpr) + ')</span></div>' +
+      '<label class="form-label text-end d-block">اختر التاريخ:</label>' +
+      '<input type="date" id="swal-attend-date" class="form-control" value="' + todayStr + '" max="' + todayStr + '">',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonColor: '#198754',
+    confirmButtonText: 'إضافة',
+    cancelButtonText: 'إلغاء',
+    preConfirm: function(){
+      var v = document.getElementById('swal-attend-date').value;
+      if(!v){
+        Swal.showValidationMessage('الرجاء اختيار تاريخ');
+        return false;
+      }
+      return v;
+    }
+  }).then(function(result){
+    if(!result.isConfirmed) return;
+
+    var dateStr = result.value;
+    var respName = (typeof userData !== 'undefined' && userData && userData[0] && userData[0].name)
+                     ? userData[0].name : 'مشرف';
+
+    Swal.fire({ title:'جاري الإضافة...', didOpen: function(){ Swal.showLoading(); }, allowOutsideClick:false });
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.ok){
+          Swal.fire({ icon:'success', title:'تمت الإضافة', timer:1500, showConfirmButton:false });
+          if(typeof onSuccess === 'function') onSuccess(dateStr);
+        }else{
+          Swal.fire({
+            icon:'warning', title:'لم تتم الإضافة',
+            text: (res && res.message) ? res.message : 'حدث خطأ غير معروف'
+          });
+        }
+      })
+      .withFailureHandler(function(err){
+        Swal.fire({ icon:'error', title:'فشل', text: String(err && err.message || err) });
+      })
+      .addManualAttendance({
+        cpr: cpr,
+        name: name,
+        date: dateStr,
+        resp: respName
+      });
+  });
+}
+/////////////////////////////////////////////////////////////////////////////
+// تهيئة هيكل بوابة الطالب الجديدة (القائمة الجانبية على الهاتف + نافذة المستخدم
+// المنسدلة بالشريط العلوي)، تحل محل prepareDashboardPage() الخاصة بلوحة الإدارة
+// لأن عناصر id الخاصة بها (#wrapper, #sidebar-wrapper, #menu-toggle) غير موجودة
+// في هيكل صفحة الطالب الجديد.
+/////////////////////////////////////////////////////////////////////////////
+function prepareStudentPortalShell(){
+  var portal = document.getElementById('studentPortal');
+  var menuBtn = document.getElementById('spMobileMenuBtn');
+  var sidebar = document.getElementById('spSidebar');
+  var overlay = document.getElementById('spSidebarOverlay');
+  var userTrigger = document.getElementById('spUserTrigger');
+  var userPopover = document.getElementById('spUserPopover');
+  var notifBtn = document.getElementById('spNotifBtn');
+  var notifPopover = document.getElementById('spNotifPopover');
+
+  if(menuBtn && !menuBtn.hasAttribute('data-init')){
+    menuBtn.setAttribute('data-init','1');
+    menuBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      portal.classList.add('sp-sidebar-open');
+    });
+  }
+  if(overlay && !overlay.hasAttribute('data-init')){
+    overlay.setAttribute('data-init','1');
+    overlay.addEventListener('click', function(){
+      portal.classList.remove('sp-sidebar-open');
+    });
+  }
+  // إغلاق القائمة الجانبية على الهاتف عند اختيار أي تبويب
+  if(sidebar && !sidebar.hasAttribute('data-init')){
+    sidebar.setAttribute('data-init','1');
+    sidebar.querySelectorAll('.sp-nav-item').forEach(function(link){
+      link.addEventListener('click', function(){
+        portal.classList.remove('sp-sidebar-open');
+        var title = link.querySelector('span') ? link.querySelector('span').textContent : '';
+        var pageTitle = document.getElementById('spPageTitle');
+        if(pageTitle) pageTitle.textContent = title;
+      });
+    });
+  }
+  if(userTrigger && !userTrigger.hasAttribute('data-init')){
+    userTrigger.setAttribute('data-init','1');
+    userTrigger.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(notifPopover) notifPopover.hidden = true;
+      userPopover.hidden = !userPopover.hidden;
+    });
+    document.addEventListener('click', function(){
+      userPopover.hidden = true;
+    });
+  }
+  if(notifBtn && !notifBtn.hasAttribute('data-init')){
+    notifBtn.setAttribute('data-init','1');
+    notifBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(userPopover) userPopover.hidden = true;
+      notifPopover.hidden = !notifPopover.hidden;
+    });
+    document.addEventListener('click', function(){
+      notifPopover.hidden = true;
+    });
+  }
+
+  var todayEl = document.getElementById('spTodayDate');
+  if(todayEl){
+    todayEl.textContent = new Date().toLocaleDateString('ar-BH', { weekday:'long', day:'numeric', month:'long' });
+  }
+
+  var journeyDetailsBtn = document.getElementById('spJourneyDetailsBtn');
+  if(journeyDetailsBtn && !journeyDetailsBtn.hasAttribute('data-init')){
+    journeyDetailsBtn.setAttribute('data-init','1');
+    journeyDetailsBtn.addEventListener('click', function(){
+      alertMSG('جاري العمل على تجهيز رحلتك', 'info');
+    });
+  }
+
+  // شريط "وضع معاينة الإدارة" (عند فتح صفحة طالب من لوحة الإدارة عبر
+  // adminPreviewStudentPage) — نُخفي زر تسجيل الخروج الحقيقي حتى لا يُسجَّل
+  // الموظف نفسه خروجًا من حسابه بالخطأ، ونوفر بدلًا منه زر عودة آمن.
+  var previewBar = document.getElementById('spAdminPreviewBar');
+  var previewNameEl = document.getElementById('spAdminPreviewName');
+  var previewExitBtn = document.getElementById('spAdminPreviewExitBtn');
+  if(typeof adminPreviewActive_ !== 'undefined' && adminPreviewActive_){
+    portal.classList.add('sp-preview-mode');
+    if(previewBar) previewBar.classList.remove('d-none');
+    if(previewNameEl && studentData && studentData[0]) previewNameEl.textContent = studentData[0].name;
+    document.querySelectorAll('.sp-logout-btn, .sp-user-popover button[onclick="logout()"]').forEach(function(btn){
+      btn.classList.add('d-none');
+    });
+    if(previewExitBtn && !previewExitBtn.hasAttribute('data-init')){
+      previewExitBtn.setAttribute('data-init','1');
+      previewExitBtn.addEventListener('click', function(){
+        adminPreviewActive_ = false;
+        loadDashboard();
+      });
+    }
+  }else{
+    portal.classList.remove('sp-preview-mode');
+    if(previewBar) previewBar.classList.add('d-none');
+  }
+
+  // زر "لوحة الإدارة" بقائمة المستخدم — يظهر فقط لو صاحب الحساب الحقيقي (لا وضع معاينة إدارية
+  // لطالب آخر) له أيضًا صلاحية إدارية بشيت emp (نفس رقمه الشخصي). راجع مناقشات.md "طالب
+  // بصلاحية إدارية". لا تأثير على تسجيل الدخول نفسه — فقط رابط تنقّل لمن له الصلاحية أصلًا.
+  var goAdminBtn = document.getElementById('spGoAdminBtn');
+  if(goAdminBtn){
+    // .d-none لا hidden — .sp-user-popover button{display:flex} (بلا !important) يُبطل سمة
+    // [hidden] الافتراضية هنا، بنفس السبب الموثَّق أعلاه لأزرار تسجيل الخروج بوضع المعاينة.
+    var isPreview = typeof adminPreviewActive_ !== 'undefined' && adminPreviewActive_;
+    if(isPreview || !studentData || !studentData[0] || !studentData[0].cpr){
+      goAdminBtn.classList.add('d-none');
+    }else if(!goAdminBtn.hasAttribute('data-checked')){
+      goAdminBtn.setAttribute('data-checked','1');
+      google.script.run.withSuccessHandler(function(perm){
+        goAdminBtn.classList.toggle('d-none', !(perm && perm.allowed));
+      }).withFailureHandler(function(){ goAdminBtn.classList.add('d-none'); }).hasExamPermission(studentData[0].cpr);
+    }
+  }
+}
+/////////////////////////////////////////////////////////////////////////////
+// نظير prepareStudentPortalShell أعلاه، لكن لصفحة الموظف (emp.html) — تُستدعى من
+// setEmpDash. عند فتح صفحة متعاون من لوحة الإدارة عبر adminPreviewStaffPage، نُخفي
+// رابط "تسجيل خروج" الحقيقي (حتى لا يُسجَّل الموظف نفسه خروجًا من حسابه بالخطأ)
+// ونعرض بدلًا منه شريطًا تحذيريًا بزر عودة آمن للوحة الإدارة.
+/////////////////////////////////////////////////////////////////////////////
+function prepareEmpPreviewBar(){
+  var previewBar = document.getElementById('empAdminPreviewBar');
+  var previewNameEl = document.getElementById('empAdminPreviewName');
+  var previewExitBtn = document.getElementById('empAdminPreviewExitBtn');
+  var logOutLink = document.getElementById('logOut');
+
+  if(typeof adminPreviewActive_ !== 'undefined' && adminPreviewActive_){
+    if(previewBar) previewBar.classList.remove('d-none');
+    if(previewNameEl && userData && userData[0]) previewNameEl.textContent = userData[0].name;
+    // إخفاء بـ style !important صريح، وليس كلاس d-none: زر الخروج الحقيقي أصبح .icon-button
+    // (نفس نمط لوحة الإدارة الجديدة)، وهذا الكلاس يضبط display:inline-grid !important، فتخسر
+    // أمامه أي محاولة إخفاء بـ!important من كلاس آخر يُحمَّل قبله في نفس ورقة الأنماط.
+    if(logOutLink) logOutLink.style.setProperty('display','none','important');
+    if(previewExitBtn && !previewExitBtn.hasAttribute('data-init')){
+      previewExitBtn.setAttribute('data-init','1');
+      previewExitBtn.addEventListener('click', function(){
+        adminPreviewActive_ = false;
+        // نعيد بيانات الإداري نفسه (لا بيانات المتعاون المُعايَن) قبل تحميل لوحة الإدارة من
+        // جديد، وإلا يظل اسمه هو الظاهر بالقائمتين الجانبية والعلوية بدل اسم الإداري.
+        if(typeof adminOwnUserData_ !== 'undefined' && adminOwnUserData_) userData = adminOwnUserData_;
+        loadDashboard();
+      });
+    }
+  }else{
+    if(previewBar) previewBar.classList.add('d-none');
+    if(logOutLink) logOutLink.style.removeProperty('display');
+  }
+}
+/////////////////////////////////////////////////////////////////////////////
+// مزامنة صورة/اسم الطالب في نافذة المستخدم بالشريط العلوي (id مختلف عن
+// #stuImage / #stuNameTit المستخدمَين في القائمة الجانبية، حتى لا يتعارض مع
+// الكود الحالي الذي يضبطهما مباشرة).
+/////////////////////////////////////////////////////////////////////////////
+function syncStudentTopbar(stu){
+  var imgTop = document.getElementById('stuImageTop');
+  var nameTop = document.getElementById('stuNameTop');
+  if(imgTop) imgTop.src = document.getElementById('stuImage').src;
+  if(nameTop) nameTop.textContent = shortDisplayName(stu.name);
+}
+/////////////////////////////////////////////////////////////////////////////
+// رسم مسار المراحل الدراسية (رحلتي العلمية) في تبويب الرئيسية، اعتمادًا على
+// class0..class3 الفعلية لبيانات الطالب (بلا أي بيانات وهمية).
+/////////////////////////////////////////////////////////////////////////////
+function renderStudentJourney(stu){
+  var list = document.getElementById('spStageTimeline');
+  var stageSymbol = document.getElementById('spStageSymbol');
+  var stageName = document.getElementById('spStageName');
+  var footerStageName = document.getElementById('spFooterStageName');
+  if(!list) return;
+
+  var stages = [
+    { key:'class0', name:'المرحلة التأهيلية', colorClass:'sp-qualification' },
+    { key:'class1', name:'المرحلة التأسيسية', colorClass:'sp-foundation' },
+    { key:'class2', name:'المرحلة التأصيلية', colorClass:'sp-rooting' },
+    { key:'class3', name:'المرحلة التحصيلية', colorClass:'sp-attainment' }
+  ];
+
+  list.innerHTML = '';
+  stages.forEach(function(s, i){
+    var val = stu[s.key];
+    var li = document.createElement('li');
+    li.dataset.stageIndex = i;
+    var statusText, statusIcon, dotContent = (i+1);
+
+    if(val === 'done'){
+      li.className = 'sp-complete';
+      statusText = 'مكتملة';
+      statusIcon = '<b><i class="bi bi-check-lg"></i> مكتملة</b>';
+      dotContent = '<i class="bi bi-check"></i>';
+    }else if(val === 'active'){
+      li.className = 'sp-current';
+      statusText = 'أنت هنا الآن';
+      statusIcon = '<b>المرحلة الحالية</b>';
+    }else if(val === true){
+      statusText = 'الطلب قيد المراجعة';
+      statusIcon = '<i class="bi bi-hourglass-split"></i>';
+    }else{
+      statusText = 'تُفتح بعد اجتياز المرحلة السابقة';
+      statusIcon = '<i class="bi bi-lock"></i>';
+    }
+
+    li.innerHTML =
+      '<span class="sp-stage-dot ' + s.colorClass + '">' + dotContent + '</span>' +
+      '<div><strong>' + s.name + '</strong><small>' + statusText + '</small></div>' +
+      statusIcon;
+    list.appendChild(li);
+
+    if(val === 'active' && stageSymbol && stageName){
+      stageSymbol.textContent = (i+1);
+      stageName.textContent = s.name;
+    }
+    if(val === 'active' && footerStageName){
+      footerStageName.textContent = s.name;
+    }
+  });
+}
+/////////////////////////////////////////////////////////////////////////////
+// بادج ذهبي قابل للضغط أمام أي مرحلة صدرت شهادة اجتيازها فعليًا (شيت stageCertificates —
+// المصدر الوحيد لتحديد هذا، لا class0..class3 التي تعكس فقط انتقالًا إداريًا قد يسبق إصدار
+// الشهادة الفعلي) — يستبدل نقطة المرحلة العادية (رقم/علامة صح) بشارة ذهبية تفتح رابط الشهادة
+// عند الضغط، مع تاريخ الإصدار كعنوان تلميحي (tooltip) وإضافة نصية لسطر الحالة. تُستدعى بعد
+// renderStudentJourney بشكل غير حاجب (لا تؤخّر رسم المسار الأساسي — استدعاء خادمي منفصل).
+// راجع مناقشات.md "شهادات الاجتياز" للسياق الكامل.
+/////////////////////////////////////////////////////////////////////////////
+function applyStageCertBadges(cpr){
+  var list = document.getElementById('spStageTimeline');
+  if(!list) return;
+  google.script.run.withSuccessHandler(function(certs){
+    if(!Array.isArray(certs) || !certs.length) return;
+    certs.forEach(function(cert){
+      var li = list.querySelector('li[data-stage-index="' + cert.stageIndex + '"]');
+      if(!li) return;
+      var dot = li.querySelector('.sp-stage-dot');
+      if(!dot) return;
+
+      var dateStr = '';
+      var d = cert.issuedAt ? new Date(cert.issuedAt) : null;
+      if(d && !isNaN(d.getTime())) dateStr = d.toLocaleDateString('ar-BH', {day:'numeric', month:'long', year:'numeric'});
+
+      var badge = document.createElement('a');
+      badge.className = dot.className + ' sp-cert-badge';
+      badge.href = cert.url;
+      badge.target = '_blank';
+      badge.rel = 'noopener';
+      badge.title = dateStr ? ('اضغط لعرض شهادة الاجتياز — صدرت في ' + dateStr) : 'اضغط لعرض شهادة الاجتياز';
+      badge.innerHTML = '<i class="bi bi-award-fill"></i>';
+      dot.replaceWith(badge);
+
+      var subEl = li.querySelector('div small');
+      if(subEl && dateStr) subEl.textContent = subEl.textContent + ' · صدرت الشهادة في ' + dateStr;
+    });
+  }).withFailureHandler(function(){ /* لا حرج — الشارة تحسينية، لا تعطيل بديل */ })
+  .getMyStageCertificates(cpr);
+}
+/////////////////////////////////////////////////////////////////////////////
+// شبكة إحصاءات الرئيسية: بيانات حقيقية فقط (حضور، تسميع، اختبارات ناجحة).
+// تُستدعى بعد التأكد من توفر attendData و dectationData، وتُحضِر بيانات
+// الاختبارات بشكل استباقي إن لم تكن محمَّلة (أصلًا تُحمَّل عند فتح تبويب
+// الاختبارات فقط).
+/////////////////////////////////////////////////////////////////////////////
+function renderStudentMetrics(stu){
+  var attEl = document.getElementById('spMetricAttendance');
+  var decEl = document.getElementById('spMetricRecitation');
+  var examEl = document.getElementById('spMetricExams');
+
+  // نسبة الحضور = محاضرات مرحلته الحالية الفعلية (من "إدارة المحاضرات") التي له حضور فيها ÷
+  // إجمالي محاضراتها منذ "بداية الدورة" (راجع getStageAttendanceStats بdataGet.js ومناقشات.md
+  // "نظام إدارة المراحل"). تحل محل عداد "أيام الحضور: إجمالي منذ التسجيل" القديم، الذي كان
+  // فعليًا يعدّ كل تاريخ حضور بالسجل بأكمله بلا أي فلترة بتاريخ رغم تسميته.
+  if(attEl){
+    var subEl = document.getElementById('spMetricAttendanceSub');
+    google.script.run.withSuccessHandler(function(res){
+      if(!res || res.percent === null || res.percent === undefined){
+        attEl.textContent = '—';
+        if(subEl) subEl.textContent = 'لم تُحدَّد بداية الدورة بعد';
+        return;
+      }
+      attEl.textContent = res.percent + '%';
+      if(subEl) subEl.textContent = res.attended + ' من ' + res.total + ' محاضرة منذ بداية الدورة';
+    }).withFailureHandler(function(){
+      attEl.textContent = '—';
+    }).getStageAttendanceStats(stu.cpr);
+  }
+
+  if(decEl){
+    var decCount = Array.isArray(dectationData) ? dectationData.filter(function(e){
+      return e.stuCpr*1 == stu.cpr*1 && e.level == currentLevel;
+    }).length : 0;
+    decEl.textContent = decCount;
+  }
+
+  if(examEl){
+    if(Array.isArray(examsForStu)){
+      examEl.textContent = examsForStu.filter(function(e){ return e.rate != 'راسب' && e.level == currentLevel; }).length;
+    }else{
+      google.script.run.withSuccessHandler(function(dr){
+        examsForStu = dr;
+        examEl.textContent = Array.isArray(examsForStu) ? examsForStu.filter(function(e){ return e.rate != 'راسب' && e.level == currentLevel; }).length : 0;
+      }).getAnswersData(stu.cpr);
+    }
+  }
+}
+/////////////////////////////////////////////////////////////////////////////
+// تبويب "الملف الشخصي" — المرحلة 2: ربط حقيقي بالباك-إند (بعد موافقة المستخدم
+// النهائية على التصميم). يقرأ بيانات حقيقية عبر getMyProfileData(cpr) في كل
+// مرة يُفتح فيها التبويب (وليس من studentData المحمَّلة أصلًا، لأنها لا تحمل كل
+// الحقول اللازمة هنا)، ويحفظ عبر saveProfileData/changePassword/
+// confirmProfileEmail/linkVerifiedEmailToProfile/uploadProfileAvatar
+// (dataGet.js/dataPost.js/auth.js). راجع مناقشات.md وdesign-guidelines.md
+// (المرحلة 4) للسياق. رسائل التوست عبر alertMSG()/#gToast الموحّدة للمشروع.
+/////////////////////////////////////////////////////////////////////////////
+var pfInited_ = false;
+var pfApplyServerData_ = null; // تُضبَط مرة واحدة داخل initProfileTab، تُستدعى في كل تحميل بيانات
+var pfCpr_ = '';
+var pfPendingAvatarBase64_ = null;
+var pfPendingAvatarMime_ = null;
+var PF_STAGE_NAMES_ = ['المرحلة التأهيلية','المرحلة التأسيسية','المرحلة التأصيلية','المرحلة التحصيلية'];
+
+// يُغلّف google.script.run بوعد (Promise) عادي — نفس فكرة getDectationDataRef الموجودة أصلًا
+// بالمشروع، لكن معمَّمة لأي دالة خادم بدل تكرار نفس النمط لكل نداء.
+function pfGasCall(fnName){
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(resolve, reject){
+    var caller = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    caller[fnName].apply(caller, args);
+  });
+}
+
+function renderProfileTab(){
+  var stu = (typeof studentData !== 'undefined' && studentData && studentData[0]) ? studentData[0] : null;
+  var cpr = stu ? stu.cpr : '';
+  if(!cpr){ alertMSG('تعذّر تحديد الحساب الحالي', 'error'); return; }
+  pfCpr_ = cpr;
+
+  loadingStart();
+  google.script.run.withSuccessHandler(function(data){
+    loadingEnd();
+    if(!data || !data.ok){
+      alertMSG((data && data.message) || 'تعذّر تحميل بيانات الملف الشخصي', 'error');
+      return;
+    }
+    if(!pfInited_){
+      initProfileTab();
+      pfInited_ = true;
+    }
+    if(pfApplyServerData_) pfApplyServerData_(data);
+  }).withFailureHandler(function(err){
+    loadingEnd();
+    alertMSG('تعذّر تحميل بيانات الملف الشخصي: ' + err, 'error');
+  }).getMyProfileData(cpr);
+}
+
+function pfSetFieldValue(form, name, val){
+  var field = form.elements.namedItem(name);
+  if(field) field.value = val || '';
+}
+
+// محدد دولة الهاتف في تبويب "الملف الشخصي" (طالب/متعاون/مدير معًا) — نفس نمط تسجيل طالب جديد
+// (registration.html: #phoneCountry/populatePhoneCountrySelect/updatePhonePattern)، لكن هنا كل
+// حقل هاتف له select مستقل قابل للتفاعل دومًا (بلا مفهوم "مقيم/خارج البحرين" الخاص بالتسجيل)،
+// فنكتب مزامنة النمط بأنفسنا بدل استدعاء updatePhonePattern المرتبطة بمعرّفات ثابتة.
+function pfSyncPhonePattern(selectEl, inputEl){
+  if(!inputEl) return;
+  inputEl.pattern = (selectEl && selectEl.value === '973') ? '^[0-9]{8}$' : '^[0-9]{4,14}$';
+}
+function pfInitPhoneCountrySelect(selectEl, inputEl){
+  if(!selectEl || typeof populatePhoneCountrySelect !== 'function') return;
+  populatePhoneCountrySelect(selectEl);
+  pfSyncPhonePattern(selectEl, inputEl);
+  selectEl.addEventListener('change', function(){ pfSyncPhonePattern(selectEl, inputEl); });
+}
+
+// يفصل رقم هاتف مخزَّن (قد يكون بادئة دولة + رقم محلي "973XXXXXXXX"، أو رقمًا محليًا مجرَّدًا
+// بالصيغة القديمة قبل هذا التغيير "XXXXXXXX") إلى {dialCode, local} — لعرض الرقم المحلي فقط
+// في الحقل (بلا تكرار الكود مع شارة الدولة)، مع اختيار الدولة الصحيحة تلقائيًا في القائمة.
+// أي رقم 8 أرقام أو أقل يُعامَل دومًا كرقم بحريني مجرَّد قديم (تفاديًا لتطابق زائف مع كود دولة
+// قصير كـ"1" لأمريكا). القائمة مرتَّبة من الأطول كودًا للأقصر لتفادي تطابق كود قصير جزئيًا أولًا.
+function pfSplitPhoneValue(fullPhone){
+  var digits = String(fullPhone || '').replace(/\D/g, '');
+  if(!digits || digits.length <= 8 || typeof COUNTRY_LIST_ === 'undefined'){
+    return { dialCode: '973', local: digits };
+  }
+  var candidates = COUNTRY_LIST_.filter(function(c){ return c[2]; }).slice().sort(function(a, b){ return b[2].length - a[2].length; });
+  for(var i = 0; i < candidates.length; i++){
+    var code = candidates[i][2];
+    if(digits.indexOf(code) === 0 && digits.length - code.length >= 4){
+      return { dialCode: code, local: digits.slice(code.length) };
+    }
+  }
+  return { dialCode: '973', local: digits };
+}
+// يعكس pfSplitPhoneValue: يملأ شارة/قائمة الدولة بالكود الصحيح وحقل الإدخال بالرقم المحلي فقط
+// (بلا كود الدولة داخله)، عند تحميل بيانات حقيقية من الخادم.
+function pfApplyPhoneValue(selectEl, inputEl, fullPhone){
+  if(!inputEl) return;
+  var parts = pfSplitPhoneValue(fullPhone);
+  if(selectEl) selectEl.value = parts.dialCode;
+  inputEl.value = parts.local;
+  pfSyncPhonePattern(selectEl, inputEl);
+}
+// يعكس الاتجاه عند الحفظ: يُلحق كود الدولة المختار بالرقم المحلي المُدخَل قبل إرساله للخادم،
+// حتى يبقى الشكل المخزَّن دائمًا بصيغة دولية كاملة (نفس تنسيق toInternationalWhatsAppNumber
+// المستخدَم بالفعل عند إرسال واتساب في أماكن أخرى بالمشروع)، لا رقمًا محليًا مجرَّدًا بعد الآن.
+function pfComposePhoneValue(selectEl, inputEl){
+  if(!inputEl) return '';
+  var local = inputEl.value.trim();
+  if(!local) return '';
+  var dialCode = (selectEl && selectEl.value) || '973';
+  return dialCode + local;
+}
+
+function initProfileTab(){
+  var form = document.getElementById('profileForm');
+  if(!form) return;
+
+  var saveButton = document.getElementById('saveButton');
+  var discardButton = document.getElementById('discardButton');
+  var saveState = document.getElementById('pfSaveState');
+  var unsavedIndicator = document.getElementById('unsavedIndicator');
+  var avatarInput = document.getElementById('pfAvatarInput');
+  var avatarPreview = document.getElementById('pfAvatarPreview');
+  var initialState = '';
+
+  pfInitPhoneCountrySelect(document.getElementById('phoneCountrySelect'), document.getElementById('phone'));
+  pfInitPhoneCountrySelect(document.getElementById('phone2CountrySelect'), document.getElementById('phone2'));
+  applyDobAgeLimit(document.getElementById('dob'));
+
+  function activateTab(tabName){
+    document.querySelectorAll('.sp-settings-tab').forEach(function(button){
+      button.classList.toggle('active', button.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.sp-settings-panel').forEach(function(panel){
+      var active = panel.dataset.panel === tabName;
+      panel.hidden = !active;
+      panel.classList.toggle('active', active);
+    });
+  }
+  document.querySelectorAll('.sp-settings-tab').forEach(function(button){
+    button.addEventListener('click', function(){ activateTab(button.dataset.tab); });
+  });
+
+  function serializeForm(){
+    var data = {};
+    new FormData(form).forEach(function(value, key){ data[key] = value; });
+    return JSON.stringify(data);
+  }
+
+  function markDirty(){
+    var dirty = serializeForm() !== initialState || !!pfPendingAvatarBase64_;
+    if(saveButton) saveButton.disabled = !dirty;
+    if(discardButton) discardButton.disabled = !dirty;
+    if(saveState){
+      saveState.classList.toggle('dirty', dirty);
+      saveState.querySelector('strong').textContent = dirty ? 'لديك تغييرات غير محفوظة' : 'جميع التغييرات محفوظة';
+    }
+    if(unsavedIndicator){
+      unsavedIndicator.classList.toggle('dirty', dirty);
+      unsavedIndicator.querySelector('strong').textContent = dirty ? 'تغييرات تنتظر الحفظ' : 'لا توجد تغييرات غير محفوظة';
+    }
+  }
+
+  function syncDisplayName(){
+    var fullNameEl = document.getElementById('fullName');
+    var fullName = (fullNameEl && fullNameEl.value.trim()) || '—';
+    var displayEl = document.getElementById('pfDisplayName');
+    if(displayEl) displayEl.textContent = fullName;
+  }
+
+  function updateCompletion(){
+    var required = ['fullName','dob','gender','nationality','email','phone','block','area'];
+    var filled = required.filter(function(name){
+      var field = form.elements.namedItem(name);
+      return field && String(field.value).trim();
+    }).length;
+    var phone2El = form.elements.namedItem('phone2');
+    var hasAvatar = avatarPreview && avatarPreview.src && avatarPreview.src.indexOf('id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm') === -1;
+    var percent = Math.round((filled / required.length) * 80) + ((phone2El && phone2El.value.trim()) ? 10 : 0) + (hasAvatar ? 10 : 0);
+    percent = Math.min(percent, 100);
+    var pctEl = document.getElementById('pfCompletionPercent');
+    var barEl = document.getElementById('pfCompletionBar');
+    var hintEl = document.getElementById('pfCompletionHint');
+    if(pctEl) pctEl.textContent = percent + '%';
+    if(barEl) barEl.style.width = percent + '%';
+    if(hintEl) hintEl.textContent = percent === 100 ? 'ملفك مكتمل وجاهز' : 'أضف صورة شخصية ورقم هاتف بديل';
+  }
+
+  function validateField(field){
+    var wrap = field.closest('.sp-input-wrap');
+    if(!wrap) return field.checkValidity();
+    var valid = field.checkValidity();
+    wrap.classList.toggle('sp-invalid', !valid);
+    var formField = field.closest('.sp-form-field');
+    var message = formField ? formField.querySelector('.sp-field-message') : null;
+    if(message && !valid){
+      message.classList.add('error');
+      message.textContent = field.validity.patternMismatch ? 'يرجى إدخال 8 أرقام صحيحة' : 'هذا الحقل مطلوب';
+    }else if(message){
+      message.classList.remove('error');
+    }
+    return valid;
+  }
+
+  form.addEventListener('input', function(event){
+    if(event.target.matches('input, select')) validateField(event.target);
+    if(event.target.id === 'fullName') syncDisplayName();
+    updateCompletion();
+    markDirty();
+  });
+  form.addEventListener('change', function(){ updateCompletion(); markDirty(); });
+
+  document.querySelectorAll('[data-contact-choice]').forEach(function(button){
+    button.addEventListener('click', function(){
+      document.querySelectorAll('[data-contact-choice]').forEach(function(item){ item.classList.remove('active'); });
+      button.classList.add('active');
+      var prefInput = document.getElementById('contactPreference');
+      if(prefInput) prefInput.value = button.dataset.contactChoice;
+      markDirty();
+    });
+  });
+
+  if(avatarInput && avatarPreview){
+    avatarInput.addEventListener('change', function(){
+      var file = avatarInput.files && avatarInput.files[0];
+      if(!file) return;
+      if(!/^image\/(png|jpe?g)$/.test(file.type)){
+        alertMSG('صيغة الصورة غير مدعومة، يرجى اختيار png أو jpg', 'error');
+        avatarInput.value = '';
+        return;
+      }
+      if(file.size > 3 * 1024 * 1024){
+        alertMSG('حجم الصورة يجب ألا يتجاوز 3 ميجابايت', 'error');
+        avatarInput.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(event){
+        var dataUrl = event.target.result;
+        avatarPreview.src = dataUrl;
+        pfPendingAvatarBase64_ = dataUrl.split(',')[1];
+        pfPendingAvatarMime_ = file.type;
+        updateCompletion();
+        markDirty();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.querySelectorAll('[data-toggle-password]').forEach(function(button){
+    button.addEventListener('click', function(){
+      var input = document.getElementById(button.dataset.togglePassword);
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      button.setAttribute('aria-label', showing ? 'إظهار كلمة المرور' : 'إخفاء كلمة المرور');
+      button.innerHTML = '<i class="bi ' + (showing ? 'bi-eye' : 'bi-eye-slash') + '"></i>';
+    });
+  });
+
+  var currentPasswordEl = document.getElementById('currentPassword');
+  var newPassword = document.getElementById('newPassword');
+  var confirmPassword = document.getElementById('confirmPassword');
+  var strength = form.querySelector('.sp-password-strength');
+  var strengthText = document.getElementById('passwordStrengthText');
+  var matchText = document.getElementById('passwordMatch');
+
+  if(newPassword){
+    newPassword.addEventListener('input', function(){
+      var value = newPassword.value;
+      var score = 0;
+      if(value.length >= 8) score++;
+      if(/[A-Zأ-ي]/.test(value) && /[a-zأ-ي]/.test(value)) score++;
+      if(/\d/.test(value)) score++;
+      if(/[^A-Za-z0-9أ-ي]/.test(value)) score++;
+      strength.className = 'sp-password-strength ' + (['','weak','medium','good','strong'][score] || '');
+      strengthText.textContent = ['لم تُدخل كلمة مرور','ضعيفة','متوسطة','جيدة','قوية'][score];
+    });
+  }
+
+  if(confirmPassword){
+    confirmPassword.addEventListener('input', function(){
+      if(!confirmPassword.value){
+        matchText.textContent = '';
+        matchText.classList.remove('error');
+        return;
+      }
+      var matches = newPassword.value === confirmPassword.value;
+      matchText.textContent = matches ? 'كلمتا المرور متطابقتان' : 'كلمتا المرور غير متطابقتين';
+      matchText.classList.toggle('error', !matches);
+    });
+  }
+
+  function resetPasswordFields(){
+    ['currentPassword','newPassword','confirmPassword'].forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
+    if(strength) strength.className = 'sp-password-strength';
+    if(strengthText) strengthText.textContent = 'لم تُدخل كلمة مرور';
+    if(matchText){ matchText.textContent = ''; matchText.classList.remove('error'); }
+  }
+
+  form.addEventListener('submit', async function(event){
+    event.preventDefault();
+    var fields = Array.prototype.slice.call(form.querySelectorAll('input[required], select[required]'));
+    var allValid = fields.map(validateField).every(Boolean);
+    if(newPassword.value && newPassword.value !== confirmPassword.value){
+      activateTab('security');
+      alertMSG('يرجى التأكد من تطابق كلمتي المرور', 'error');
+      return;
+    }
+    if(!allValid){
+      var invalid = fields.find(function(field){ return !field.checkValidity(); });
+      var panel = invalid.closest('.sp-settings-panel');
+      activateTab(panel.dataset.panel);
+      setTimeout(function(){ invalid.focus(); }, 250);
+      alertMSG('يرجى مراجعة الحقول المطلوبة', 'error');
+      return;
+    }
+
+    saveButton.disabled = true;
+    loadingStart();
+    try{
+      if(pfPendingAvatarBase64_){
+        var avatarResult = await pfGasCall('uploadProfileAvatar', pfCpr_, pfPendingAvatarBase64_, pfPendingAvatarMime_);
+        if(!avatarResult || !avatarResult.ok) throw new Error((avatarResult && avatarResult.message) || 'تعذّر رفع الصورة');
+        pfPendingAvatarBase64_ = null;
+        pfPendingAvatarMime_ = null;
+        // تحديث الشريط الجانبي/العلوي فورًا بالصورة الجديدة — كانا يعتمدان studentData[0].avatarUrl
+        // اللي محدَّثة أصلًا فقط بإعادة تحميل كاملة (تسجيل دخول من جديد)، فتظل الصورة القديمة/
+        // الافتراضية ظاهرة رغم نجاح الرفع فعليًا حتى تحديث الصفحة.
+        // قاعدة خصوصية صريحة: صورة المستخدِمة الأنثى لا تظهر إطلاقًا إلا داخل معاينة صفحة الملف
+        // الشخصي نفسها (avatarPreview أعلاه، غير متأثر بهذا الشرط) — لا الشريط الجانبي/العلوي حتى
+        // لصاحبة الحساب نفسها، فلا يُحدَّثان هنا لو كان الجنس أنثى (يبقيان على الصورة الافتراضية).
+        var pfCurrentGender_ = (typeof studentData !== 'undefined' && studentData && studentData[0]) ? studentData[0].gender : '';
+        if(pfCurrentGender_ !== 'أنثى'){
+          if(typeof studentData !== 'undefined' && studentData && studentData[0]) studentData[0].avatarUrl = avatarResult.avatarUrl;
+          var stuImageEl = document.getElementById('stuImage');
+          var stuImageFooterEl2 = document.getElementById('stuImageFooter');
+          if(stuImageEl) stuImageEl.src = avatarResult.avatarUrl;
+          if(stuImageFooterEl2) stuImageFooterEl2.src = avatarResult.avatarUrl;
+        }
+      }
+
+      var payload = {
+        name: form.elements.namedItem('fullName').value,
+        dob: form.elements.namedItem('dob').value,
+        gender: form.elements.namedItem('gender').value,
+        nationality: form.elements.namedItem('nationality').value,
+        phone: pfComposePhoneValue(document.getElementById('phoneCountrySelect'), document.getElementById('phone')),
+        phone2: pfComposePhoneValue(document.getElementById('phone2CountrySelect'), document.getElementById('phone2')),
+        contactPreference: (document.getElementById('contactPreference') || {}).value || 'email'
+      };
+      var saveResult = await pfGasCall('saveProfileData', pfCpr_, payload);
+      if(!saveResult || !saveResult.ok) throw new Error((saveResult && saveResult.message) || 'تعذّر حفظ البيانات');
+
+      if(newPassword.value){
+        var pwResult = await pfGasCall('changePassword', pfCpr_, currentPasswordEl.value, newPassword.value);
+        if(!pwResult || !pwResult.ok) throw new Error((pwResult && pwResult.message) || 'تعذّر تغيير كلمة المرور');
+        pfApplySecurityStatus(true);
+      }
+
+      resetPasswordFields();
+      if(typeof studentData !== 'undefined' && studentData && studentData[0]){
+        studentData[0].name = payload.name;
+        studentData[0].phone = payload.phone;
+      }
+      syncDisplayName();
+      if(typeof syncStudentTopbar === 'function' && typeof studentData !== 'undefined' && studentData && studentData[0]) syncStudentTopbar(studentData[0]);
+      var footerNameEl = document.getElementById('stuNameFooter');
+      if(footerNameEl && typeof shortDisplayName === 'function') footerNameEl.textContent = shortDisplayName(payload.name);
+
+      initialState = serializeForm();
+      loadingEnd();
+      markDirty();
+      alertMSG('تم حفظ التغييرات بنجاح', 'success');
+    }catch(err){
+      loadingEnd();
+      saveButton.disabled = false;
+      alertMSG('تعذّر الحفظ: ' + (err && err.message ? err.message : err), 'error');
+    }
+  });
+
+  if(discardButton){
+    discardButton.addEventListener('click', function(){
+      pfPendingAvatarBase64_ = null;
+      pfPendingAvatarMime_ = null;
+      if(avatarInput) avatarInput.value = '';
+      resetPasswordFields();
+      renderProfileTab();
+      alertMSG('تم التراجع عن التغييرات', 'info');
+    });
+  }
+
+  var actionMessages = {
+    academic: 'تم فتح ملخص رحلتك العلمية',
+    'signout-all': 'تم إنهاء الجلسات الأخرى تجريبيًا',
+    'end-session': 'تم إنهاء جلسة الهاتف تجريبيًا'
+  };
+  document.addEventListener('click', function(event){
+    var pane = document.getElementById('profile-tab-pane');
+    var element = event.target.closest('[data-action]');
+    if(!element || !pane || !pane.contains(element)) return;
+    var action = element.dataset.action;
+    if(actionMessages[action]) alertMSG(actionMessages[action], 'info');
+  });
+  var viewJourneyBtn = document.getElementById('pfViewJourneyBtn');
+  if(viewJourneyBtn) viewJourneyBtn.addEventListener('click', function(){ alertMSG('تم فتح ملخص رحلتك العلمية', 'info'); });
+  var helpBtn = document.getElementById('pfHelpBtn');
+  if(helpBtn) helpBtn.addEventListener('click', function(){ alertMSG('سيتم توصيلك بفريق دعم بصائر', 'info'); });
+
+  // زر "ربط الحساب" في قائمة طرق الدخول (تبويب الأمان) يوجّه لنفس تدفّق ربط Google/Yahoo
+  // الحقيقي المبني في تبويب التواصل، بدل تكرار نفس المنطق مرتين.
+  var connectGoogleBtn = document.querySelector('#profile-tab-pane [data-action="connect-google"]');
+  if(connectGoogleBtn){
+    connectGoogleBtn.addEventListener('click', function(){
+      activateTab('contact');
+      var googleMethodBtn = document.querySelector('[data-email-method="google"]');
+      if(googleMethodBtn) googleMethodBtn.click();
+    });
+  }
+
+  // -- تُستدعى من renderProfileTab في كل مرة يُفتح فيها التبويب (بيانات حقيقية من الخادم) --
+  pfApplyServerData_ = function(data){
+    pfSetFieldValue(form, 'fullName', data.name);
+    pfSetFieldValue(form, 'cpr', data.cpr);
+    pfSetFieldValue(form, 'dob', data.dob);
+    pfSetFieldValue(form, 'gender', data.gender);
+    pfSetFieldValue(form, 'nationality', data.nationality);
+    pfSetFieldValue(form, 'email', data.email);
+    pfApplyPhoneValue(document.getElementById('phoneCountrySelect'), document.getElementById('phone'), data.phone);
+    pfApplyPhoneValue(document.getElementById('phone2CountrySelect'), document.getElementById('phone2'), data.phone2);
+    pfSetFieldValue(form, 'block', data.block);
+    pfSetFieldValue(form, 'area', data.area);
+
+    var preference = data.contactPreference || 'whatsapp';
+    var prefInput = document.getElementById('contactPreference');
+    if(prefInput) prefInput.value = preference;
+    document.querySelectorAll('[data-contact-choice]').forEach(function(button){
+      button.classList.toggle('active', button.dataset.contactChoice === preference);
+    });
+
+    pfPendingAvatarBase64_ = null;
+    pfPendingAvatarMime_ = null;
+    if(avatarInput) avatarInput.value = '';
+    if(avatarPreview) avatarPreview.src = data.avatarUrl || 'https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&sz=w500';
+
+    var stageName = data.stageIndex > -1 ? PF_STAGE_NAMES_[data.stageIndex] : 'غير محدَّدة';
+    var sub = document.getElementById('pfIdentitySub');
+    if(sub) sub.textContent = 'طالب في ' + stageName + (data.cpr ? ' · رقم الطالب ' + data.cpr : '');
+    var academic = document.getElementById('pfAcademicSummary');
+    if(academic) academic.textContent = stageName + (data.mazhab ? ' · ' + data.mazhab : '');
+
+    var methodEl = document.getElementById('emailVerificationMethod');
+    if(methodEl) methodEl.value = 'manual';
+    var verifiedEl = document.getElementById('emailVerifiedState');
+    if(verifiedEl) verifiedEl.value = data.emailVerified ? 'true' : 'false';
+
+    pfApplySecurityStatus(!!data.hasPassword);
+
+    resetPasswordFields();
+    syncDisplayName();
+    updateCompletion();
+    initialState = serializeForm();
+    markDirty();
+
+    initProfileEmailVerification();
+  };
+}
+
+// تحديث حالة توثيق البريد في بطاقة الهوية أعلى الصفحة (الشارة الخضراء "حساب موثّق")
+function pfApplyEmailStatus(verified){
+  var badge = document.querySelector('#profile-tab-pane .sp-verified-badge');
+  if(!badge) return;
+  badge.style.display = verified ? '' : 'none';
+}
+
+// تحديث حالة "الرقم الشخصي وكلمة المرور" في تبويب الأمان (مؤشر أعلى القسم + سطر طرق الدخول)
+// بحسب hasPassword الحقيقية القادمة من الخادم، بدل نص ثابت "غير مُفعّلة" دائمًا.
+function pfApplySecurityStatus(hasPassword){
+  var scoreText = document.querySelector('#profile-tab-pane .sp-security-score strong');
+  if(scoreText) scoreText.textContent = hasPassword ? 'مفعّلة' : 'غير مُفعّلة';
+
+  var loginPill = document.querySelector('#profile-tab-pane .sp-login-methods article:first-child .sp-status-pill');
+  if(loginPill){
+    loginPill.className = 'sp-status-pill ' + (hasPassword ? 'success' : 'warning');
+    loginPill.textContent = hasPassword ? 'مفعّلة' : 'غير مُفعّلة';
+  }
+
+  var heading = document.querySelector('#profile-tab-pane .sp-security-section .sp-subsection-heading h3');
+  var currentPassField = document.getElementById('currentPassword');
+  var currentPassWrap = currentPassField ? currentPassField.closest('.sp-form-field') : null;
+  if(heading) heading.textContent = hasPassword ? 'تغيير كلمة المرور' : 'إنشاء كلمة مرور';
+  if(currentPassWrap) currentPassWrap.style.display = hasPassword ? '' : 'none';
+}
+
+// تُستدعى في كل مرة يُفتح فيها التبويب (عبر pfApplyServerData_) — تربط مستمعي الأحداث مرة
+// واحدة فقط (email.dataset.pfWired)، لكنها تُعيد مزامنة الحالة المعروضة (طريقة التوثيق/الشارة)
+// من قيم الحقول المخفية الحالية في كل مرة، لأن pfApplyServerData_ يضبطها من بيانات الخادم
+// الطازجة قبل استدعاء هذه الدالة.
+function initProfileEmailVerification(){
+  var email = document.getElementById('email');
+  var methodInput = document.getElementById('emailVerificationMethod');
+  var verifiedInput = document.getElementById('emailVerifiedState');
+  var status = document.getElementById('emailStatus');
+  var providerPanel = document.getElementById('providerEmailPanel');
+  var manualPanel = document.getElementById('manualEmailPanel');
+  var providerIcon = document.getElementById('providerConnectedIcon');
+  var providerLabel = document.getElementById('providerLabel');
+  var providerEmailText = document.getElementById('providerEmailText');
+  var switchAccount = document.getElementById('switchProviderAccount');
+  var sendCode = document.getElementById('sendEmailCode');
+  var codeArea = document.getElementById('verificationCodeArea');
+  var codeInput = document.getElementById('emailVerificationCode');
+  var verifyCode = document.getElementById('verifyEmailCode');
+  var resendCode = document.getElementById('resendEmailCode');
+  var emailMessage = document.getElementById('emailMessage');
+  var codeHint = document.getElementById('codeHint');
+  var countdownTimer;
+  if(!email || !methodInput) return;
+
+  function notifyChange(){
+    methodInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setStatus(state, label){
+    status.className = 'sp-email-status ' + state;
+    var icon = state === 'verified' ? 'bi-patch-check-fill' : state === 'pending' ? 'bi-clock' : 'bi-exclamation-circle';
+    status.innerHTML = '<i class="bi ' + icon + '"></i><b>' + label + '</b>';
+    verifiedInput.value = state === 'verified' ? 'true' : 'false';
+    pfApplyEmailStatus(state === 'verified');
+  }
+
+  var PF_PROVIDER_MARKS_ = {
+    google: { cls: 'sp-google-mark', text: 'G', label: 'حساب Google المرتبط' },
+    yahoo: { cls: 'sp-yahoo-mark', text: 'Y!', label: 'حساب Yahoo المرتبط' }
+  };
+  function renderProvider(method){
+    if(method === 'microsoft'){
+      providerIcon.className = 'sp-provider-connected-icon sp-microsoft-mark';
+      providerIcon.innerHTML = '<i></i><i></i><i></i><i></i>';
+      providerLabel.textContent = 'حساب Microsoft المرتبط';
+    }else{
+      var mark = PF_PROVIDER_MARKS_[method] || PF_PROVIDER_MARKS_.google;
+      providerIcon.className = 'sp-provider-connected-icon ' + mark.cls;
+      providerIcon.textContent = mark.text;
+      providerLabel.textContent = mark.label;
+    }
+    providerEmailText.textContent = email.value;
+  }
+
+  function selectMethod(method, options){
+    var config = options || {};
+    document.querySelectorAll('[data-email-method]').forEach(function(button){
+      var active = button.dataset.emailMethod === method;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+
+    methodInput.value = method;
+    var manual = method === 'manual';
+    providerPanel.hidden = manual;
+    manualPanel.hidden = !manual;
+
+    if(manual){
+      if(!config.keepVerification) setStatus('unverified', 'غير متحقق');
+      if(verifiedInput.value === 'true') setStatus('verified', 'تم التحقق يدويًا');
+    }else if(config.linkedEmail){
+      renderProvider(method);
+      var verifiedLabels = { google: 'موثّق عبر Google', yahoo: 'موثّق عبر Yahoo', microsoft: 'موثّق عبر Microsoft' };
+      setStatus('verified', verifiedLabels[method] || verifiedLabels.google);
+      codeArea.hidden = true;
+      codeInput.value = '';
+    }
+  }
+
+  // بدء تدفّق ربط Google/Yahoo الحقيقي: نافذة OAuth وسيطة (startOAuthRelay في
+  // auth-js.html، تُستخدم أيضًا في صفحة الدخول) → عند النجاح نرسل البريد المُتحقَّق منه فعليًا
+  // للخادم (linkVerifiedEmailToProfile في auth.js) ليكتبه ويُعلّمه موثّقًا مباشرة.
+  function startLinkFlow(method, btn){
+    if(typeof startOAuthRelay !== 'function'){
+      alertMSG('تعذّر فتح نافذة الربط، يرجى إعادة تحميل الصفحة والمحاولة مجددًا', 'error');
+      return;
+    }
+    startOAuthRelay(method, btn, null, function(verifiedEmail){
+      loadingStart();
+      google.script.run.withSuccessHandler(function(result){
+        loadingEnd();
+        if(!result || !result.ok){
+          alertMSG((result && result.message) || 'تعذّر ربط الحساب', 'error');
+          return;
+        }
+        email.value = result.email;
+        selectMethod(method, { linkedEmail: true });
+        notifyChange();
+        alertMSG('تم ربط البريد والتحقق منه بنجاح', 'success');
+      }).withFailureHandler(function(err){
+        loadingEnd();
+        alertMSG('تعذّر ربط الحساب: ' + err, 'error');
+      }).linkVerifiedEmailToProfile(pfCpr_, verifiedEmail);
+    });
+  }
+
+  function startCountdown(seconds){
+    clearInterval(countdownTimer);
+    seconds = seconds || 75;
+    resendCode.disabled = true;
+    resendCode.innerHTML = 'إعادة الإرسال بعد <b id="codeCountdown">' + seconds + '</b> ثانية';
+    var liveCountdown = resendCode.querySelector('b');
+    countdownTimer = setInterval(function(){
+      seconds -= 1;
+      liveCountdown.textContent = seconds;
+      if(seconds <= 0){
+        clearInterval(countdownTimer);
+        resendCode.disabled = false;
+        resendCode.textContent = 'إعادة إرسال الرمز';
+      }
+    }, 1000);
+  }
+
+  function sendVerificationCode(){
+    if(!email.checkValidity()){
+      email.closest('.sp-input-wrap').classList.add('sp-invalid');
+      emailMessage.classList.add('error');
+      emailMessage.textContent = 'يرجى كتابة بريد إلكتروني صحيح';
+      email.focus();
+      return;
+    }
+    email.closest('.sp-input-wrap').classList.remove('sp-invalid');
+    emailMessage.classList.remove('error');
+
+    sendCode.disabled = true;
+    google.script.run.withSuccessHandler(function(result){
+      sendCode.disabled = false;
+      if(!result || !result.ok){
+        if(result && result.cooldown){
+          alertMSG('يرجى الانتظار قليلًا قبل طلب رمز جديد', 'warning');
+          codeArea.hidden = false;
+          startCountdown(result.retryAfterSeconds);
+          return;
+        }
+        alertMSG((result && result.message) || 'تعذّر إرسال رمز التحقق', 'error');
+        return;
+      }
+      emailMessage.textContent = 'تم إرسال الرمز إلى ' + email.value;
+      codeArea.hidden = false;
+      codeInput.value = '';
+      setStatus('pending', 'بانتظار الرمز');
+      startCountdown(result.cooldownSeconds);
+      notifyChange();
+      codeInput.focus();
+      alertMSG('تم إرسال رمز التحقق إلى بريدك الإلكتروني', 'success');
+    }).withFailureHandler(function(err){
+      sendCode.disabled = false;
+      alertMSG('تعذّر إرسال رمز التحقق: ' + err, 'error');
+    }).requestRegistrationOtp(pfCpr_, email.value);
+  }
+
+  // مستمعو الأحداث تُربَط مرة واحدة فقط (نفس عناصر DOM في كل استدعاء لاحق لهذه الدالة)؛
+  // إعادة المزامنة الفعلية للحالة المعروضة تحدث دومًا عبر selectMethod أسفل الدالة.
+  if(!email.dataset.pfWired){
+    email.dataset.pfWired = '1';
+
+    document.querySelectorAll('[data-email-method]').forEach(function(button){
+      button.addEventListener('click', function(){
+        var method = button.dataset.emailMethod;
+        if(method === 'manual'){
+          selectMethod('manual');
+          notifyChange();
+        }else{
+          startLinkFlow(method, button);
+        }
+      });
+    });
+
+    if(switchAccount){
+      switchAccount.addEventListener('click', function(){
+        startLinkFlow(methodInput.value, switchAccount);
+      });
+    }
+
+    if(sendCode) sendCode.addEventListener('click', sendVerificationCode);
+    if(resendCode) resendCode.addEventListener('click', sendVerificationCode);
+
+    if(codeInput){
+      codeInput.addEventListener('input', function(){
+        codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+        codeHint.classList.remove('error');
+        codeHint.textContent = 'أدخل الرمز المرسَل إلى بريدك';
+      });
+    }
+
+    if(verifyCode){
+      verifyCode.addEventListener('click', function(){
+        if(codeInput.value.length !== 6){
+          codeHint.classList.add('error');
+          codeHint.textContent = 'يرجى إدخال الرمز المكوّن من 6 أرقام';
+          codeInput.focus();
+          return;
+        }
+        verifyCode.disabled = true;
+        google.script.run.withSuccessHandler(function(result){
+          verifyCode.disabled = false;
+          if(!result || !result.ok){
+            codeHint.classList.add('error');
+            codeHint.textContent = (result && result.message) || 'الرمز غير صحيح';
+            codeInput.closest('.sp-input-wrap').classList.add('sp-invalid');
+            codeInput.focus();
+            return;
+          }
+          clearInterval(countdownTimer);
+          codeInput.closest('.sp-input-wrap').classList.remove('sp-invalid');
+          codeHint.classList.remove('error');
+          codeHint.textContent = 'تم التحقق من البريد بنجاح';
+          email.value = result.email;
+          setStatus('verified', 'تم التحقق يدويًا');
+          notifyChange();
+          alertMSG('تم تفعيل بريدك الإلكتروني بنجاح', 'success');
+        }).withFailureHandler(function(err){
+          verifyCode.disabled = false;
+          alertMSG('تعذّر التحقق من الرمز: ' + err, 'error');
+        }).confirmProfileEmail(pfCpr_, codeInput.value);
+      });
+    }
+
+    email.addEventListener('input', function(){
+      if(methodInput.value !== 'manual') return;
+      codeArea.hidden = true;
+      codeInput.value = '';
+      setStatus('unverified', 'غير متحقق');
+      emailMessage.classList.remove('error');
+      emailMessage.textContent = 'سنرسل رمز تحقق مكوّنًا من 6 أرقام';
+    });
+  }
+
+  var initialMethod = methodInput.value || 'manual';
+  selectMethod(initialMethod, {
+    silent: true,
+    keepVerification: verifiedInput.value === 'true'
+  });
+}
+/////////////////////////////////////////////////////////////////////////////
+function startProg(){
+  getAllStudent();
+}
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+function loadStartDataOld(){
+   // تحميل الصفحة الرئيسية أولاً بدلاً من تسجيل الدخول
+   loadPage({func: "loadHomePage", callback: function(){} }); // استدعاء الصفحة الجديدة
+
+   // التحميلات الخلفية الاخرى تبقى كما هي
+   // getAllStudent(); ... الخ
+   setMainData();
+   setMainStatus();
+}
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+function loadStartData(){
+  initFirebaseAuth();
+  // نتحقق من حالة الجلسة مرة واحدة فقط عند فتح الصفحة، ثم نلغي الاشتراك في
+  // هذا المستمع فورًا؛ فلا يُعاد استدعاؤه تلقائيًا لاحقًا أثناء تسجيل الدخول
+  // اليدوي (وهو ما كان يحمّل الصفحة قبل إتمام خطوة إنشاء كلمة المرور).
+  const unsubscribeAuthCheck = firebase.auth().onAuthStateChanged(function(user){
+    unsubscribeAuthCheck();
+    if (user) {
+      AUTH_CPR = String(user.uid).replace(/^u/, '');
+      // لا نعتمد على جلسة محفوظة إلا لحساب فعّل بريده وأنشأ كلمة مرور فعليًا؛
+      // غير ذلك نخرج منها ونعرض شاشة الدخول من جديد (تفاديًا لتجاوز خطوة
+      // إنشاء كلمة المرور الإلزامية بإغلاق المتصفح قبل إتمامها).
+      google.script.run.withSuccessHandler(function(status){
+        if (status && status.found && status.emailVerified && status.hasPassword) {
+          loadLoginDataForAuthedUser(AUTH_CPR);
+        } else {
+          firebase.auth().signOut().catch(function(){}).then(loadLogin);
+        }
+      }).withFailureHandler(function(){
+        // تعذّر التحقق (خطأ شبكة عابر) — لا نمنع دخولاً كان سيعمل غالبًا
+        loadLoginDataForAuthedUser(AUTH_CPR);
+      }).checkCprStatus(AUTH_CPR);
+    } else {
+      loadLogin();
+    }
+  });
+  getAllStudent();
+  getMatnsRef();
+  //getAllExams();
+  getAnnouncesRef();
+  setMainData();
+  setMainStatus();
+  setMazhabsList();
+}
+///////////////////////////////////////////////////////////////////////////
+function getAllStudent(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    allStuData = dr;
+    //alert(allStuData.length);
+    try{
+    setStudentsRow();
+    }catch(err){}
+    loadingEnd();
+  }).getPersons();
+}
+///////////////////////////////////////////////////////////////////////////
+async function getAllExams(){
+  //alert(currentLevel)
+
+    google.script.run.withSuccessHandler(function(data){
+      allExams = data;
+      //alert([null , currentLevel])
+      //alert(allExams)
+  }).withFailureHandler(function(err){
+    alert(err)
+  }).getExams(null, null, studentData && studentData[0] ? studentData[0].cpr : null);
+
+}
+///////////////////////////////////////////////////////////////////////////
+function getMatnsRef(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    matnsRef = dr;
+    //alert(matnsRef.length);
+    try{
+      const matnOptions = document.querySelector('#matn_dec');
+      setChooseListMatn(matnOptions  , matnsRef);      
+    loadingEnd();
+    }catch(err){}
+    loadingEnd();
+  }).getMatns();
+}
+
+///////////////////////////////////////////////////////////////////////////
+function getAnnouncesRef(){
+  loadingStart();
+  google.script.run.withSuccessHandler(function(dr){
+    announcesRef = dr;
+    //alert(announcesRef.length);
+    try{
+    loadingEnd();
+    }catch(err){}
+    loadingEnd();
+  }).getAnnounces();
+}
+
+///////////////////////////////////////////////////////////////////////////
+// تُعيد Promise حقيقيًا (بخلاف السابق الذي كان async بالاسم فقط دون أي await
+// فعلي بداخله) حتى يستطيع من يستدعيها فعليًا انتظار اكتمال جلب dectationData بدل
+// الاعتماد على مهلة setTimeout ثابتة تخمينية (كانت السبب في تأخير/فشل عرض تبويب
+// التسميع). راجع setStudentDash في funcs-js.html للاستخدام الفعلي.
+///////////////////////////////////////////////////////////////////////////
+function getDectationDataRef(){
+  loadingStart();
+  dectationDataPromise_ = new Promise(function(resolve){
+    google.script.run.withSuccessHandler(function(dr){
+      dectationData = Array.isArray(dr) ? dr : [];
+      try{ loadingEnd(); }catch(err){}
+      loadingEnd();
+      resolve(dectationData);
+    }).withFailureHandler(function(err){
+      try{ loadingEnd(); }catch(err){}
+      loadingEnd();
+      dectationData = dectationData || [];
+      resolve(dectationData);
+    }).getDectationData();
+  });
+  return dectationDataPromise_;
+}
+
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+async function clickEvent(e){
+
+  if(e.target.matches('#goToRegisterLink')){
+    e.preventDefault();
+    showResidencyGateModal();
+  }
+
+  /* if (e.target.matches('.datesAtt')) {
+    const datesContainer = document.getElementById('datesCont');
+    const datesAttBtns = datesContainer.querySelectorAll('.datesAtt');
+
+    if(e.target.matches('.cnc')){
+      setAllAttendsRow();
+    }else{
+      datesAttBtns.forEach(btn => {
+        // إعادة الباقي للوضع الطبيعي
+        btn.classList.replace('bg-danger-subtle', 'bg-light-subtle');
+        btn.classList.replace('border-danger-subtle', 'border-light-subtle');
+        btn.classList.replace('text-danger-emphasis', 'text-light-emphasis');
+        btn.classList.remove('shadow-sm');
+      });
+
+      // تفعيل الزر اللي اتضغط
+      e.target.classList.replace('bg-light-subtle', 'bg-danger-subtle');
+      e.target.classList.replace('border-light-subtle', 'border-danger-subtle');
+      e.target.classList.replace('text-light-emphasis', 'text-danger-emphasis');
+      e.target.classList.add('shadow-sm');
+
+      const chDate = e.target.innerHTML;
+      //alert(chDate);
+      setAllAttendsRow(chDate);
+    }
+  } */
+  // تفاعل القائمة المنسدلة
+  if (e.target.matches('.datesAtt')) {
+    e.preventDefault(); // منع السلوك الافتراضي للروابط
+
+    const mainBtn = document.getElementById('dateFilterBtn'); // الزر الرئيسي للقائمة
+    const btnText = mainBtn.querySelector('span'); // النص داخل الزر
+
+    // 1. إذا ضغط على إلغاء التصفية (cnc)
+    if(e.target.matches('.cnc') || e.target.closest('.cnc')){
+       
+       // إعادة الزر الرئيسي لشكله الافتراضي
+       btnText.innerText = "تصفية حسب التاريخ";
+       mainBtn.classList.remove('active', 'btn-danger');
+       mainBtn.classList.add('btn-outline-danger');
+
+       // مسح البحث من الجدول
+       $('#datatable').DataTable().search('').draw();
+
+    } else {
+      // 2. إذا ضغط على تاريخ محدد
+      
+      const chDate = e.target.innerText.trim(); // التاريخ المختار
+      
+      // تحديث الزر الرئيسي ليظهر التاريخ المختار
+      btnText.innerText = chDate;
+      mainBtn.classList.remove('btn-outline-danger');
+      mainBtn.classList.add('btn-danger', 'active'); // تلوين الزر بالأحمر
+
+      // وضع التاريخ في الجدول
+      $('#datatable').DataTable().search(chDate).draw();
+    }
+  }
+
+  if(e.target.matches('.lecAttend')){
+    //const data = e.target.dataset.data;
+      let msgAlert = document.querySelector('.msgAlert');
+      let lecName = msgAlert.querySelector('.lecName').textContent;
+      //alert(lecName)
+    loadingStart();
+    google.script.run.withSuccessHandler(function(dr){
+      
+      msgAlert.classList.add('d-none');
+      if(dr != 'added'){alertMSG(dr,'info');}else{alertMSG('تم تسجيل رغبتك بنجاح، شكرا لك','success');};
+      try{
+      loadingEnd();
+      }catch(err){}
+      loadingEnd();
+    }).setLecAttend(studentData[0], lecName);
+  }
+
+  if(e.target.matches('.delete-moq')){
+    const id = e.target.dataset.id;
+    //alert(id);
+    deleteRecord(id);
+  }
+
+  if(e.target.matches('.edit-moq')){
+    const id = e.target.dataset.id;
+    //alert(id);
+    editRecord(id);
+  }
+
+  if(e.target.matches('#stuImage') || e.target.matches('.profile')){
+    loadProfile();
+  }
+
+  if(e.target.matches('.showCard')){
+    openIssuedFile(e.target.dataset.cardUrl);
+  }
+
+  if(e.target.closest('#clearSearchuser')){
+    setTimeout(function(){
+      searchInTable('searchuser' , 'usersTable' , 0);
+    },500)
+  }
+
+  if(e.target.matches('.wpd')){
+    var wpdNum = toInternationalWhatsAppNumber(e.target.dataset.phone);
+    if(wpdNum) window.open('https://wa.me/'+wpdNum , '_blank');
+  }
+
+  if(e.target.matches('.callPhone')){
+    window.open('tel:' + e.target.dataset.phone, '_self');
+  }
+
+  if(e.target.closest('.addManualAttendBtn')){
+    var addAttendBtn = e.target.closest('.addManualAttendBtn');
+    var attendCpr = addAttendBtn.dataset.cpr;
+    var attendName = addAttendBtn.dataset.name;
+    if(attendCpr){
+      addManualAttendanceFlow(attendCpr, attendName, function(){
+        setAttendData();
+      });
+    }
+  }
+
+  if(e.target.closest('.deleteAttendBtn')){
+    var delAttendBtn = e.target.closest('.deleteAttendBtn');
+    var delCpr = delAttendBtn.dataset.cpr;
+    var delName = delAttendBtn.dataset.name;
+    var delDate = delAttendBtn.dataset.date;
+    if(delCpr && delDate){
+      Swal.fire({
+        title: 'حذف سجل الحضور',
+        html: 'هل أنت متأكد من حذف سجل حضور <strong>' + delName + '</strong> بتاريخ <strong>' + delDate + '</strong>؟',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'نعم، احذف',
+        cancelButtonText: 'إلغاء'
+      }).then(function(result){
+        if(!result.isConfirmed) return;
+        google.script.run.withSuccessHandler(function(res){
+          if(res && res.ok){
+            alertMSG('تم حذف سجل الحضور', 'success');
+            setAttendData();
+          }else{
+            swal.fire('تعذّر الحذف', (res && res.message) || '', 'error');
+          }
+        }).withFailureHandler(function(err){
+          swal.fire('خطأ', 'تعذّر الاتصال بالخادم: ' + err, 'error');
+        }).deleteAttendance(delCpr, delDate);
+      });
+    }
+  }
+
+  const newStuCardBtn = e.target.closest('.newStuCard');
+  if(newStuCardBtn){
+    const cpr = newStuCardBtn.dataset.cpr;
+    const data = newStuRegData.filter(s=> s.cpr == cpr);
+    if(!data.length) return;
+    const requestData = data[0];
+    const requestRow = newStuCardBtn.closest('.userRow');
+    const requestGrade = requestRow ? parseInt(requestRow.dataset.grade, 10) : NaN;
+    grade = isNaN(requestGrade) ? null : requestGrade;
+    //alertMSG('newStuCard'+cpr , 'success');
+    document.querySelector('#timeBox').value = toDateFormate(requestData.time).replace('الساعة' , '');
+    document.querySelector('#cprBox').value = requestData.cpr;
+    document.querySelector('#userNameBox').value = requestData.name;
+    applyDobAgeLimit(document.querySelector('#dobReg'));
+    document.querySelector('#dobReg').value = toDateInputFormat(requestData.dob);
+    document.querySelector('#ageReg').value = calculateAgeInYears(requestData.dob);
+    document.querySelector('#gender').value = requestData.gender;
+    document.querySelector('#nationality').value = requestData.nationality;
+    document.querySelector('#mailBox').value = requestData.mail;
+    document.querySelector('#phone').value = requestData.phone;
+    document.querySelector('#block').value = requestData.block;
+    document.querySelector('#area').value = requestData.area;
+    document.querySelector('#pastStudies').value = requestData.pastStudies;
+
+    const summaryAvatar = document.getElementById('newStuSummaryAvatar');
+    if(summaryAvatar){
+      summaryAvatar.src = requestData.avatarUrl || DEFAULT_AVATAR_URL_;
+      summaryAvatar.alt = 'صورة ' + (requestData.name || 'المتقدم');
+    }
+    const summaryName = document.getElementById('newStuSummaryName');
+    if(summaryName) summaryName.textContent = requestData.name || '—';
+    const summaryMeta = document.getElementById('newStuSummaryMeta');
+    if(summaryMeta){
+      const stageName = grade !== null && typeof getLevelName === 'function' ? getLevelName(grade) : 'المرحلة غير محددة';
+      summaryMeta.textContent = (requestData.cpr || '—') + ' · ' + stageName;
+    }
+    const summaryType = document.getElementById('newStuSummaryType');
+    if(summaryType){
+      const returning = typeof isReturningReg === 'function' && isReturningReg(requestData);
+      summaryType.textContent = returning ? 'طالب سابق' : 'طالب جديد';
+      summaryType.className = 'soft-badge' + (returning ? ' pink' : '');
+    }
+    const summaryMode = document.getElementById('newStuSummaryMode');
+    if(summaryMode){
+      summaryMode.textContent = requestData.isRemote ? 'عن بُعد' : 'حضوري';
+      summaryMode.className = 'soft-badge ' + (requestData.isRemote ? 'blue' : 'green');
+    }
+
+    document.querySelector('#acceptNewStu').dataset.cpr = cpr;
+    document.querySelector('#refuseNewStu').dataset.cpr = cpr;
+    return;
+  }
+
+  if(e.target.closest('#iqrarBtn')){
+    const acceptIqrar = document.getElementById('acceptIqrar').checked;
+    if(!acceptIqrar){
+      alertMSG('لابد من الإقرار بما ورد أعلاه عن طريق التأشير على الخيار المكتوب باللون الأحمر' , 'info');
+    // استكمال جلسة نشطة بالفعل: الطالب سبق أن أجاب استبيان ما قبل الاختبار عند بدء هذه الجلسة
+    // أول مرة، فتخطّي البوابة مباشرة لـloadQuestions (تحقّق محلي فوري بلا حاجة لسؤال الخادم).
+    }else if(examIsResuming){
+      loadQuestions();
+    }else{
+      // لا جلسة نشطة حاليًا، لكن قد يكون الطالب أجاب الاستبيان بمحاولة سابقة حُظرت قبل إنشاء
+      // جلسة (مثلًا الاختبار كان مغلقًا وقتها) — نتحقق من الخادم قبل عرض البوابة مرة أخرى، بدل
+      // الاكتفاء بفحص الجلسة النشطة فقط الذي لا يغطي هذه الحالة. فشل التحقق لا يمنع الطالب،
+      // يعرض الاستبيان احتياطًا كالسلوك السابق.
+      loadingStart();
+      google.script.run.withSuccessHandler(function(already){
+        loadingEnd();
+        if(already) loadQuestions(); else showPreExamSurveyGate(branch, currentLevel, loadQuestions);
+      }).withFailureHandler(function(){
+        loadingEnd();
+        showPreExamSurveyGate(branch, currentLevel, loadQuestions);
+      }).hasSubmittedPreExamSurvey(studentData[0].cpr, branch, currentLevel);
+    }
+  }
+
+  if(e.target.closest('#iqrarExit')){
+    loadLogin();
+  }
+
+
+  try{
+    if(e.target.closest('.nav-link').classList.contains('nav-link')){
+      const innerData = e.target.closest('.nav-link').dataset;
+      innerData.bsToggle == 'tab' ? showAllTabs(innerData.bsTarget.replace('#','')) : null;
+      const navLink = e.target.closest('.nav-link').id;
+      if(navLink == 'dectationNav'){
+        getMatnsRef();
+        //alert(matnsRef)
+        if(matnsRef != undefined){
+          //alert(matnsRef[0].matn)
+        }else{
+          setTimeout(function(){
+            try{
+              //getMatnsRef();
+              //alert(matnsRef[0].matn)
+              }catch(err){}
+            },2000)
+        }
+        getDectationDataRef();
+        if(!studentData){
+          const matnOptions = document.querySelector('#matn_dec');
+          const stuNamesList = document.querySelector('#stuNames_dec_list');
+          setDataList(stuNamesList  , allStuData.filter(e=> e.gender == userData[0].gender) );
+          setChooseListMatn(matnOptions  , matnsRef);
+        }else{
+
+        }
+
+        //setOptions(matnOptions , matnsRef);
+      //alert(navLink == 'dectation')
+
+      }
+      if(navLink == 'examsNav'){
+        //alert(navLink)
+        loadingStart();
+        // تأثير تحميل البطاقات (shimmer) لتبويب "الاختبارات والشهادات" — يبقى ظاهرًا طوال
+        // سلسلة النداءين (getExams ثم getAnswersData داخل getExamsCertiData)، ويُزال فعليًا من
+        // setPastExams() نفسها (funcs-js.html) بمجرد اكتمال البناء، أو هنا مباشرة لو فشل/فرغ
+        // النداء الأول قبل الوصول لـsetPastExams() إطلاقًا.
+        var examsStatsGridEl = document.getElementById('examsStatsGrid');
+        var pastExamsListEl = document.getElementById('pastExamsList');
+        if(examsStatsGridEl) examsStatsGridEl.classList.add('sp-exam-loading');
+        if(pastExamsListEl) pastExamsListEl.classList.add('sp-exam-loading');
+        google.script.run.withSuccessHandler(function(data){
+            allExams = data;
+            //alert([null , currentLevel])
+            //alert(allExams)
+            if(allExams){
+              getExamsCertiData();
+            }else{
+              document.getElementById('pastExamsList').innerHTML = '<p class="text-center text-secondary">لا يوجد اختبارات</p>';
+              if(examsStatsGridEl) examsStatsGridEl.classList.remove('sp-exam-loading');
+              if(pastExamsListEl) pastExamsListEl.classList.remove('sp-exam-loading');
+            }
+            loadingEnd();
+        }).withFailureHandler(function(err){
+          alert(err);
+          if(examsStatsGridEl) examsStatsGridEl.classList.remove('sp-exam-loading');
+          if(pastExamsListEl) pastExamsListEl.classList.remove('sp-exam-loading');
+          loadingEnd();
+        }).getExams(null, null, studentData && studentData[0] ? studentData[0].cpr : null);
+      }
+      if(navLink == 'attendNav'){
+        setAttendData();
+      }
+      if(navLink == 'mazhabNav'){
+        renderMazhabSelection();
+      }
+      if(innerData.bsTarget == '#profile-tab-pane'){
+        renderProfileTab();
+      }
+
+    }
+  }catch(err){
+    
+  }
+
+  try{
+    const link = e.target.closest('.nav-link');
+    if (link?.id === 'logOut') {
+      logout();
+    }else if (link?.id === 'adminDash') {
+      thisEmp.manage ?
+      loadDashboard() : null;
+    }
+    closeUserMenu();
+  }catch(err){
+    
+  }
+
+  try{
+    if(e.target.classList.contains('nav-link') && e.target.getAttribute('data-bs-toggle') === 'tab'){
+      thisPage = e.target.getAttribute('data-bs-target');
+    }
+  }catch(err){
+    
+  }
+
+  if(e.target.matches('.backEmp')){
+    // emp.html أصبح يستخدم غلاف لوحة الإدارة (page-view/data-route) بدل تبويبات Bootstrap،
+    // فتُستعاد الصفحة دائمًا على "الرئيسة" (لا مطابقة نصية على id تبويب قديم لم يعد موجودًا).
+    await loadEmp();
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.attendReg')){
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader)
+    loadAttendReg();
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.newRegCheck')){
+    showCurrentStus = false;
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader)
+    loadNewRegCheck();
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.certManage')){
+    showCurrentStus = true;
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader);
+    getAllCertiData();
+    showModal('certManage');
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.stuManage')){
+    showCurrentStus = true;
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader);
+    await getDectationDataRef();
+    //await alert(dectationData.length);
+    await loadCurrentStus();
+  }
+
+  if(e.target.closest('#followUpBtn') && userData[0].followUp){
+    activateAdminRoute('emp-followup');
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.empManage')){
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader)
+    loadEmpManag();
+  }
+
+  if(e.target.closest('.cardClick') && e.target.closest('.allAttend')){
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader)
+    //setAttendData();
+    loadAllAttend();
+  }
+
+
+  if(e.target.closest('.cardClick') && e.target.closest('.stWorksMan')){
+    showCurrentStus = true;
+    const card = e.target.closest('.card');
+    const cardLoader = card.querySelector('.cardLoader');
+    cardLoader.style.display="block";
+    startCardLoader(cardLoader);
+    getAllStWrksData();
+    showModal('stWorksMan');
+  }
+
+  if(e.target.dataset.bsDismiss == "modal"){
+    const modalID = e.target.closest('.modal').id;
+    hideModal(modalID)
+  }
+
+
+  if(e.target.matches('#startExam')){
+    setExamsTimesData();
+    //startCountdown();
+  }
+
+  if(e.target.matches('.delWerd')){
+    const code = e.target.dataset.code;
+    const row = e.target.closest('tr');
+
+    swal.fire({
+      title: 'تأكيد الحذف',
+      text: "هل أنت من متأكد من حذف السجل ؟!!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'نعم، احذف '
+    }).then((result) => {
+      if (result.isConfirmed) {
+        loadingStart();
+        google.script.run.withSuccessHandler(function(r){
+          getDectationDataRef();
+          if(r){
+            swal.fire('تم!!','تم حذف السجل','success');
+              if (row) {
+                row.remove(); // حذف الصف من الجدول
+              }            
+            loadingEnd();
+          }else{
+            swal.fire('خطأ!!','حدث خطأ أثناء الحذف','info');
+            loadingEnd();
+          }
+        }).withFailureHandler(function(f){
+          swal.fire('خطأ!!','حدث خطأ '+f+' أثناء الإجراء','error');
+            loadingEnd();
+        }).deleteDectation(code);
+      }
+    })
+
+  }
+
+  if(e.target.closest('#requestAttendBtn')){
+    requestAttendanceFlow();
+  }
+
+  if(e.target.matches('#getCardViaMail')){
+    const hisName = document.getElementById('cardStName').textContent;
+    makeNewGiftCard(hisName);
+  }
+
+  if(e.target.matches('.extractCert')){
+    extractCertifications(e);
+  }
+
+  if(e.target.matches('.extractWrksCert')){
+    extractWrksCertifications(e);
+  }
+
+  if(e.target.matches('.checkWPconnection')){
+    checkWPconnection(e , userData[0].phone);
+  }
+
+  if(e.target.closest('.sp-exam-start-btn')){
+    startExamFromBtn(e.target.closest('.sp-exam-start-btn'));
+    return;
+  }
+
+  if(e.target.closest('.sp-cert-issue-btn')){
+    var certBtn = e.target.closest('.sp-cert-issue-btn');
+    startCertSelfIssue(certBtn.dataset.exam, +certBtn.dataset.level);
+    return;
+  }
+
+  if(e.target.closest('.mazhabBtn')){
+
+    const container = document.querySelector('.mazhabCard');
+    const clickedCard = e.target.closest('.mazhabBtn');
+    if (!clickedCard || !container.contains(clickedCard)) return;
+
+    const mazhabEl = clickedCard.querySelector('.mazhab');
+    const choosen = mazhabEl ? mazhabEl.textContent : '';
+    if (!choosen || choosen === studentData[0].mazhab) return; // نفس المذهب المختار أصلًا — لا داعي لأي نداء
+
+    if(studentData[0].mazhab != ''){
+      /* alertMSG('لقد سجلت رغبتك من قبل بدراسة ' + studentData[0].mazhab,'info');
+      return; */
+
+          swal.fire({
+          title: 'تأكيد تغيير المذهب الفقهي',
+          text: "هل أنت متأكد من تغيير مذهبك إلى "+ choosen +" ؟!!",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'نعم، أكّد التغيير'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            try{
+              loadingStart();
+              google.script.run.withSuccessHandler(function(s){
+                loadingEnd();
+                if(s && s.error){
+                  swal.fire('تعذّر التغيير', s.message || 'تغيير المذهب الفقهي مغلق حاليًا', 'info');
+                  return;
+                }
+                swal.fire('تم التسجيل','تم تغيير رغبتك إلى '+ choosen,'success');
+                studentData[0].mazhab = choosen;
+                renderMazhabSelection();
+                loadStudent();
+              }).withFailureHandler(function(f){
+                swal.fire('خطأ','لم يتم تسجيل رغبتك بنجاح، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ f,'error');
+                loadingEnd();
+              }).setMazhab(choosen , studentData[0].cpr);
+            }catch(err){
+              swal.fire('خطأ','لم يتم تسجيل رغبتك بنجاح، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ err,'error');
+              loadingEnd();
+            }
+          }
+        })
+
+    }else{
+
+      try{
+        loadingStart();
+        google.script.run.withSuccessHandler(function(s){
+          swal.fire('تم التسجيل','تم تسجيل رغبتك بدراسة '+ choosen,'success');
+          loadingEnd();
+          studentData[0].mazhab = choosen;
+          renderMazhabSelection();
+        }).withFailureHandler(function(f){
+          swal.fire('خطأ','لم يتم تسجيل رغبتك بنجاح، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ f,'error');
+          loadingEnd();
+        }).setMazhab(choosen , studentData[0].cpr);
+      }catch(err){
+        swal.fire('خطأ','لم يتم تسجيل رغبتك بنجاح، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ err,'error');
+        loadingEnd();
+      }
+    }
+
+    return
+  }
+
+  const acceptNewStuTarget = e.target.closest('#acceptNewStu, .acceptNewStu');
+  if(acceptNewStuTarget){
+    // طالب سجّل دون اختيار مرحلة (setupRegistrationsGradeFix يضبط grade = null في هذه الحالة)
+    // يلزم اختيار مرحلة له أولًا من خانة renderStagelessStageSelect قبل إتمام القبول.
+    if(grade === null || typeof grade === 'undefined' || isNaN(grade)){
+      alertMSG('يرجى اختيار المرحلة لهذا الطالب أولًا قبل القبول', 'error');
+      return;
+    }
+    newRegAproval = 'yes';
+    const cpr = acceptNewStuTarget.dataset.cpr;
+      try{
+        loadingStart();
+        google.script.run.withSuccessHandler(function(s){
+          const completionDialog = swal.fire('تم قبول الطلب','تم قبول الطالب / الطالبة، وإنشاء الملفات المطلوبة وإرسال البطاقة وإشعار القبول عبر الإيميل','success');
+          loadingEnd();
+          hideModal('newStuModal');
+          const acceptedRow = document.getElementById(cpr);
+          if(acceptedRow) acceptedRow.remove();
+          updateAcceptSelectedState();
+          completionDialog.then(function(){ if(typeof getNewStuRegData === 'function') getNewStuRegData(); });
+        }).withFailureHandler(function(f){
+          swal.fire('خطأ','لم يتم تسجيل الإجراء، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ f,'error');
+          loadingEnd();
+        }).setStudentsQrCard(cpr , newRegAproval , grade, (typeof userData !== 'undefined' && userData && userData[0] && userData[0].name) || '', (typeof userData !== 'undefined' && userData && userData[0] && userData[0].cpr) || '');
+      }catch(err){
+        swal.fire('خطأ','لم يتم تسجيل الإجراء، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ err,'error');
+        loadingEnd();
+      }
+    return
+  }
+
+  const acceptAllNewStuTarget = e.target.closest('#acceptAllNewStu, .acceptAllNewStu');
+  if(acceptAllNewStuTarget){
+    const visibleCount = document.querySelectorAll('#usersContainer .userRow').length;
+    if(visibleCount === 0) return;
+    Swal.fire({
+      title: 'قبول الطلبات الظاهرة',
+      text: 'سيتم قبول ' + visibleCount + ' من الطلبات الظاهرة في الصفحة الحالية وفق الفلاتر المطبقة.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#b5262c',
+      confirmButtonText: 'نعم، اقبل الطلبات',
+      cancelButtonText: 'إلغاء',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        newRegAproval = 'yes';
+        stopProcessing = false; 
+        acceptAllNewStu(); 
+      }
+    });     
+  }
+
+  const refuseNewStuTarget = e.target.closest('#refuseNewStu, .refuseNewStu');
+  if(refuseNewStuTarget){
+    newRegAproval = 'no';
+    const cpr = refuseNewStuTarget.dataset.cpr;
+      try{
+        loadingStart();
+        google.script.run.withSuccessHandler(function(s){
+          const completionDialog = swal.fire('تم رفض الطلب','تم استبعاد الطالب / الطالبة من طلبات التسجيل','success');
+          loadingEnd();
+          hideModal('newStuModal');
+          const refusedRow = document.getElementById(cpr);
+          if(refusedRow) refusedRow.remove();
+          updateAcceptSelectedState();
+          completionDialog.then(function(){ if(typeof getNewStuRegData === 'function') getNewStuRegData(); });
+        }).withFailureHandler(function(f){
+          swal.fire('خطأ','لم يتم تسجيل الإجراء، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ f,'error');
+          loadingEnd();
+        }).setStudentsQrCard(cpr , newRegAproval , grade);
+      }catch(err){
+        swal.fire('خطأ','لم يتم تسجيل الإجراء، يرجى التواصل مع الإدارة وإرسال هذه الرسالة لهم '+ err,'error');
+        loadingEnd();
+      }
+    return
+  }
+  
+  //alert(e.target.classList)
+  if(e.target.matches('.nav-link') && userData ){
+    if(!userData[0].manage) return;
+    const action = e.target.getAttribute('data-action');
+    if(!action) return;
+    //alert(action)
+    showCurrentStus ? setAllStudentsRow(action) : setNewRegStudentsRow(action);
+  }
+
+  // فلتر المرحلة بصفحة "متابعة التسميع" (currentStus.html، مُعاد تصميمها) — مستقل تمامًا
+  // عن المُعترِض أعلاه المقصور على manage=true (مُعترِض عام لعنصر .nav-link مشترك مع صفحات
+  // أخرى)، لأن هذه الصفحة تُفتح أيضًا بصلاحية "متابعة" وحدها بلا manage إطلاقًا.
+  if(e.target.closest('.curstu-stage-btn')){
+    var curStuBtn = e.target.closest('.curstu-stage-btn');
+    var curStuAction = curStuBtn.getAttribute('data-action');
+    document.querySelectorAll('.curstu-stage-btn').forEach(function(b){ b.classList.toggle('active', b === curStuBtn); });
+    showCurrentStus ? setAllStudentsRow(curStuAction) : setNewRegStudentsRow(curStuAction);
+  }
+
+  if (e.target.closest('#sendWhatsMSG')) {
+    const selected = document.querySelector('input[name="countCurrStu"]:checked');
+
+    if (selected) {
+      const msgGender = selected.id; // ✅ نستخدم الـid بدل العنصر نفسه
+      const container = document.querySelector('#usersContainer');
+      const names = container.querySelectorAll('.name');
+      const genders = container.querySelectorAll('.gender');
+      const stuPhones = container.querySelectorAll('.stuPhone');
+
+      //const phonesForWhatsApp = []; // تأكد من تعريف المصفوفة هنا أو قبل الكود
+        //alert([msgGender, stuPhones.length])
+              phonesForWhatsApp = [];
+      for (let i = 0; i < stuPhones.length; i++) { // ✅ نستخدم < بدل <=
+        const phone = stuPhones[i].textContent.trim();
+        const gender = genders[i].textContent.trim();
+        const name = names[i].textContent.trim();
+
+
+          if (
+            (msgGender === 'Count' && gender !== '') ||
+            (msgGender === 'mCount' && gender === 'ذكر') ||
+            (msgGender === 'fCount' && gender === 'أنثى')
+          ) {
+            if (phone.replace(/\D+/g,'').length >= 8) {
+                phonesForWhatsApp.push({ name: name, phone: phone });
+              }else {
+              alertMSG(`لن يتم الإرسال إلى ${name} لأن الرقم ${phone} غير صحيح`, 'warning');
+            }
+          }
+      }
+
+      showModal('sendWhatsMsg');
+    } else {
+      alertMSG('الرجاء اختيار المجموعة أولاً', 'warning');
+    }
+  }
+
+
+  if(e.target.matches('#wpSendBtn')){
+
+    const textMsg = document.querySelector('#wpTxt');
+    if(textMsg.value.trim() === ''){
+      alertMSG('لا يمكن إرسال رسالة فارغة','error')
+    }else{
+      swal.fire({
+        title: '<i class="bi bi-whatsapp"></i>',
+        text: "هل أنت متأكد من الإرسال ؟!!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'نعم، أودّ الإرسال',
+        cancelButtonText: 'لا، شكرًا'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          var msgText = textMsg.value.trim();
+          google.script.run.withSuccessHandler(function(res){
+            if(res.ok){
+              hideModal('sendWhatsMsg');
+              textMsg.value = '';
+              swal.fire('تم البدء', 'بدأ إرسال الرسالة إلى ' + res.total + ' مستلمًا في الخلفية على خادم بصائر. يمكنك إغلاق الصفحة الآن، وستكمل العملية تلقائيًا، ويمكنك متابعة حالتها لاحقًا من صفحة "إرسال رسالة".', 'success');
+              if(typeof refreshWPQueueStatus === 'function') refreshWPQueueStatus();
+            }else{
+              swal.fire('تعذّر بدء الإرسال', res.reason || '', 'error');
+            }
+          }).withFailureHandler(function(err){
+            swal.fire('خطأ', 'تعذّر الاتصال بالخادم: ' + err, 'error');
+          }).startWPQueueSend(phonesForWhatsApp, msgText);
+        }
+      })
+    }
+
+  }
+
+  if(e.target.matches('#wpQueueRefreshBtn')){
+    refreshWPQueueStatus();
+  }
+
+  if(e.target.matches('#wpQueueStopBtn')){
+    swal.fire({
+      title: 'إيقاف الإرسال',
+      text: 'هل تريد إيقاف عملية الإرسال الجارية؟ ما تم إرساله بالفعل لن يتأثر.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'نعم، أوقف',
+      cancelButtonText: 'تراجع'
+    }).then((result) => {
+      if(result.isConfirmed){
+        google.script.run.withSuccessHandler(function(){
+          refreshWPQueueStatus();
+        }).stopWPQueueSend();
+      }
+    });
+  }
+
+  if(e.target.matches('#wpQueueDetailsBtn')){
+    var st = window.wpLastQueueStatus_ || { sent: 0, total: 0, failed: 0, failedList: [] };
+    document.getElementById('wpDetailsSummary').textContent =
+      'تم الإرسال إلى ' + st.sent + ' من ' + st.total + ' مستلمًا' + (st.failed ? '، وتعذّر الإرسال إلى ' + st.failed + '.' : '، بنجاح تام.');
+    var failTableWrap = document.getElementById('wpFailTableWrap');
+    var failTableBody = document.getElementById('wpFailTableBody');
+    if(st.failedList && st.failedList.length){
+      failTableBody.innerHTML = st.failedList.map(function(f){
+        return '<tr><td>' + escapeHtml(f.name || '—') + '</td><td>' + escapeHtml(f.phone || '—') + '</td><td>' + escapeHtml(f.reason || '') + '</td></tr>';
+      }).join('');
+      failTableWrap.style.display = 'block';
+    }else{
+      failTableWrap.style.display = 'none';
+    }
+    showModal('wpProgressModal');
+  }
+
+   if(e.target.closest('#googleSignInBtn')){
+     googleSignInForEmail();
+   }
+
+   if(e.target.closest('#yahooSignInBtn')){
+     yahooSignInForEmail();
+   }
+
+   if(e.target.closest('#manualEmailToggleBtn')){
+     document.getElementById('manualEmailWrap')?.classList.remove('d-none');
+     document.getElementById('mailBox')?.focus();
+   }
+
+   //////////////////////////////////////////////////////////////////////
+   // متصفح ملفات تبويب "المقررات" (curriculumGrid + courseDrawer)
+   //////////////////////////////////////////////////////////////////////
+   if(e.target.closest('#courseSearchClear')){
+     var searchTopInput = document.getElementById('courseSearchTop');
+     if(searchTopInput){
+       searchTopInput.value = '';
+       searchTopInput.dispatchEvent(new Event('input', {bubbles:true}));
+       searchTopInput.focus();
+     }
+   }
+
+   if(e.target.closest('.curriculum-card')){
+     var courseCard = e.target.closest('.curriculum-card');
+     openCourseDrawer(courseCard.dataset.folderId, courseCard.dataset.folderName, courseCard.dataset.icon);
+   }
+
+   if(e.target.closest('.sp-filter-group button')){
+     var filterBtn = e.target.closest('.sp-filter-group button');
+     filterBtn.closest('.sp-filter-group').querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+     filterBtn.classList.add('active');
+     var filterVal = filterBtn.dataset.courseFilter;
+     document.querySelectorAll('#curriculumGrid .curriculum-card').forEach(function(card){
+       var show = filterVal === 'all' || filterVal === card.dataset.state;
+       card.style.display = show ? '' : 'none';
+     });
+   }
+
+   if(e.target.closest('.sp-view-switch button')){
+     var viewBtn = e.target.closest('.sp-view-switch button');
+     viewBtn.closest('.sp-view-switch').querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+     viewBtn.classList.add('active');
+     document.getElementById('curriculumGrid')?.classList.toggle('list-view', viewBtn.dataset.courseView === 'list');
+   }
+
+   if(e.target.closest('#courseDrawerClose') || e.target.closest('#courseDrawerOverlay')){
+     closeCourseDrawer();
+   }
+
+   if(e.target.closest('.material-folder')){
+     var folderBtn = e.target.closest('.material-folder');
+     var sub = folderBtn.parentElement.querySelector('.material-sublevel');
+     if(sub){
+       var isOpen = !sub.classList.contains('d-none');
+       if(isOpen){
+         sub.classList.add('d-none');
+         folderBtn.classList.remove('expanded');
+       }else{
+         sub.classList.remove('d-none');
+         folderBtn.classList.add('expanded');
+         if(!sub.dataset.loaded){
+           sub.dataset.loaded = '1';
+           sub.innerHTML = '<div class="text-center text-secondary py-2"><div class="spinner-border spinner-border-sm"></div></div>';
+           loadDrawerLevel(folderBtn.dataset.folderId, sub);
+         }
+       }
+     }
+   }
+
+   if(e.target.closest('.material-file')){
+     var fileBtn = e.target.closest('.material-file');
+     var fileLink = fileBtn.dataset.link;
+     var fileSize = +fileBtn.dataset.size || 0;
+     // حد فحص الفيروسات في Google Drive (~100MB): فوقه بيظهر تحذير "يتعذّر فحص الملف"
+     // وهو تحذير ما بيشتغلش صح جوه iframe مصغّر، فنفتح الملفات الكبيرة في تاب Drive مباشرة
+     var DRIVE_SCAN_LIMIT_ = 100 * 1024 * 1024;
+     if(fileBtn.dataset.media === '1' && fileSize > DRIVE_SCAN_LIMIT_){
+       window.open('https://drive.google.com/file/d/' + fileBtn.dataset.fileId + '/view', '_blank');
+     }else if(fileBtn.dataset.media === '1'){
+       var mediaFrame = document.getElementById('courseMediaFrame');
+       var mediaTitle = document.getElementById('courseMediaModalTitle');
+       if(mediaTitle) mediaTitle.textContent = fileBtn.querySelector('.material-name')?.textContent || '';
+       if(mediaFrame) mediaFrame.src = 'https://drive.google.com/file/d/' + fileBtn.dataset.fileId + '/preview';
+       showModal('courseMediaModal');
+     }else if(fileLink){
+       window.open(fileLink, '_blank');
+     }
+   }
+
+   if(e.target.closest('#oauthForceDismissBtn')){
+     var mbEl = document.getElementById('mailBox');
+     var forcedDismiss = detectForcedOAuth(mbEl?.value);
+     oauthForceDismissedFor_ = forcedDismiss ? forcedDismiss.btn : null;
+     updateGmailForceState(mbEl);
+   }
+
+   if(e.target.closest('#oauthInlineTriggerBtn')){
+     var forcedNow = detectForcedOAuth(document.getElementById('mailBox')?.value);
+     if(forcedNow) document.getElementById(forcedNow.btn)?.click();
+   }
+
+   if(e.target.closest('#googleUndoBtn')){
+     undoGoogleVerification();
+   }
+
+   if(e.target.closest('#googleLoginBtn')){
+     googleSignInForLogin();
+   }
+
+   if(e.target.closest('#yahooLoginBtn')){
+     yahooSignInForLogin();
+   }
+
+   if(e.target.closest('#skipEmailVerifyBtn')){
+     skipEmailVerification();
+   }
+
+   if(e.target.matches('#verMail')){
+     if( !mailVerification(document.getElementById('mailBox')) ) return
+     if(e.target.disabled) return;
+
+     var mailBoxForCheck_ = document.getElementById('mailBox');
+     var emailGate_ = await confirmEmailProviderOk(mailBoxForCheck_.value);
+     if(!emailGate_.proceed) return; // خطأ صياغة صريح: لا إرسال، الرسالة عُرضت بالفعل
+     if(emailGate_.correctedEmail){
+       mailBoxForCheck_.value = emailGate_.correctedEmail;
+       mailVerification(mailBoxForCheck_);
+     }
+
+     e.target.disabled = true;
+     document.getElementById('mailBox').disabled = true;
+     document.getElementById('mailSpinner').classList.remove('d-none');
+     document.getElementById('mailCode').classList.add('d-none');
+     document.getElementById('mailCode').value = '';
+     var mail = document.getElementById('mailBox').value.trim();
+
+     var verMailCpr = (document.getElementById('cprBox') && document.getElementById('cprBox').value) ||
+                       (typeof newRegCpr !== 'undefined' ? newRegCpr : '') ||
+                       (typeof studentData !== 'undefined' && studentData && studentData[0] ? studentData[0].cpr : '');
+
+     google.script.run.withSuccessHandler(function(res){
+      document.getElementById('mailSpinner').classList.add('d-none');
+      document.getElementById('mailBox').disabled = false;
+      e.target.disabled = false;
+
+      if(res && res.ok){
+        document.getElementById('mailCode').classList.remove('d-none');
+        document.getElementById('mailCode').focus();
+        document.getElementById('mailCode').disabled = false;
+        startResendCooldown(e.target, res.cooldownSeconds, '✉ إعادة إرسال رمز التحقق');
+        return;
+      }
+
+      if(res && res.cooldown){
+        // رمز سابق لا يزال صالحًا: نُبقي حقل إدخاله ظاهرًا بدل حجب المستخدم بلا مسار.
+        document.getElementById('mailCode').classList.remove('d-none');
+        document.getElementById('mailCode').disabled = false;
+        alertMSG('تم إرسال رمز مؤخرًا، يرجى الانتظار ' + res.retryAfterSeconds + ' ثانية قبل طلب رمز جديد، أو أدخل الرمز الذي وصلك بالفعل.', 'warning');
+        startResendCooldown(e.target, res.retryAfterSeconds, '✉ إعادة إرسال رمز التحقق');
+        return;
+      }
+
+      if(res && res.quotaExceeded){
+        // امتلاء الحصة اليومية لإرسال البريد بالكامل (حالة نادرة): لا نُعطّل تسجيل الطالب
+        // بسبب هذا، بل نُكمل ونؤجّل التحقق الفعلي من البريد إلى أول تسجيل دخول له. رسالة
+        // بهذه الأهمية (الطالب يسجّل الآن، وسيُفاجَأ لاحقًا بطلب تفعيل البريد عند أول دخول
+        // إن لم ينتبه لهذه اللحظة تحديدًا) تستحق نافذة واضحة بدل توست سهل الفوات.
+        mailCheck = true;
+        mailVerifiedDeferred = true;
+        document.querySelector('.oauth-icon-row')?.classList.remove('bg-danger', 'bg-opacity-25', 'rounded-4', 'border', 'border-danger');
+        Swal.fire({
+          icon: 'warning',
+          title: 'سيلزم تفعيل بريدك لاحقًا',
+          text: 'تعذّر إرسال رمز التحقق الآن (الحد اليومي لإرسال البريد ممتلئ). سنُكمل تسجيلك، لكن سيُطلب منك التحقق من بريدك الإلكتروني عند أول تسجيل دخول لاحقًا — يرجى الانتباه لذلك.',
+          confirmButtonText: 'حسنًا، فهمت'
+        });
+      }else{
+        alertMSG('تعذّر إرسال رمز التحقق: ' + ((res && res.message) || 'خطأ غير معروف') + '. يرجى التأكد من صحة البريد الإلكتروني أو المحاولة لاحقًا.', 'error');
+      }
+     }).withFailureHandler(function(err){
+      document.getElementById('mailSpinner').classList.add('d-none');
+      document.getElementById('mailBox').disabled = false;
+      e.target.disabled = false;
+      alertMSG('تعذّر إرسال رمز التحقق: ' + err, 'error');
+     }).requestRegistrationOtp(verMailCpr, mail)
+   }
+
+   if(e.target.matches('#uploadArea')){
+    const fileInput = document.getElementById('fileInput');
+        fileInput.click();
+   }
+
+  if (e.target.type === 'button' && e.target.getAttribute('data-bs-dismiss') === 'modal') {
+    const modalEl = e.target.closest('.modal');
+    if (modalEl && modalEl.id === 'uploadModal') {
+      resetModal();
+    }
+  }
+
+  closeUserMenu (e)
+  //alert(e.target.id)
+}  
+//////////////////////clickEventEnd//////////////////////////////////////////////////////
+
+async function checkWPconnection(e , phone){
+
+  alertMSG('جاري التحقق من اتصال الواتساب','info');
+
+  e.target.classList.add('d-none');
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      //alert(e.target.matches('.extractCertWP'))
+      //{"reason":"request invalid on disconnected device","requestid":302718452,"status":false}
+      if(res.status){
+        alertMSG("اتصال ناجح","success");
+      }else{
+        swal.fire('خطأ!!','اتصال غير ناجح بسبب: '+res.reason , 'error');
+        //alertMSG("اتصال غير ناجح بسبب: "+res.reason,"error");
+        e.target.classList.remove('d-none');
+      }
+    })
+    .withFailureHandler(function(err){
+      e.target.classList.remove('d-none');
+      alertMSG(err,'error');
+    })
+    .checkWhatsApp(phone, (typeof userData !== 'undefined' && userData && userData[0] && userData[0].cpr) || '');
+
+}
+
+////////////////////////////////////////////////////////////////////////////
+async function extractCertifications(e) {
+
+  if (!userData[0].manage){
+    swal.fire('خطأ!!','ليس لديك الصلاحية لهذا الإجراء','error');
+    return;
+  }
+
+  const card = e.target.closest('.card');
+  const spinner = card.querySelector('.spinner');
+  const badge = card.querySelector('.badge').textContent;
+  const exam = card.querySelector('.exam').textContent.replace(badge,'').trim();
+
+  alertMSG('جاري استخراج شهادات '+exam+'، سيستغرق التنفيذ بعض الوقت','info');
+
+  e.target.classList.add('d-none');
+  spinner.classList.remove('d-none');
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      spinner.classList.add('d-none');
+      alertMSG("تم الانتهاء من إصدار الشهادات","success");
+      getAllCertiData();
+      google.script.run.sendFinishedMail(exam);
+    })
+    .withFailureHandler(function(err){
+      spinner.classList.add('d-none');
+      e.target.classList.remove('d-none');
+      alertMSG(err,'error');
+    })
+    .generatCertificate(exam, (typeof userData !== 'undefined' && userData && userData[0] && userData[0].cpr) || '');  // بدون استدعاء ذاتي
+}
+
+////////////////////////////////////////////////////////////////////////////
+async function extractWrksCertifications(e) {
+
+  if (!userData[0].manage){
+    swal.fire('خطأ!!','ليس لديك الصلاحية لهذا الإجراء','error');
+    return;
+  }
+
+  const card = e.target.closest('.card');
+  const spinner = card.querySelector('.spinner');
+  const badge = card.querySelector('.badge').textContent;
+  const exam = card.querySelector('.exam').textContent.replace(badge,'').trim();
+
+  alertMSG('جاري استخراج شهادات '+exam+'، سيستغرق التنفيذ بعض الوقت','info');
+
+  e.target.classList.add('d-none');
+  spinner.classList.remove('d-none');
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      spinner.classList.add('d-none');
+      alertMSG("تم الانتهاء من إصدار الشهادات","success");
+      getAllStWrksData();
+      google.script.run.sendFinishedMail(exam);
+    })
+    .withFailureHandler(function(err){
+      spinner.classList.add('d-none');
+      e.target.classList.remove('d-none');
+      alertMSG(err,'error');
+    })
+    .generatWrksCertificate(exam, (typeof userData !== 'undefined' && userData && userData[0] && userData[0].cpr) || '');  // بدون استدعاء ذاتي
+}
+
+//////////////////////clickEventEnd//////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+function showAllTabs(id){
+  const tabsDiv = document.querySelector('.tabsContDiv');
+  const allTabs = tabsDiv.querySelectorAll('.tab-pane');
+
+  for(var i=0 ; i<allTabs.length ; i++){
+    allTabs[i].id == id ? allTabs[i].classList.add('show') : allTabs[i].classList.remove('show');
+    allTabs[i].id == id ? allTabs[i].classList.add('active') : allTabs[i].classList.remove('active');
+  }
+  
+}
+///////////////////////////////////////////////////////////////////////////document.querySelectorAll(`[data-name*="funnel-chart-percent"]`)
+async function inputEvent(e){
+
+  if(e.target.matches('#searchuser')){
+    searchInTable(e.target.id , 'usersTable' , 0);
+  }
+
+  if(e.target.matches('#courseSearchTop')){
+    var topQ = e.target.value.trim();
+    clearTimeout(courseSearchTimer_);
+    var courseGrid = document.getElementById('curriculumGrid');
+    var resultsBox = document.getElementById('curriculumSearchResults');
+    var emptyBox = document.getElementById('curriculumEmpty');
+    document.getElementById('courseSearchClear')?.classList.toggle('d-none', !topQ);
+
+    if(!topQ){
+      resultsBox?.classList.add('d-none');
+      courseGrid?.classList.remove('d-none');
+      return;
+    }
+    if(!currentCourseBagId_) return;
+
+    courseGrid?.classList.add('d-none');
+    emptyBox?.classList.add('d-none');
+    if(resultsBox){
+      resultsBox.classList.remove('d-none');
+      resultsBox.innerHTML = '<div class="text-center text-secondary py-4"><div class="spinner-border spinner-border-sm"></div></div>';
+    }
+    courseSearchTimer_ = setTimeout(function(){
+      google.script.run.withSuccessHandler(function(results){
+        if(!resultsBox) return;
+        if(!results || results.error){
+          resultsBox.innerHTML = '<p class="text-center text-danger py-3 material-empty">تعذّر البحث</p>';
+          return;
+        }
+        if(results.length === 0){
+          resultsBox.innerHTML = '<p class="text-center text-secondary py-3 material-empty">لا توجد نتائج مطابقة</p>';
+          return;
+        }
+        renderDrawerLevel(results, resultsBox);
+      }).withFailureHandler(function(err){
+        if(resultsBox) resultsBox.innerHTML = '<p class="text-center text-danger py-3 material-empty">تعذّر البحث: ' + err + '</p>';
+      }).searchCourseFolder(currentCourseBagId_, topQ);
+    }, 500);
+  }
+
+  if(e.target.matches('#courseDrawerSearch')){
+    var courseQ = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#courseDrawerBody .material-item-wrap').forEach(function(wrap){
+      var nameEl = wrap.querySelector('.material-name');
+      var match = !courseQ || (nameEl && nameEl.textContent.toLowerCase().indexOf(courseQ) !== -1);
+      wrap.style.display = match ? '' : 'none';
+    });
+  }
+  
+  if(e.target.matches('#nameEdited')){
+    document.getElementById('cardStName').textContent = e.target.value;
+  }
+
+  if(e.target.matches('#block')){
+    const blockVal = e.target.value.trim();
+    const areaEl = document.getElementById('area');
+    const spinnerEl = document.getElementById('areaSpinner');
+    clearTimeout(blockLookupTimer);
+    const myToken = ++blockLookupToken;
+
+    // نمسح نتيجة المنطقة القديمة فورًا مع أي تعديل، حتى لا يبقى اسم منطقة غير مطابق للرقم الجديد
+    if(areaEl) areaEl.value = '';
+
+    if(!blockVal){
+      spinnerEl?.classList.add('d-none');
+      if(areaEl) areaEl.disabled = false;
+    }else{
+      spinnerEl?.classList.remove('d-none');
+      if(areaEl) areaEl.disabled = true; // نقفل الحقل أثناء البحث لمنع أي تعديل يدوي متزامن
+      blockLookupTimer = setTimeout(async function(){
+        const data = await searchBlock(blockVal);
+        if(myToken !== blockLookupToken) return; // تجاهل نتيجة متأخرة إن واصل المستخدم الكتابة
+        spinnerEl?.classList.add('d-none');
+        if(areaEl){
+          areaEl.disabled = false;
+          areaEl.value = (data !== 'error' && data.areaAR) ? data.areaAR : '';
+        }
+      }, 400);
+    }
+  }
+
+  if(e.target.matches('#mailBox')){
+    //document.getElementById('mailBox')
+    mailVerification(e.target);
+    // أي تعديل على البريد يُلغي أي تحقق سابق، ويُلزم بإرسال رمز جديد
+    mailCheck = false;
+    mailVerifiedDeferred = false;
+    const mailCodeEl = document.getElementById('mailCode');
+    if(mailCodeEl){
+      mailCodeEl.classList.add('d-none');
+      mailCodeEl.classList.remove('is-valid');
+      mailCodeEl.value = '';
+    }
+    updateGmailForceState(e.target);
+  }
+
+  if(e.target.matches('#mailCode')){
+    var codeEl = e.target;
+    var code = codeEl.value.trim();
+    if(!/^[0-9]{6}$/.test(code)){
+      codeEl.classList.remove('is-valid');
+      mailCheck = false;
+      return;
+    }
+    var verCpr = (document.getElementById('cprBox') && document.getElementById('cprBox').value) ||
+                 (typeof newRegCpr !== 'undefined' ? newRegCpr : '') ||
+                 (typeof studentData !== 'undefined' && studentData && studentData[0] ? studentData[0].cpr : '');
+    google.script.run.withSuccessHandler(function(res){
+      if(res && res.ok){
+        codeEl.classList.add('is-valid');
+        mailCheck = true;
+        document.querySelector('.oauth-icon-row')?.classList.remove('bg-danger', 'bg-opacity-25', 'rounded-4', 'border', 'border-danger');
+      }else{
+        codeEl.classList.remove('is-valid');
+        mailCheck = false;
+        alertMSG((res && res.message) || 'الرمز غير صحيح، يرجى المحاولة مرة أخرى.', 'error');
+      }
+    }).withFailureHandler(function(err){
+      codeEl.classList.remove('is-valid');
+      mailCheck = false;
+      alertMSG('تعذّر التحقق من الرمز: ' + err, 'error');
+    }).verifyRegistrationOtp(verCpr, code);
+  }
+
+}
+
+//////////////////////////////////////////////////////////////////////////
+async function dragoverEvent(e){
+  if (e.target.matches('#uploadArea')) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  }
+}  
+//////////////////////////////////////////////////////////////////////////
+async function dragleaveEvent(e){
+  if (e.target.matches('#uploadArea')) {
+        uploadArea.classList.remove('dragover');
+  }
+}  
+//////////////////////////////////////////////////////////////////////////
+async function dropEvent(e){
+  if (e.target.matches('#uploadArea')) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);    
+  }
+}  
+///////////////////////////////////////////////////////////////////////////document.querySelectorAll(`[data-name*="funnel-chart-percent"]`)
+async function changeEvent(e){
+
+  // بحث المنطقة عن رقم المجمع أصبح على حدث input (auth-js.html/js.html inputEvent)
+  // ليعمل أثناء الكتابة مباشرة، بدل انتظار فقدان تركيز الحقل.
+
+  if(e.target.matches('#mailBox') || e.target.matches('#emailCapture')){
+    checkEmailTypo(e.target);
+  }
+
+  if(e.target.matches('input[name="residency"]')){
+    applyResidencyChoice(e.target.value);
+  }
+
+  if(e.target.matches('#phoneCountry')){
+    updatePhonePattern();
+  }
+
+  if(e.target.matches('#nationality') && !document.getElementById('countryFieldWrap')?.classList.contains('d-none')){
+    syncResidencyCountryFromNationality();
+  }
+
+  if(e.target.matches('#stuName_dec')){
+    const matn = document.querySelector('#matn_dec').value;
+    const stuName = e.target.value;
+    if(stuName == ''){
+      document.getElementById('stuDectationTable').innerHTML = '<h4 class="text-center text-secondary">لا يوجد بيانات</h4>';
+    }else{
+      let thisStudent;
+      try{
+          thisStudent = allStuData.filter(e=> e.name == stuName)[0]
+          stuCpr = thisStudent.cpr;
+          stuLevel = thisStudent.level;
+        }
+        catch(err){
+          stuCpr = 0;
+          stuLevel = 0;
+        };
+      const stuDecData = matn == '' ?
+      dectationData.filter(e=> e.stuCpr == stuCpr) :
+      dectationData.filter(e=> e.stuCpr == stuCpr && e.matn == matn);
+      setStudentsDectation(stuDecData);
+    }
+
+          const matnOptions = document.querySelector('#matn_dec');
+          const matnsRefFiltered = matnsRef.filter(m => m.level == stuLevel);
+          setChooseListMatn(matnOptions  , matnsRefFiltered);
+  }
+
+  if(e.target.matches('#matn_dec')){
+
+      const werdOptions = document.querySelector('#werd_dec');
+      werdOptions.value = '';
+      const matn = e.target.value;
+      setChooseListWerd(werdOptions  , matnsRef , matn);
+
+    const stuName = document.querySelector('#stuName_dec').value;
+     if(matn == '' || stuName == ''){
+      document.getElementById('stuDectationTable').innerHTML = '<h4 class="text-center text-secondary">لا يوجد بيانات</h4>';
+     }else{
+      let stuCpr;
+      try{
+          stuCpr = allStuData.filter(e=> e.name == stuName)[0].cpr;
+        }
+        catch(err){
+          stuCpr = 0;
+        };
+      const stuDecData = matn == '' ?
+      dectationData.filter(e=> e.stuCpr == stuCpr) :
+      dectationData.filter(e=> e.stuCpr == stuCpr && e.matn == matn);
+      setStudentsDectation(stuDecData);
+     }
+
+  }
+  
+  if(e.target.matches('#werd_dec')){
+
+      const werdDetails = document.querySelector('.werdDetails');
+      const matn = document.querySelector('#matn_dec').value;
+      const werd = e.target.value;
+      const matns = matnsRef.filter(m => m.matn == matn && m.werd == werd)[0];
+      //alert(matns)
+      werdDetails.textContent = `من ${matns.start} إلى ${matns.end}`;
+  }
+
+    if (e.target.matches('input[name="options-base"]')) {
+      
+      const pastDiv = document.getElementById("pastDiv");
+      const pastStudies = document.getElementById("pastStudies");
+      
+      didYou = e.target.value; // نخزن القيمة المختارة
+
+      if (didYou === "yes") {
+        pastDiv.classList.remove("d-none");
+        pastStudies.setAttribute("required", "required");
+      } else {
+        pastDiv.classList.add("d-none");
+        pastStudies.removeAttribute("required");
+        pastStudies.value = "";
+      }
+
+      //alert(didYou)
+    }
+
+   if(e.target.matches('#fileInput')){
+        handleFiles(e.target.files);
+   }
+  
+}
+////////////////////////////////////////////////////////////////////////////////////////werdDetails
+
+function searchInTable(inputID , tableID , indexField) {
+  var input, filter, table, tr, td, i, txtValue;
+  input = document.getElementById(inputID);
+  filter = input.value.toUpperCase();
+  table = document.getElementById(tableID);
+  tr = table.getElementsByTagName("tr");
+  for (i = 0; i < tr.length; i++) {
+    td = tr[i].getElementsByTagName("td")[indexField];
+    if (td) {
+      txtValue = td.textContent || td.innerText;
+      if (txtValue.toUpperCase().indexOf(filter) > -1) {
+        tr[i].style.display = "";
+      } else {
+        tr[i].style.display = "none";
+      }
+    }       
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////loadQuestions();
+
+function setExamsTimesData(){
+  //alert(123)
+  loadingStart();
+  
+  google.script.run.withSuccessHandler(function(data){
+  //alert(data.length)
+
+    if(data){
+      loadIqrar();
+      loadingEnd();
+    }else{
+      alertMSG('إجابة الاختبار غير متاحة في الوقت الحالي، شكرا لك','info');
+      //loadLogin();
+          loadingEnd();
+    }
+
+  }).getExams(branch , currentLevel);
+}
+
+///////////////////////////////////////////////////////////////////////////
+function setStudentsDectation(data){
+
+  var rowsContainer = document.getElementById('stuDectationTable');
+  var temp = document.getElementById('dectationRow').content;
+    
+    rowsContainer.innerHTML = '';
+  if(!studentData){
+    var filteredData = data;
+  }else{
+    var filteredData = data.filter(d=> d.level == currentLevel)
+  }
+  //alert(filteredData[0].matn)
+  if(filteredData.length < 1 ){
+    rowsContainer.innerHTML = '<h4 class="text-center text-secondary">لا يوجد بيانات</h4>';
+  }else{
+    filteredData.forEach(function(e,index){
+      var row = temp.cloneNode(true);
+      var stRow = row.querySelector('.dec_row');
+      var num = row.querySelector('.num');
+      var matn = row.querySelector('.matn');
+      var werd = row.querySelector('.werd');
+      var rate = row.querySelector('.rate');
+      var resp = row.querySelector('.resp');
+      var control = row.querySelector('.control');
+      //alert(data[index].matn)
+      var allWerd = matnsRef.filter(m => m.matn == e.matn)[0].awrad;
+      var matnCut = e.matn.split(' ');
+      
+      num.textContent = index+1;
+      matn.textContent = matnCut.length > 1 ? matnCut[0] + " " + matnCut[1] : matnCut[0];
+      matn.title = e.matn;
+      werd.textContent = e.werd + " / " + allWerd;
+      rate.textContent = e.rate + " / 4";
+      resp.textContent = e.resp;
+
+      if(!studentData){
+        control.innerHTML = `<a class="delWerd" data-code="${e.code}"><i class="bi bi-trash-fill text-danger delWerd" data-code="${e.code}"></i></a>`
+      }else{
+        control.remove();
+        //resp.remove();
+      }
+
+      setTimeout(function(){
+        rowsContainer.appendChild(row);
+      },20*index);
+    
+    })
+  }
+  setTimeout(function(){
+  },3000)
+}
+
+/////////////////////////////////////////////////////////////////////
+// تبويب "التسميع والأوراد" الجديد في بوابة الطالب (student.html، تصميم sp-*
+// بنمط "قائمة مهام" بدل الجدول القديم أعلاه — راجع design-guidelines.md المرحلة 3).
+// دالة منفصلة عن setStudentsDectation عمدًا: تلك ما زالت تُستخدم كما هي في صفحة
+// الموظف (متابعة التسميع، emp.html) وصفحة "إرسال رسالة" (currentStus.html)،
+// وكلتاهما تعتمدان على قالب <tr> مختلف تمامًا (#dectationRow) لم تُمس بهذا التغيير.
+/////////////////////////////////////////////////////////////////////
+function dectationRateLabel(rate){
+  var n = Number(rate);
+  if(isNaN(n)) return '';
+  if(n >= 4) return 'ممتاز';
+  if(n >= 3) return 'جيد جدًا';
+  if(n >= 2) return 'جيد';
+  if(n >= 1) return 'مقبول';
+  return 'ضعيف';
+}
+
+// عدد الأسابيع المتتالية (تنتهي بأحدث أسبوع فيه تسميع) التي سُمِّع فيها ورد واحد على
+// الأقل — مبني بالكامل من تواريخ حقيقية (dates)، وليس رقمًا افتراضيًا.
+function computeRecitationStreak(dates){
+  var weekOf = function(d){
+    var oneJan = new Date(d.getFullYear(), 0, 1);
+    var week = Math.ceil((((d - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
+    return d.getFullYear() * 53 + week;
+  };
+  var weeks = {};
+  dates.forEach(function(raw){
+    var d = new Date(raw);
+    if(isNaN(d.getTime())) return;
+    weeks[weekOf(d)] = true;
+  });
+  var absWeeks = Object.keys(weeks).map(Number).sort(function(a,b){ return b - a; });
+  if(!absWeeks.length) return 0;
+
+  var curAbsWeek = weekOf(new Date());
+  if(curAbsWeek - absWeeks[0] > 1) return 0; // آخر تسميع كان قبل أكثر من أسبوع، فالتتابع انقطع فعليًا
+
+  var streak = 0, expected = absWeeks[0];
+  for(var i = 0; i < absWeeks.length; i++){
+    if(absWeeks[i] !== expected) break;
+    streak++;
+    expected--;
+  }
+  return streak;
+}
+
+function renderStudentDectationTaskList(data){
+  var container = document.getElementById('spDectationList');
+  var emptyEl = document.getElementById('dectationEmpty');
+  if(!container) return;
+
+  var list = Array.isArray(data) ? data : [];
+
+  var countEl = document.getElementById('recitationCountStat');
+  var avgEl = document.getElementById('recitationAvgStat');
+  var streakEl = document.getElementById('recitationStreakStat');
+  if(countEl) countEl.textContent = list.length;
+  if(avgEl){
+    var rates = list.map(function(e){ return Number(e.rate); }).filter(function(n){ return !isNaN(n); });
+    avgEl.textContent = rates.length ? (rates.reduce(function(a,b){ return a+b; },0) / rates.length).toFixed(1) : '—';
+  }
+  if(streakEl) streakEl.textContent = computeRecitationStreak(list.map(function(e){ return e.date; }));
+
+  if(!list.length){
+    container.innerHTML = '';
+    if(emptyEl) emptyEl.classList.remove('d-none');
+    return;
+  }
+  if(emptyEl) emptyEl.classList.add('d-none');
+
+  var sorted = list.slice().sort(function(a,b){ return new Date(b.date).getTime() - new Date(a.date).getTime(); });
+
+  container.innerHTML = sorted.map(function(e){
+    var dateStr = e.date ? new Date(e.date).toLocaleDateString('ar-BH', {day:'numeric', month:'long'}) : '';
+    var label = dectationRateLabel(e.rate);
+    return '<article class="sp-task-item">' +
+      '<span class="sp-task-number">' + escapeHtmlSp(e.werd != null ? e.werd : '') + '</span>' +
+      '<div><strong>' + escapeHtmlSp(e.matn || '') + '</strong>' +
+        '<small>' + escapeHtmlSp(e.resp || '') + (dateStr ? ' · ' + dateStr : '') + '</small></div>' +
+      '<span class="sp-rating"><i class="bi bi-star-fill"></i>' + (label ? label + ' ' : '') + '(' + escapeHtmlSp(e.rate != null ? e.rate : '—') + '/4)</span>' +
+    '</article>';
+  }).join('');
+}
+
+// نسخة محلية بسيطة من escapeHtml (المُعرَّفة أصلًا في admin-js.html فقط) حتى لا تعتمد
+// صفحة الطالب على تحميل سكربت لوحة الإدارة.
+function escapeHtmlSp(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/////////////////////////////////////////////////////////////////////
+
+function toDateFormate(stringDate){
+const rawDate = new Date(stringDate);
+
+const formattedDate = rawDate.getFullYear() + "-" +
+  String(rawDate.getMonth() + 1).padStart(2, '0') + "-" +
+  String(rawDate.getDate()).padStart(2, '0') + " الساعة " +
+  String(rawDate.getHours()).padStart(2, '0') + ":" +
+  String(rawDate.getMinutes()).padStart(2, '0')/*  + ":" +
+  String(rawDate.getSeconds()).padStart(2, '0') */;
+
+    //console.log(formattedDate); // النتيجة: 2024-11-02 15:06:49
+  return formattedDate
+}
+
+
+function toDateInputFormat(stringDate) {
+  const rawDate = new Date(stringDate);
+
+  const formattedDate = rawDate.getFullYear() + "-" +
+    String(rawDate.getMonth() + 1).padStart(2, '0') + "-" +
+    String(rawDate.getDate()).padStart(2, '0');
+
+  return formattedDate; // مثال: 2025-09-19
+}
+
+//////////////////////////////////////////////////////////////////////
+
+function makeNewGiftCard(name){
+  const cpr = studentData[0].cpr;
+  const mail = studentData[0].mail;
+  const phone = studentData[0].phone;
+  var congrates = studentData[0].congrates;
+
+  if(congrates >=3) {
+    swal.fire('تنبيه!!','لقد استهلكت عدد المرات المتاحة لاستخراج البطاقة، نعتذر منك','info');
+    return
+    }
+
+  loadingStart();
+  google.script.run.withSuccessHandler(function(r){
+    getDectationDataRef();
+    if(r){
+      swal.fire({
+        title: 'تم!!',
+        icon: 'success',
+        html: 'تم الإرسال إلى بريدك الإلكتروني، كما يمكنك فتح الصورة من <a href="' + r + '" target="_blank" style="color: blue; text-decoration: underline;">الرابط</a>'
+      });
+      //alert(congrates)
+      studentData[0].congrates += 1;
+      loadingEnd();
+    }else{
+      swal.fire('خطأ!!','حدث خطأ، يرجى المحاولة مرة أخرى لاحقًا','info');
+      loadingEnd();
+    }
+  }).withFailureHandler(function(f){
+    swal.fire('خطأ!!','حدث خطأ '+f+' أثناء الإجراء','error');
+      loadingEnd();
+  }).exportNewCard(name,mail,phone, cpr);  
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////
+
+function hideModal(modalID) {
+  const myModalEl = document.getElementById(modalID)
+  //const modal = new bootstrap.Modal(myModalEl)
+  myModalEl.classList.remove('show');
+  myModalEl.style.display = null;
+  var backDrops = document.querySelectorAll('.modal-backdrop');
+  //alert(backDrops.length)
+  for( var i=0 ; i<backDrops.length ; i++){
+    backDrops[i].remove();
+  }
+  var body = document.querySelector('body');
+  body.className  = "";
+  body.removeAttribute('style');
+}
+///////////////////////////////////////////////////////////////////////////////////
+
+function showModal(modalID) {
+  currModalID = modalID;
+  const myModalEl = document.getElementById(modalID)
+  // مودالات لوحة الإدارة (certManage/stWorksMan/...) معرَّفة فقط داخل adminDashboard.html —
+  // غير موجودة إطلاقًا لو كانت emp.html هي المحمَّلة حاليًا (مثلاً أثناء معاينة الإدارة لموظف
+  // بصلاحية "إدارة"، عبر adminPreviewStaffPage)، فكانت الدالة تفشل بصمت بخطأ غير واضح.
+  if (!myModalEl) { console.error('showModal: العنصر غير موجود:', modalID); return; }
+  //const modal = new bootstrap.Modal(myModalEl)
+  myModalEl.classList.add('show');
+  myModalEl.style.display = 'block';
+
+  var backDrop = `<div class="modal-backdrop show" aria-hidden="true"></div>`
+  // create a new div element
+  const newDiv = document.createElement("div");
+
+  newDiv.classList.add('modal-backdrop');
+  newDiv.classList.add('show');
+  newDiv.setAttribute('aria-hidden','true')
+
+  // add the newly created element and its content into the DOM
+  //const currentDiv = document.getElementById("imageEditor");
+  document.body.appendChild(newDiv);
+
+  var body = document.querySelector('body');
+  body.classList.add('modal-open');
+  body.style.overflow = 'hidden';
+  body.style.paddingRight = '17px';
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// متابعة حالة الإرسال الجماعي لرسائل واتساب، والتي تعمل الآن في الخلفية على الخادم
+// عبر Trigger مجدول (wpQueue.js) ولا تتطلب إبقاء المتصفح مفتوحًا. هذه الدوال هنا
+// لعرض آخر حالة معروفة عند فتح صفحة "إرسال رسالة" أو الضغط على "تحديث"، مع تحديث
+// تلقائي كل 15 ثانية طالما الصفحة مفتوحة وما زالت العملية جارية.
+/////////////////////////////////////////////////////////////////////////////////
+var wpQueuePollTimer_ = null;
+
+function refreshWPQueueStatus(){
+  if(!document.getElementById('wpQueueStatusText')) return; // المستخدم غادر صفحة "إرسال رسالة"
+  if(wpQueuePollTimer_){ clearTimeout(wpQueuePollTimer_); wpQueuePollTimer_ = null; }
+
+  google.script.run.withSuccessHandler(function(st){
+    renderWPQueueStatus(st);
+    if(st.status === 'running' && document.getElementById('wpQueueStatusText')){
+      wpQueuePollTimer_ = setTimeout(refreshWPQueueStatus, 15000);
+    }
+  }).withFailureHandler(function(){
+    // تجاهل بصمت؛ سيُعاد المحاولة عند الضغط على تحديث يدويًا
+  }).getWPQueueStatus();
+}
+
+function renderWPQueueStatus(st){
+  var textEl = document.getElementById('wpQueueStatusText');
+  if(!textEl) return;
+
+  var stopBtn = document.getElementById('wpQueueStopBtn');
+  var detailsBtn = document.getElementById('wpQueueDetailsBtn');
+  var progressWrap = document.getElementById('wpQueueProgressWrap');
+  var progressBar = document.getElementById('wpQueueProgressBar');
+
+  window.wpLastQueueStatus_ = st;
+
+  if(st.status === 'idle'){
+    textEl.textContent = 'لم يتم إرسال أي رسالة جماعية بعد.';
+    stopBtn.classList.add('d-none');
+    detailsBtn.classList.add('d-none');
+    progressWrap.classList.add('d-none');
+    return;
+  }
+
+  var processed = st.sent + st.failed;
+  var pct = st.total > 0 ? Math.round((processed / st.total) * 100) : 0;
+  progressWrap.classList.remove('d-none');
+  progressBar.style.width = pct + '%';
+
+  if(st.status === 'running'){
+    textEl.textContent = 'جارٍ الإرسال... تم إرسال ' + st.sent + ' من ' + st.total + ' (متبقٍّ ' + st.remaining + (st.failed ? '، تعذّر الإرسال لـ' + st.failed : '') + ')';
+    stopBtn.classList.remove('d-none');
+  }else if(st.status === 'stopped'){
+    textEl.textContent = 'تم إيقاف عملية الإرسال يدويًا بعد إرسال ' + st.sent + ' من ' + st.total + (st.failed ? ' (تعذّر الإرسال لـ' + st.failed + ')' : '');
+    stopBtn.classList.add('d-none');
+  }else{ // done
+    textEl.textContent = 'اكتملت آخر عملية إرسال: ' + st.sent + ' من ' + st.total + (st.failed ? ' — تعذّر الإرسال لـ' + st.failed : ' — بنجاح تام');
+    stopBtn.classList.add('d-none');
+  }
+  detailsBtn.classList.remove('d-none');
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+// الجلب كان يتم مباشرة من المتصفح (fetch) على رابط Apps Script خارجي منفصل، وهو ما كان
+// يفشل أحيانًا (خصوصًا في التصفح الخاص) بسبب قيود الإطار المعزول لصفحات Apps Script على
+// إعادة التوجيه/الكوكيز الخاصة بذلك الرابط. أصبح الجلب الآن يتم من خادم Apps Script نفسه
+// (UrlFetchApp عبر google.script.run)، وهو غير متأثر بهذه القيود إطلاقًا.
+function searchBlock(blockNumber) {
+  return new Promise(function (resolve) {
+    google.script.run
+      .withSuccessHandler(function (data) {
+        resolve(data && !data.error ? data : 'error');
+      })
+      .withFailureHandler(function (err) {
+        console.error('Error fetching block:', err);
+        resolve('error');
+      })
+      .lookupBlockArea(blockNumber);
+  });
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function mailVerification(ele){
+
+    if(ele.checkValidity()){
+      ele.classList.add('is-valid');
+      ele.classList.remove('is-invalid');
+      document.getElementById('verMail').classList.remove('d-none');
+      return true;
+    }else{
+      ele.classList.remove('is-valid');
+      ele.classList.add('is-invalid');
+      document.getElementById('verMail').classList.add('d-none');
+      return false;
+    }
+
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// اقتراح تصحيح لأخطاء إملائية شائعة في نطاق البريد الإلكتروني (الجزء بعد @)، مثل
+// gamil.com أو gmail.con بدل gmail.com، عبر مقارنة النطاق المكتوب بقائمة أشهر
+// النطاقات ومسافة التحرير (Levenshtein) بينهما.
+/////////////////////////////////////////////////////////////////////////////
+var COMMON_EMAIL_DOMAINS_ = ['gmail.com','hotmail.com','outlook.com','yahoo.com','icloud.com','live.com','msn.com'];
+
+function levenshteinDistance(a, b){
+  var m = a.length, n = b.length;
+  var dp = [];
+  for(var i = 0; i <= m; i++){ dp.push([i]); }
+  for(var j = 0; j <= n; j++){ dp[0][j] = j; }
+  for(i = 1; i <= m; i++){
+    for(j = 1; j <= n; j++){
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function suggestEmailDomainFix(email){
+  var m = /^([^\s@]+)@([^\s@]+)$/.exec(String(email || '').trim());
+  if(!m) return null;
+  var localPart = m[1], domain = m[2].toLowerCase();
+  if(COMMON_EMAIL_DOMAINS_.indexOf(domain) !== -1) return null; // النطاق صحيح أصلًا
+
+  var best = null, bestDist = 3; // نتجاهل فروقًا أكبر من فرقين حتى لا نقترح تصحيحًا لنطاق مختلف فعلًا
+  COMMON_EMAIL_DOMAINS_.forEach(function(d){
+    var dist = levenshteinDistance(domain, d);
+    if(dist > 0 && dist < bestDist){ bestDist = dist; best = d; }
+  });
+  return best ? (localPart + '@' + best) : null;
+}
+
+function checkEmailTypo(inputEl){
+  if(!inputEl || !inputEl.value) return;
+  var suggestion = suggestEmailDomainFix(inputEl.value);
+  if(!suggestion) return;
+  Swal.fire({
+    icon: 'question',
+    text: 'هل تقصد ' + suggestion + '؟',
+    showCancelButton: true,
+    confirmButtonText: 'نعم، صحّح',
+    cancelButtonText: 'لا'
+  }).then(function(result){
+    if(result.isConfirmed){
+      inputEl.value = suggestion;
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// حارس إلزامي يُستدعى مباشرة قبل أي إرسال فعلي لبريد إلكتروني (رمز تحقق أو معرّف
+// دخول)، في أي صفحة (تسجيل طالب، تفعيل بريد عند الدخول، إضافة/تعديل متعاون، ...).
+// يُعيد Promise تُحسم بـ { proceed, correctedEmail }:
+//  - صياغة غير صحيحة إطلاقًا (لا @ أو لا نقطة) → رسالة خطأ واضحة، proceed:false (لا إرسال).
+//  - نطاق يبدو خطأ إملائيًا شائعًا (عبر suggestEmailDomainFix الموجودة أعلاه) → نافذة
+//    "هل تقصد ...؟": الموافقة تُعيد correctedEmail بالنطاق المصحَّح، الرفض يُبقي البريد كما
+//    كتبه المستخدم دون أي تعديل (وفي الحالتين proceed:true، أي "أكمل الآن").
+//  - غير ذلك → proceed:true فورًا دون أي نافذة.
+/////////////////////////////////////////////////////////////////////////////
+function confirmEmailProviderOk(email){
+  return new Promise(function(resolve){
+    var trimmed = String(email || '').trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)){
+      Swal.fire({
+        icon: 'error',
+        title: 'تعذّر إرسال البريد',
+        html: 'البريد الإلكتروني الذي أدخلته (<span dir="ltr" style="font-weight:700">' + escapeHtml(trimmed) + '</span>) غير مكتمل الصياغة (يجب أن يكون بالشكل name@domain.com). يرجى تصحيحه ثم المحاولة مرة أخرى.',
+        confirmButtonText: 'حسنًا'
+      }).then(function(){ resolve({ proceed:false, correctedEmail:null }); });
+      return;
+    }
+    var suggestion = suggestEmailDomainFix(trimmed);
+    if(suggestion){
+      Swal.fire({
+        icon: 'warning',
+        title: 'تحقق من بريدك الإلكتروني',
+        html: 'كتبت: <span dir="ltr" style="font-weight:700">' + escapeHtml(trimmed) + '</span><br><br>' +
+              'يبدو أن هناك خطأ إملائيًا شائعًا في اسم مزوّد البريد. هل تقصد:<br>' +
+              '<span dir="ltr" style="font-weight:700;color:#198754">' + escapeHtml(suggestion) + '</span>؟',
+        showCancelButton: true,
+        confirmButtonText: 'نعم، صحّح البريد',
+        cancelButtonText: 'لا، هذا بريدي الصحيح',
+        reverseButtons: true
+      }).then(function(result){
+        resolve({ proceed:true, correctedEmail: result.isConfirmed ? suggestion : null });
+      });
+      return;
+    }
+    resolve({ proceed:true, correctedEmail:null });
+  });
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// أغلب أخطاء التحقق من البريد سببها كتابة يدوية خاطئة. لو النطاق المكتوب هو أحد نطاقات
+// المزوّدين المدعومين بزر "تحقّق سريع" (جوجل/ياهو/مايكروسوفت) بالضبط، أو خطأ إملائي قريب منه
+// جدًا (اكتشفه suggestEmailDomainFix أعلاه)، الأصح إجبار المتابعة عبر ذلك الزر (تحقق فعلي
+// 100%، ولا يستهلك أي رسالة) بدل مسار الرمز اليدوي الذي قد يحمل نفس الخطأ الإملائي. يعمل فقط
+// في الصفحات التي فيها فعلًا الزر المطابق (صفحة التسجيل حاليًا) — الصفحات الأخرى (كالملف
+// الشخصي) تُبقي المسار اليدوي متاحًا دائمًا.
+/////////////////////////////////////////////////////////////////////////////
+var OAUTH_FORCE_ICONS_ = {
+  google: '<svg width="16" height="16" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>',
+  yahoo: '<svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#6001D2" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/><path fill="#fff" d="M9.5 7l2 4.7L13.5 7H16l-3.4 7.3V17h-2.2v-2.7L7 7h2.5z"/></svg>'
+};
+var OAUTH_FORCE_DOMAIN_MAP_ = {
+  'gmail.com': { btn:'googleSignInBtn', label:'تحقّق سريع عبر جوجل', icon:'google' },
+  'yahoo.com': { btn:'yahooSignInBtn', label:'تحقّق سريع عبر ياهو', icon:'yahoo' }
+};
+// معرّف الزر الذي أُهملت (تجاهُل) بطاقته الإجبارية آخر مرة — يُلغى تلقائيًا فور تغيّر النطاق
+// المكتشَف (مزوّد مختلف أو لا شيء)، فلا يبقى "التجاهل" ساريًا على نطاق مختلف بالخطأ.
+var oauthForceDismissedFor_ = null;
+
+function detectForcedOAuth(email){
+  var m = /^([^\s@]+)@([^\s@]+)$/.exec(String(email || '').trim());
+  if(!m) return null;
+  var domain = m[2].toLowerCase();
+  if(OAUTH_FORCE_DOMAIN_MAP_[domain]) return OAUTH_FORCE_DOMAIN_MAP_[domain];
+  var suggestion = suggestEmailDomainFix(email);
+  var sm = suggestion && /@([^\s@]+)$/.exec(suggestion.toLowerCase());
+  return (sm && OAUTH_FORCE_DOMAIN_MAP_[sm[1]]) || null;
+}
+
+function updateGmailForceState(inputEl){
+  var verMailBtn = document.getElementById('verMail');
+  var hint = document.getElementById('mailFieldHint');
+  if(!verMailBtn || !hint || !document.getElementById('googleSignInBtn')) return;
+
+  var forced = detectForcedOAuth(inputEl.value);
+
+  if(forced && forced.btn !== oauthForceDismissedFor_){
+    verMailBtn.classList.add('d-none');
+    hint.innerHTML =
+      'يرجى التحقق من خلال الضغط على ' +
+      '<button type="button" class="oauth-inline-icon-btn" id="oauthInlineTriggerBtn" title="' + forced.label + '" aria-label="' + forced.label + '">' +
+        (OAUTH_FORCE_ICONS_[forced.icon] || '') +
+      '</button> أو ' +
+      '<button type="button" id="oauthForceDismissBtn" class="btn btn-link btn-sm text-secondary p-0 align-baseline">تجاهل</button>';
+  }else{
+    if(!forced) oauthForceDismissedFor_ = null;
+    if(document.getElementById('mailBox').checkValidity()) verMailBtn.classList.remove('d-none');
+    hint.textContent = 'سيتم إرسال رمز تحقق إلى بريدك قبل إتمام التسجيل.';
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+
+// يمنع اختيار تاريخ ميلاد يجعل العمر أقل من 10 سنوات نسبةً لليوم الحالي (وقت استخدام الحقل
+// فعليًا، وليس تاريخًا ثابتًا) — يُطبَّق على كل حقل "تاريخ الميلاد" بالمشروع (تسجيل طالب جديد،
+// مراجعة طلبات جديدة/الطلاب الحاليين، الملف الشخصي لطالب/متعاون/مدير).
+function applyDobAgeLimit(inputEl){
+  if(!inputEl) return;
+  var d = new Date();
+  d.setFullYear(d.getFullYear() - 10);
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  inputEl.max = d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+function calculateAgeInYears(birthDateString) {
+  const birthDate = new Date(birthDateString);
+  const today = new Date();
+
+  // لو تاريخ الميلاد بعد اليوم → نرجع 0
+  if (birthDate > today) return 0;
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+
+  // لو عيد الميلاد لسه مجاش السنة دي نقص سنة
+  const hasBirthdayPassedThisYear =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+
+  if (!hasBirthdayPassedThisYear) {
+    age--;
+  }
+
+  return age;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+// دفعة قبول/رفض جماعية — تعرض تقدّمها عبر الشريط المشترك (acceptBatchBanner، admin-js.html) بدل
+// مودال محلي، ولا تُشغَّل حالة "دفعة قبول جارية" إلا عند القبول الفعلي (newRegAproval === 'yes')،
+// لا الرفض (لا يهم تزامنه بنفس القدر: لا ملفات ولا بريد). راجع مناقشات.md "علاج تكرار عملية القبول".
+function acceptAllNewStu () {
+
+  const rows = Array.from(document.querySelectorAll('#usersContainer .userRow'));
+  if (rows.length === 0) return;
+
+  const isAccepting = newRegAproval === 'yes';
+  const staffName = (typeof userData !== 'undefined' && userData && userData[0] && userData[0].name) || '';
+  const staffCpr = (typeof userData !== 'undefined' && userData && userData[0] && userData[0].cpr) || '';
+  const total = rows.length;
+  let completed = 0;
+  const failures = [];
+
+  if (isAccepting) google.script.run.startAcceptBatch(total, staffName);
+
+  function finishBatch() {
+    if (isAccepting) google.script.run.endAcceptBatch();
+    setTimeout(() => {
+      if (stopProcessing) return;
+      let completionDialog;
+      if (failures.length === 0) {
+        completionDialog = Swal.fire('اكتمل القبول', 'تم قبول ' + total + ' من الطلبات الظاهرة وإنشاء الملفات المطلوبة.', 'success');
+      } else {
+        completionDialog = Swal.fire({
+          icon: 'warning',
+          title: 'اكتملت العملية مع بعض الأخطاء',
+          html: 'نجح: ' + (total - failures.length) + ' من ' + total + '<br><br>تعذّرت معالجة:<br>' +
+            failures.map(function (f) { return escapeHtml(f.name) + ' — ' + escapeHtml(f.reason); }).join('<br>')
+        });
+      }
+      completionDialog.then(function(){ if(typeof getNewStuRegData === 'function') getNewStuRegData(); });
+    }, 400);
+  }
+
+  function processStudent(index) {
+    if (index >= rows.length || stopProcessing) {
+      finishBatch();
+      return;
+    }
+
+    const row = rows[index];
+    const cpr = row.id;
+    const nameEl = row.querySelector('.name');
+    const studentName = nameEl ? nameEl.textContent : cpr;
+    // مرحلة هذا الصف تحديدًا (row.dataset.grade، يضبطها setNewRegStudentsRow) بدل grade المشتركة —
+    // ضرورية في تبويب "الكل" حيث grade = null (لا مرحلة واحدة ثابتة لكل الصفوف المعروضة معًا)
+    const rowGrade = row.dataset.grade !== undefined && row.dataset.grade !== '' ? parseInt(row.dataset.grade, 10) : grade;
+
+    // طالب سجّل دون اختيار مرحلة ولم يُحدِّد له الموظف مرحلة بعد من الخانة اليدوية — يُستبعَد من
+    // دفعة القبول (لا معنى لقبوله دون مرحلة)، ولا يمنع ذلك بقية الدفعة من إكمال معالجتها.
+    if (isAccepting && (rowGrade === null || typeof rowGrade === 'undefined' || isNaN(rowGrade))) {
+      failures.push({ name: studentName, reason: 'لم تُحدَّد مرحلة لهذا الطالب' });
+      completed++;
+      google.script.run.updateAcceptBatchProgress(completed);
+      processStudent(index + 1);
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(s) {
+        row.remove();
+        completed++;
+        if (isAccepting) google.script.run.updateAcceptBatchProgress(completed);
+        processStudent(index + 1);
+      })
+      .withFailureHandler(function(f) {
+        failures.push({ name: studentName, reason: String(f) });
+        completed++;
+        if (isAccepting) google.script.run.updateAcceptBatchProgress(completed);
+        processStudent(index + 1);
+      })
+      .setStudentsQrCard(cpr, newRegAproval, rowGrade, staffName, staffCpr);
+  }
+
+  processStudent(0);
+}
+///////////////////////////////////////////////////////////////////////////////////////////
+
+function closeAllSwal() {
+  // غلق أي رسالة مفتوحة (لو موجودة)
+  if (typeof Swal !== "undefined") {
+    Swal.close();
+  }
+
+  // تنظيف أي كلاس مضاف على body أو html
+  document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+  document.body.classList.remove('swal2-shown', 'swal2-height-auto');
+
+  // إعادة التفاعل مع الصفحة
+  document.body.style.pointerEvents = 'auto';
+  document.body.style.overflow = 'auto';
+
+  // حذف أي كونتينر متبقي
+  document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+}
+///////////////////////////////////////////////////////////////////////////////////////////
+function getDriveId(url) {
+  const match = url.match(/[-\w]{25,}/);
+  return match ? match[0] : url;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+// دالة تشغيل الجدول (يجب استدعاؤها بعد إضافة الصفوف للجدول)
+function initDataTable() {
+  if ($.fn.DataTable.isDataTable('#datatable')) {
+    $('#datatable').DataTable().destroy();
+  }
+
+  $('#datatable').DataTable({
+    // 1. تفعيل الترتيب
+    ordering: true, 
+    
+    // 2. إعدادات الأعمدة
+    columnDefs: [
+        { 
+            "orderable": false, 
+            "targets": -1 // تعطيل الترتيب عن العمود الأخير (الإجراءات)
+        }
+    ],
+
+    // باقي الإعدادات (تخطيط الجدول واللغة) كما هي...
+    dom: '<"row g-2 mb-3 align-items-center"' +
+         '<"col-12 col-md-auto order-2 order-md-1" <"#customFilterPlace">>' + 
+         '<"col-12 col-md order-1 order-md-2"f>' + 
+         '>' + 
+         '<"row"<"col-12"tr>>' + 
+         '<"row mt-3 align-items-center"<"col-md-6 d-flex justify-content-start"l><"col-md-6 d-flex justify-content-end"p>>',
+    
+    pagingType: "simple_numbers",
+    responsive: true,
+    pageLength: 10,
+    language: {
+      search: "",
+      searchPlaceholder: "🔍 ابحث بالاسم، الرقم الشخصي...",
+      lengthMenu: "عرض _MENU_ سجل",
+      info: "عرض _START_ إلى _END_ من _TOTAL_",
+      zeroRecords: "لم يتم العثور على نتائج",
+      paginate: {
+        next: '<i class="fas fa-chevron-left"></i>', 
+        previous: '<i class="fas fa-chevron-right"></i>',
+        first: '<i class="fas fa-angle-double-right"></i>',
+        last: '<i class="fas fa-angle-double-left"></i>'
+      }
+    },
+    initComplete: function() {
+      var datesContainer = document.getElementById('datesCont');
+      var customPlace = document.getElementById('customFilterPlace');
+      if (datesContainer && customPlace) {
+        customPlace.appendChild(datesContainer);
+        datesContainer.classList.remove('d-none');
+        datesContainer.className = "w-100"; 
+      }
+    }
+  });
+}
+</script>

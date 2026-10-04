@@ -1,0 +1,47 @@
+
+<script>
+
+  function prepareProfile(){
+    
+    // Avatar Upload Preview
+    document.getElementById('avatarUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('avatarPreview').style.backgroundImage = `url(${e.target.result})`;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Mobile Navigation
+    document.getElementById('mobileNav')?.addEventListener('change', function(e) {
+        const tabId = e.target.value;
+        const tabEl = document.querySelector(`[href="#${tabId}"]`);
+        const tab = new bootstrap.Tab(tabEl);
+        tab.show();
+    });
+
+    // Dark Mode Toggle
+    document.getElementById('darkMode')?.addEventListener('change', function(e) {
+        if (e.target.checked) {
+            document.body.style.backgroundColor = '#1a1d20';
+            document.body.style.color = '#e9ecef';
+        } else {
+            document.body.style.backgroundColor = '#f5f7fb';
+            document.body.style.color = '#212529';
+        }
+    });
+
+    // Form Submissions
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('تم حفظ التغييرات بنجاح!');
+        });
+    });
+
+}
+
+</script>

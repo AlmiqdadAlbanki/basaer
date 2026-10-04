@@ -1,0 +1,576 @@
+<style>
+
+@import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
+
+  html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+  height: 100%;
+}
+* {
+  max-width: 100vw !important;
+}
+
+  body {
+    //font-family: "Tajawal" !important;
+    //font-family: "Readex Pro" !important;
+    font-family: "Rubik", sans-serif;
+    background-image: url("https://drive.google.com/thumbnail?id=1-Yd4YtQ9i2-kto_bHd7Ip4SPwLJPvYCY&amp;sz=w500");
+    background-color: "#f4f3ef" !important;
+    direction: rtl;
+  }
+
+
+  a i {
+    pointer-events: none !important;
+  }
+
+  i {
+    pointer-events: none !important;
+  }
+  
+  span {
+    pointer-events: none !important;
+  }
+
+.modal i,
+.modal span {
+  pointer-events: auto !important;
+}
+
+/* أيام تقويم flatpickr هي عناصر <span> فعلية (flatpickr-day)؛ دون هذا الاستثناء تمنعها القاعدة
+   العامة أعلاه من استقبال أي نقر إطلاقًا، فلا يعمل اختيار التاريخ في أي تقويم بالمشروع */
+.flatpickr-calendar i,
+.flatpickr-calendar span {
+  pointer-events: auto !important;
+}
+
+  
+.overlay, .background {
+  pointer-events: none;
+}
+
+#uploadArea {
+  pointer-events: auto !important;
+}
+
+.flip-entry-title{
+  width: auto !important;
+}
+
+.tabsContDiv , .tab-pane {
+  height: 100% !important;
+}
+
+  #loading {
+    color: #EB2A2F;
+    font-color: #EB2A2F;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+
+  .btn-close.white-close {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+  }
+
+  /* تصحيح موضع زر إغلاق مودالات Bootstrap (×) في صفحة RTL — نسخة Bootstrap المُحمَّلة هنا
+     غير المُعرَّبة (bootstrap.min.css القياسية، لا bootstrap.rtl.min.css)، وزر .btn-close فيها
+     يستخدم margin-left: auto (خاصية فيزيائية لا منطقية) ليدفع الزر لأقصى اليمين الفعلي دومًا،
+     بصرف النظر عن direction: rtl على الصفحة — فيظهر ملتصقًا بجانب عنوان المودال بدل أقصى
+     اليسار كما يُفترض في صفحة عربية. غير مقيَّد بـ.modal-header عمدًا: بعض المودالات (مثل
+     newStuModal) لها هيدر بكلاس مخصص (.newStuModalHeader) لا "modal-header"، لكن الزر نفسه
+     دومًا بكلاس .btn-close — فالتصحيح على الزر مباشرة يغطي كل مودالات Bootstrap في المشروع
+     (الإدارة والطالب معًا) دفعة واحدة. */
+  .btn-close {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+
+  .active.carousel-item-end,
+  .carousel-item-next:not(.carousel-item-start) {
+    transform: none;
+  }
+
+
+  .quesTitle {
+    //font-family: 'Amiri', serif;
+    line-height: 2;
+  }
+
+  .controller {
+    height: 1rem;
+    width: 1rem;
+    cursor: pointer;
+    border-width: 3px !important;
+    margin: .25rem !important;
+    border-radius: 50%;
+    transition: all .3s ease-in-out;
+  }
+
+  .controller:hover {
+    transform: scale(1.5);
+    border: 0 !important;
+    background-color: rgb(220 53 69) !important;
+  }
+
+  .controllersDiv .active {
+    transform: scale(1.5);
+    border: 0 !important;
+    background-color: rgb(220 53 69) !important ;
+  }
+
+  .form-check-input:checked {
+    background-color: rgb(220 53 69);
+    border-color: rgb(220 53 69);
+  }
+
+  .navbar-toggler:focus {
+    box-shadow: none !important;
+  }
+
+  .sideNav-item:hover {
+    background: linear-gradient(to right, #DF2336, #A22A25) !important; //#DF2336;
+    color: #fff;
+  }
+
+  .sideNav-item:hover .nav-link {
+    color: #fff;
+    font-size: 1.25rem !important;
+  }
+
+
+  .mainNav-item:hover {
+    background: #f7f7f7;
+  }
+
+
+  #pages {
+    direction: rtl !important;
+  }
+
+  #userList::after,
+  #empNameTit::after {
+    display: none;
+  }
+
+  .cardClick {
+    transition: all .2s ease-in-out;
+    cursor: pointer;
+  }
+
+  .cardClick:hover {
+    transform: scale(1.05);
+  }
+
+
+  #topBtn {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 1.3rem;
+    z-index: 99;
+    font-size: 18px;
+    border: none;
+    outline: none;
+    color: white;
+    cursor: pointer;
+    padding: 15px;
+  }
+
+
+  .backEmp {
+    position: fixed;
+    right: 1.7rem;
+    z-index: 99;
+    bottom: 0;
+  }
+
+  /* نافذة إنشاء/إعادة تعيين كلمة المرور: نفس حواف بطاقة تسجيل الدخول */
+  .authResetModalPopup {
+    border-radius: 2rem !important;
+    padding-bottom: 2.5rem !important;
+  }
+  .authResetModalPopup .swal2-actions {
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .authResetModalPopup .swal2-confirm {
+    border-radius: 2rem !important;
+  }
+
+  /* استبيان الطلاب (قبل/بعد الاختبار) — survey-js.html */
+  .surveyModalPopup {
+    border-radius: 2rem !important;
+    padding-bottom: 2.5rem !important;
+  }
+  .surveyModalPopup .swal2-actions {
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .surveyModalPopup .swal2-confirm {
+    border-radius: 2rem !important;
+  }
+  .surveyModalPopup .survey-context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: #fdecea;
+    color: #df2336;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  .surveyModalPopup .survey-field {
+    margin-bottom: 1.2rem;
+    text-align: right;
+  }
+  .surveyModalPopup .survey-field-title {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+  }
+  /* مجموعة أسئلة تحت عنوان فرعي واحد (المادة المقررة/المحاضر) — buildSurveyFieldGroup
+     بsurvey-js.html. */
+  .surveyModalPopup .survey-field-group {
+    margin-bottom: 1.3rem;
+    padding: 12px 14px 2px;
+    border: 1px solid #f3dcdd;
+    border-radius: 14px;
+    background: #fffbfb;
+  }
+  .surveyModalPopup .survey-field-group .survey-field:last-child {
+    margin-bottom: 0.6rem;
+  }
+  .surveyModalPopup .survey-group-title {
+    display: block;
+    margin-bottom: 10px;
+    color: #df2336;
+    font-weight: 800;
+    font-size: 0.92rem;
+  }
+  /* أزرار راديو HTML أصلية (مخفية بصريًا) + <label for=""> منقورة بدلًا منها — تفاعل المتصفح
+     الأصلي بلا أي جافاسكربت مخصَّص لالتقاط النقر (راجع survey-js.html). */
+  .surveyModalPopup .survey-scale {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  .surveyModalPopup .survey-scale input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+  .surveyModalPopup .survey-scale label {
+    padding: 8px 16px;
+    min-width: 40px;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 999px;
+    background: #fff;
+    color: #555;
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .surveyModalPopup .survey-scale input[type="radio"]:checked + label {
+    border-color: #df2336;
+    color: #fff;
+    background: #df2336;
+  }
+  .surveyModalPopup .survey-scale input[type="radio"]:focus-visible + label {
+    outline: 2px solid #df2336;
+    outline-offset: 2px;
+  }
+
+  /* مودال "إصدار الشهادة" الذاتي — startCertSelfIssue بـjs.html */
+  .certIssueModalPopup { border-radius: 1.5rem !important; }
+  .cert-issue-progress-track { width: 100%; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; margin: 18px 0 4px; }
+  .cert-issue-progress-fill { height: 100%; width: 5%; border-radius: 999px; background: linear-gradient(90deg, #b5262c, #df2336); }
+  .cert-issue-fake-fill { animation: certIssueFakeFill 3.5s ease-out forwards; }
+  @keyframes certIssueFakeFill {
+    0% { width: 5%; }
+    60% { width: 75%; }
+    100% { width: 90%; }
+  }
+  .cert-issue-status-icon { display: block; font-size: 2.4rem; margin-bottom: 8px; }
+  .cert-issue-status-icon.success { color: #16a34a; }
+  .cert-issue-status-icon.error { color: #df2336; }
+
+  .cardLoader {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 0;
+    animation: cardLoaderProgress 2s linear forwards;
+  }
+
+  .examBtn:hover .examCert {
+    color: white !important;
+  }
+
+
+  @keyframes cardLoaderProgress {
+    0% {
+      width: 0;
+    }
+
+    100% {
+      width: 100%;
+    }
+  }
+
+
+  .file-card {
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .file-name {
+    font-weight: bold;
+    font-size: 1rem;
+  }
+
+.image-input:not(.image-input-empty) {
+	background-image: none !important;
+}
+
+.image-input {
+	position: relative;
+	display: inline-block;
+	border-radius: .95rem;
+	background-repeat: no-repeat;
+	background-size: cover;
+}
+
+.btn.btn-icon.btn-circle {
+	border-radius: 50%;
+}
+
+.image-input [data-kt-image-input-action="change"] {
+	left: 100%;
+	top: 0;
+}
+
+.image-input [data-kt-image-input-action] {
+	cursor: pointer;
+	position: absolute;
+	transform: translate(-50%,-50%);
+}
+
+
+@media (min-width: 576px) {
+    .modal-dialog {
+        max-width: var(--bs-modal-width) !important;
+    }
+}
+
+
+        .upload-area {
+            border: 2px dashed #dadce0;
+            border-radius: 8px;
+            padding: 48px 24px;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            background-color: #e8f0fe;
+            border-color: #1a73e8;
+        }
+        
+        .upload-area.dragover {
+            background-color: #e8f0fe;
+            border-color: #1a73e8;
+            border-style: solid;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #5f6368;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            color: #5f6368;
+            margin-bottom: 8px;
+        }
+        
+        .upload-subtext {
+            font-size: 13px;
+            color: #80868b;
+        }
+        
+        .btn-upload {
+            background-color: #a67c52;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-upload:hover {
+            background-color: #1765cc;
+            color: white;
+        }
+        
+        .btn-cancel {
+            color: #1a73e8;
+            background-color: transparent;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .btn-cancel:hover {
+            background-color: #f1f3f4;
+        }
+        
+        .file-list {
+            margin-top: 20px;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: background-color 0.2s;
+        }
+        
+        .file-item:hover {
+            background-color: #e8eaed;
+        }
+        
+        .file-icon {
+            font-size: 24px;
+            color: #5f6368;
+            margin-left: 12px;
+        }
+        
+        .file-info {
+            flex-grow: 1;
+        }
+        
+        .file-name {
+            font-size: 14px;
+            color: #202124;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .file-size {
+            font-size: 12px;
+            color: #5f6368;
+        }
+        
+        .file-remove {
+            cursor: pointer;
+            color: #5f6368;
+            transition: color 0.2s;
+        }
+        
+        .file-remove:hover {
+            color: #d93025;
+        }
+        
+        .progress {
+            height: 4px;
+            margin-top: 8px;
+            border-radius: 2px;
+            background-color: #e8eaed;
+        }
+        
+        .progress-bar {
+            background-color: #1a73e8;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .upload-status {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .upload-status.success {
+            background-color: #e6f4ea;
+            color: #137333;
+            display: block;
+        }
+        
+        .upload-status.error {
+            background-color: #fce8e6;
+            color: #c5221f;
+            display: block;
+        }
+
+/* ============================================================
+   نظام التنبيهات المنبثقة الموحّد (Toast) — نفس تصميم بوابة الطالب
+   الجديدة، لكن من أعلى الصفحة. يُستخدم في كل المشروع عبر alertMSG()
+   بدل نافذة SweetAlert2 المركزية القديمة.
+   ============================================================ */
+.gToast {
+  position: fixed;
+  z-index: 20000;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-14px);
+  max-width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  color: #fff;
+  background: #23282f;
+  box-shadow: 0 12px 32px rgba(25,31,38,0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  font-family: "IBM Plex Sans Arabic", "Rubik", Tahoma, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+}
+.gToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.gToast > i { flex: 0 0 auto; font-size: 17px; line-height: 1; }
+.gToast > span { min-width: 0; }
+.gToast.gToast-success > i { color: #71d5ab; }
+.gToast.gToast-error > i { color: #ef8783; }
+.gToast.gToast-warning > i { color: #f5c453; }
+.gToast.gToast-info > i { color: #7ec1f5; }
+@media (max-width: 640px) {
+  .gToast { left: 16px; right: 16px; transform: translateY(-14px); max-width: none; }
+  .gToast.show { transform: translateY(0); }
+}
+</style>

@@ -1,0 +1,933 @@
+<script>
+  // ===================================================================
+  // Login flow: CPR + password once an account is activated; CPR + an
+  // emailed one-time code for first activation and for password reset.
+  // Both paths end in a real Firebase Auth session (persists on this device).
+  // ===================================================================
+
+  let AUTH_CPR = '';
+  let AUTH_FIREBASE_READY = false;
+  let AUTH_FRESH_LOGIN = false; // true only right after an interactive login (not a restored session)
+  let AUTH_RESET_MODE = false; // true while the OTP flow is being used to reset an existing password
+  let AUTH_CPR_MASKED_EMAIL = ''; // من checkCprStatus، يُستخدم في رسالة "نسيت كلمة المرور؟"
+
+  // نظير isValidPersonId في code.js (الخادم) — 9 أرقام بالضبط، سواء رقم شخصي بحريني حقيقي أو
+  // هوية مولَّدة لطالب خارج البحرين (نفس الصيغة، راجع generateRemoteStudentId في code.js).
+  function isValidPersonId(id) {
+    return /^\d{9}$/.test(String(id == null ? '' : id).trim());
+  }
+
+  // Toggles a password input between hidden/visible and swaps its eye icon.
+  function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (!input || !icon) return;
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    icon.classList.toggle('fa-eye', showing);
+    icon.classList.toggle('fa-eye-slash', !showing);
+  }
+
+  function initFirebaseAuth() {
+    if (AUTH_FIREBASE_READY) return;
+    firebase.initializeApp({
+      apiKey: "AIzaSyAzOQqhYH2lZxM6Yv3Ui62TlB4Bw6m3zkg",
+      authDomain: "basaerbh.com",
+      projectId: "coming-soon-basaer"
+    });
+    AUTH_FIREBASE_READY = true;
+  }
+
+  // لا نُبقي الجهاز "متذكِّرًا" لتسجيل الدخول (LOCAL) إلا لحساب فعّل بريده وأنشأ
+  // كلمة مرور فعليًا؛ غير ذلك تبقى الجلسة في الذاكرة فقط (NONE) لهذا التحميل،
+  // فلا يُعاد فتح الحساب تلقائيًا لاحقًا قبل إتمام خطوة إنشاء كلمة المرور.
+  function applyAuthPersistence(remember) {
+    const type = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.NONE;
+    return firebase.auth().setPersistence(type).catch(function () {});
+  }
+
+  // ===================================================================
+  // "تحقّق سريع عبر جوجل" في نموذج التسجيل الجديد.
+  // صفحات Google Apps Script تُعرض داخل إطار iframe معزول على نطاق فرعي
+  // عشوائي (googleusercontent.com)، وهو نطاق لا يمكن تفويضه بشكل ثابت في
+  // Firebase؛ لذلك لا يمكن استدعاء signInWithPopup مباشرة من هنا. بدلًا
+  // من ذلك، نفتح صفحة وسيطة مستقلة منشورة على استضافة Firebase نفسها
+  // (نطاق مُصرَّح به تلقائيًا) تُجري عملية الدخول بجوجل هناك، ثم تُرسل لنا
+  // البريد الموثَّق عبر postMessage وتُغلق نفسها.
+  // ===================================================================
+  const AUTH_OAUTH_RELAY_URL = 'https://basaerbh.com/google-signin-relay';
+  const AUTH_PROVIDER_LABELS_ = { google: 'جوجل', yahoo: 'ياهو' };
+
+  // نافذة وسيطة مشتركة لأي مزوّد OAuth مدعوم (حاليًا جوجل وياهو، ويمكن إضافة غيرهما بنفس
+  // النمط لاحقًا)، تُستخدم من أكثر من سياق (تحقّق سريع في نموذج التسجيل، أو تسجيل الدخول
+  // المباشر) — بدل تكرار نفس منطق فتح النافذة والاستماع لنتيجتها لكل مزوّد وسياق على حدة.
+  // onSuccess(email) تُستدعى بالبريد المُتحقَّق منه فقط عند النجاح.
+  function startOAuthRelay(provider, btn, spinEl, onSuccess) {
+    if (btn && btn.disabled) return;
+
+    // بطاقة استطلاع احتياطية (verifyToken) — راجع الشرح الكامل في
+    // website/google-signin-relay.html::sendResult. صفحات جوجل/ياهو/مايكروسوفت لتسجيل الدخول قد
+    // تقطع ارتباط window.opener بين النافذة الوسيطة وهذه الصفحة أثناء signInWithRedirect (الذي
+    // استُخدم لحل مشكلة حجب popup داخل popup على الجوال) — فلا تصل رسالة postMessage إطلاقًا رغم
+    // نجاح التحقق فعليًا على الخادم. شكوى طالب متكررة "يتحقق من البريد ثم يعيد من البداية"
+    // رجّحت هذا بقوة. الحل: نستطلع (polling) نتيجة بديلة من الخادم بالتوازي مع الاستماع
+    // لـpostMessage — أيًّا من المسارين وصل أولًا يُعتمَد عبر نفس حارس settled أدناه.
+    const verifyToken = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (String(Date.now()) + Math.random().toString(36).slice(2));
+
+    const popup = window.open(AUTH_OAUTH_RELAY_URL + '?provider=' + provider + '&verifyToken=' + encodeURIComponent(verifyToken), 'basaerOAuthSignIn', 'width=480,height=640');
+    if (!popup) {
+      alertMSG('يرجى السماح بالنوافذ المنبثقة (Pop-ups) لهذا الموقع، ثم إعادة المحاولة', 'error');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    spinEl?.classList.remove('d-none');
+
+    let settled = false;
+
+    function checkFallbackResult(onDone) {
+      google.script.run.withSuccessHandler(function (result) {
+        onDone(result);
+      }).withFailureHandler(function () { onDone(null); }).checkOauthVerifyResult(verifyToken);
+    }
+
+    // فحص دوري كل 1.5 ثانية (حتى دقيقتين تقريبًا) — شبكة أمان مستقلة عن postMessage تمامًا.
+    let pollAttempts = 0;
+    const pollTimer = setInterval(function () {
+      if (settled) { clearInterval(pollTimer); return; }
+      pollAttempts++;
+      if (pollAttempts > 80) {
+        // لو ظلت النافذة الوسيطة مفتوحة (لم تُغلق نفسها) ولا نتيجة وصلت خلال ~دقيقتين —
+        // حالة "التعليق" التي اشتكى منها بعض الطلاب. بدون هذا، كانت الصفحة الأصلية تبقى
+        // بزر معطَّل ومؤشر تحميل دائرٍ إلى ما لا نهاية بلا أي رسالة، لأن closeCheck لا يعمل إلا
+        // بعد إغلاق فعلي للنافذة.
+        clearInterval(pollTimer);
+        finish(false, 'لم تكتمل عملية التحقق خلال الوقت المتوقع، يمكنك المحاولة مرة أخرى أو استخدام رمز التحقق بالبريد');
+        return;
+      }
+      checkFallbackResult(function (result) {
+        if (!result || settled) return;
+        if (result.ok && result.email) finish(true, result.email);
+        else finish(false, result.message || 'حدث خطأ غير متوقع');
+      });
+    }, 1500);
+
+    // إغلاق النافذة الوسيطة (سواء بعد انتهائها الطبيعي من sendResult، أو إغلاق يدوي من
+    // المستخدم) هو أفضل لحظة لفحص فوري أخير قبل افتراض الإلغاء — sendResult تنتظر اكتمال
+    // الإرسال الاحتياطي للخادم قبل استدعاء window.close() فعليًا، فالنتيجة غالبًا جاهزة هناك.
+    const closeCheck = setInterval(function () {
+      if (!popup.closed) return;
+      clearInterval(closeCheck);
+      if (settled) return;
+      checkFallbackResult(function (result) {
+        if (settled) return;
+        if (result && result.ok && result.email) finish(true, result.email);
+        else if (result && !result.ok) finish(false, result.message || 'حدث خطأ غير متوقع');
+        // النافذة أُغلقت بلا أي نتيجة عبر أي من المسارين — قد يكون المستخدم أغلقها عمدًا، أو
+        // فشل التحقق بصمت؛ رسالة محايدة بدل ترك الطالب بلا أي مؤشر (الثغرة الأصلية التي
+        // سبَّبت شكوى "يعيد من البداية" بلا أي تفسير).
+        else finish(false, 'لم تكتمل عملية التحقق، يمكنك المحاولة مرة أخرى');
+      });
+    }, 500);
+
+    function cleanup() {
+      window.removeEventListener('message', onMessage);
+      clearInterval(closeCheck);
+      clearInterval(pollTimer);
+    }
+
+    function finish(ok, payload) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (btn) btn.disabled = false;
+      spinEl?.classList.add('d-none');
+      if (ok) {
+        onSuccess(payload);
+      } else if (payload) {
+        alertMSG('تعذّر تسجيل الدخول عبر ' + (AUTH_PROVIDER_LABELS_[provider] || provider) + ': ' + payload, 'error');
+      }
+    }
+
+    function onMessage(event) {
+      const data = event.data;
+      if (!data || data.source !== 'basaer-oauth-relay') return;
+      if (data.ok && data.email) {
+        finish(true, data.email);
+      } else {
+        finish(false, data.message || 'حدث خطأ غير متوقع');
+      }
+    }
+    window.addEventListener('message', onMessage);
+  }
+
+  function googleSignInForEmail() {
+    startOAuthRelay('google', document.getElementById('googleSignInBtn'), document.getElementById('googleSignInSpin'), function (email) {
+      applyGoogleVerifiedEmail(email, 'google');
+    });
+  }
+
+  function yahooSignInForEmail() {
+    startOAuthRelay('yahoo', document.getElementById('yahooSignInBtn'), document.getElementById('yahooSignInSpin'), function (email) {
+      applyGoogleVerifiedEmail(email, 'yahoo');
+    });
+  }
+
+  function applyGoogleVerifiedEmail(email, provider) {
+    const mailBox = document.getElementById('mailBox');
+    if (mailBox) {
+      mailBox.value = email;
+      mailBox.disabled = true;
+      mailBox.classList.add('is-valid');
+      mailBox.classList.remove('is-invalid');
+    }
+    mailCheck = true;
+    document.getElementById('verMail')?.classList.add('d-none');
+    document.getElementById('mailCode')?.classList.add('d-none');
+    document.getElementById('mailSpinner')?.classList.add('d-none');
+    document.getElementById('googleSignInBtn')?.closest('.oauth-icon-row')?.classList.remove('bg-danger', 'bg-opacity-25', 'rounded-4', 'border', 'border-danger');
+    document.getElementById('googleSignInBtn')?.closest('.oauth-icon-row')?.classList.add('d-none');
+    document.getElementById('manualEmailWrap')?.classList.add('d-none');
+
+    const note = document.getElementById('googleVerifiedNote');
+    const noteText = document.getElementById('googleVerifiedText');
+    const noteEmail = document.getElementById('googleVerifiedEmail');
+    if (noteEmail) noteEmail.textContent = email;
+    if (noteText) {
+      noteText.innerHTML = '✓ تم التحقق من <b id="googleVerifiedEmail">' + email + '</b> تلقائيًا عبر ' + (AUTH_PROVIDER_LABELS_[provider] || provider);
+    }
+    note?.classList.remove('d-none');
+  }
+
+  // يلغي التحقق التلقائي عبر جوجل ليعيد إظهار المسار اليدوي (بريد + رمز تحقق).
+  function undoGoogleVerification() {
+    const mailBox = document.getElementById('mailBox');
+    document.getElementById('googleVerifiedNote')?.classList.add('d-none');
+    document.getElementById('googleSignInBtn')?.closest('.oauth-icon-row')?.classList.remove('d-none');
+    document.getElementById('manualEmailWrap')?.classList.remove('d-none');
+    if (mailBox) {
+      mailBox.disabled = false;
+      mailBox.value = '';
+      mailBox.classList.remove('is-valid');
+      mailBox.focus();
+    }
+    mailCheck = false;
+  }
+
+  // ===================================================================
+  // "تسجيل الدخول عبر [مزوّد]" — نفس آلية "تحقّق سريع" في نموذج التسجيل، لكن لإتمام تسجيل
+  // الدخول مباشرة (بلا استهلاك أي رسالة بريد إطلاقًا)، بشرط أن يطابق البريد المُتحقَّق منه
+  // البريدَ المسجَّل لدى هذا الرقم الشخصي — يتحقق من ذلك الخادم في loginWithGoogleVerifiedEmail
+  // (اسمها تاريخي، تعمل مع أي مزوّد). دالة واحدة عامة تخدم الأزرار الثلاثة بدل تكرارها.
+  // ===================================================================
+  function oauthSignInForLogin(provider, btnId, spinId) {
+    const btn = document.getElementById(btnId);
+    const cpr = document.querySelector('#userId').value.trim();
+    if (!isValidPersonId(cpr)) { alertMSG('يرجى إدخال الرقم الشخصي أو هوية الدخول أولًا', 'error'); return; }
+    AUTH_CPR = cpr;
+
+    startOAuthRelay(provider, btn, document.getElementById(spinId), function (email) {
+      // بعد العودة من صفحة التحقق بنجاح: نُخفي زر "إرسال رمز التحقق" ونُظهر التحميل العام،
+      // حتى تكتمل عملية تسجيل الدخول بالكامل، تفاديًا لأي ضغط متكرر أو مسار مزدوج.
+      const sendCodeBtn = document.querySelector('#sendCodeBtn');
+      sendCodeBtn?.classList.add('d-none');
+      loadingStart();
+
+      google.script.run.withSuccessHandler(function (res) {
+        if (!res.ok) {
+          loadingEnd();
+          if (btn) btn.disabled = false;
+          document.getElementById(spinId)?.classList.add('d-none');
+          sendCodeBtn?.classList.remove('d-none');
+          alertMSG(res.message || 'تعذّر تسجيل الدخول', 'error');
+          return;
+        }
+        completeLoginWithToken(res, '#' + spinId, function () {
+          if (btn) btn.disabled = false;
+          sendCodeBtn?.classList.remove('d-none');
+        });
+      }).withFailureHandler(function (err) {
+        loadingEnd();
+        if (btn) btn.disabled = false;
+        document.getElementById(spinId)?.classList.add('d-none');
+        sendCodeBtn?.classList.remove('d-none');
+        alertMSG('تعذّر تسجيل الدخول: ' + err, 'error');
+      }).loginWithGoogleVerifiedEmail(AUTH_CPR, email);
+    });
+  }
+
+  function googleSignInForLogin() { oauthSignInForLogin('google', 'googleLoginBtn', 'googleLoginSpin'); }
+  function yahooSignInForLogin() { oauthSignInForLogin('yahoo', 'yahooLoginBtn', 'yahooLoginSpin'); }
+
+  // ===================================================================
+  // "تجاوز التحقق من البريد الإلكتروني إلى وقت لاحق" — مخرج بديل عن الأزرار الثلاثة أعلاه
+  // ورمز التحقق، لمن تعذّر عليه الوصول لبريده حاليًا. نُنبّه المستخدم صراحة قبل المتابعة أن هذا
+  // يقلّل من مستوى التحقق من الهوية (الرقم الشخصي وحده)، ثم — عند الموافقة — يُنشئ له الخادم
+  // كلمة مرور جديدة فعليًا عبر نفس مسار completeLoginWithToken المستخدم في كل مسارات الدخول.
+  // ===================================================================
+  function skipEmailVerification() {
+    const cpr = document.querySelector('#userId').value.trim();
+    if (!isValidPersonId(cpr)) { alertMSG('يرجى إدخال الرقم الشخصي أو هوية الدخول أولًا', 'error'); return; }
+    AUTH_CPR = cpr;
+
+    Swal.fire({
+      title: 'تجاوز التحقق من البريد الإلكتروني؟',
+      text: 'سيتم تسجيل دخولك مؤقتًا دون التحقق من ملكيتك لبريدك الإلكتروني المسجَّل، وستُنشئ كلمة مرور جديدة لحسابك. سيصل إشعار أمني إلى بريدك المسجَّل بذلك. يُنصح باستخدام هذا الخيار فقط إذا تعذّر عليك الوصول إلى بريدك حاليًا.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#df2336',
+      confirmButtonText: 'نعم، متابعة',
+      cancelButtonText: 'إلغاء'
+    }).then(function (result) {
+      if (!result.isConfirmed) return;
+
+      const btn = document.getElementById('skipEmailVerifyBtn');
+      const spinId = 'skipEmailVerifySpin';
+      const sendCodeBtn = document.querySelector('#sendCodeBtn');
+      if (btn) btn.disabled = true;
+      document.getElementById(spinId)?.classList.remove('d-none');
+      sendCodeBtn?.classList.add('d-none');
+      loadingStart();
+
+      google.script.run.withSuccessHandler(function (res) {
+        if (!res.ok) {
+          loadingEnd();
+          if (btn) btn.disabled = false;
+          document.getElementById(spinId)?.classList.add('d-none');
+          sendCodeBtn?.classList.remove('d-none');
+          alertMSG(res.message || 'تعذّر تسجيل الدخول', 'error');
+          return;
+        }
+        completeLoginWithToken(res, '#' + spinId, function () {
+          if (btn) btn.disabled = false;
+          sendCodeBtn?.classList.remove('d-none');
+        });
+      }).withFailureHandler(function (err) {
+        loadingEnd();
+        if (btn) btn.disabled = false;
+        document.getElementById(spinId)?.classList.add('d-none');
+        sendCodeBtn?.classList.remove('d-none');
+        alertMSG('تعذّر تسجيل الدخول: ' + err, 'error');
+      }).skipEmailVerificationLogin(AUTH_CPR);
+    });
+  }
+
+  // Checks the CPR as the user finishes typing it, and reveals only the
+  // relevant fields: the password box (+ "forgot password?" link) if this
+  // person already has a password, or the "send code" button otherwise.
+  // Debounced, and shows a "searching..." indicator so the wait is never silent.
+  let AUTH_CPR_CHECK_TIMER = null;
+  let AUTH_CPR_CHECK_TOKEN = 0;
+
+  // نطاق البريد المعروف مسبقًا لكل شخص (من res.maskedEmail) ← الزر المطابق له في صفحة الدخول.
+  // إن طابق بريده المسجَّل أحد المزوّدين، نعرض زر ذلك المزوّد تحديدًا فقط (تحقق فوري ودقيق
+  // 100%)، بدل تخيير المستخدم بين الكل أو طلب إدخال بريد يدويًا وهو أصلًا لدينا.
+  const AUTH_LOGIN_PROVIDER_BTN_ = {
+    'gmail.com': 'googleLoginBtn',
+    'yahoo.com': 'yahooLoginBtn'
+  };
+  const AUTH_LOGIN_PROVIDER_BTN_IDS_ = ['googleLoginBtn', 'yahooLoginBtn'];
+
+  function checkCprStatusOnInput() {
+    const cpr = document.querySelector('#userId').value.trim();
+    const buttons = document.querySelector('#cprActionButtons');
+    const passwordDiv = document.querySelector('#passwordLoginDiv');
+    const passwordBtn = document.querySelector('#passwordLoginBtn');
+    const forgotBtn = document.querySelector('#forgotPasswordBtn');
+    const rememberWrap = document.querySelector('#rememberMeWrap');
+    const sendCodeBtn = document.querySelector('#sendCodeBtn');
+    const skipVerifyBtn = document.querySelector('#skipEmailVerifyBtn');
+    const status = document.querySelector('#cprCheckStatus');
+    const noAccountNote = document.querySelector('#noAccountNote');
+    const providerNote = document.querySelector('#providerEmailNote');
+
+    clearTimeout(AUTH_CPR_CHECK_TIMER);
+    const myToken = ++AUTH_CPR_CHECK_TOKEN; // ignore stale responses if the user keeps typing
+
+    if (!isValidPersonId(cpr)) {
+      status?.classList.add('d-none');
+      buttons?.classList.add('d-none');
+      passwordDiv?.classList.add('d-none');
+      passwordBtn?.classList.add('d-none');
+      forgotBtn?.classList.add('d-none');
+      rememberWrap?.classList.add('d-none');
+      sendCodeBtn?.classList.add('d-none');
+      skipVerifyBtn?.classList.add('d-none');
+      noAccountNote?.classList.remove('d-none');
+      AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) { document.getElementById(id)?.classList.add('d-none'); });
+      return;
+    }
+
+    buttons?.classList.add('d-none');
+    passwordDiv?.classList.add('d-none');
+    status?.classList.remove('d-none');
+
+    AUTH_CPR_CHECK_TIMER = setTimeout(function () {
+      google.script.run.withSuccessHandler(function (res) {
+        if (myToken !== AUTH_CPR_CHECK_TOKEN) return;
+        status?.classList.add('d-none');
+
+        if (!res || !res.found) {
+          // رقم شخصي غير مسجّل في نظام التحقق (auth) إطلاقًا. تنبيه أمني: كان هذا المسار
+          // يستدعي checkStLogin(cpr) مباشرة — وتلك دالة تمنح وصولًا كاملًا للوحة الطالب فور
+          // العثور على الرقم عبر getPersons() **دون أي تحقق من الهوية** (لا رمز، لا كلمة
+          // مرور)، لأنها مصمَّمة أصلًا لسياق مختلف (بعد نجاح المصادقة). أي طالب حقيقي لم
+          // يُعثر عليه في فحص auth لكنه موجود في getPersons() كان يدخل مباشرة بلا أي تحقق —
+          // ثغرة فعلية. الآن: تحقّق آمن أولًا (بلا منح وصول)، ثم إما تنبيه لوجود مشكلة بيانات
+          // تحتاج الإدارة، أو دعوة تسجيل حقيقية لمن هو غير مسجَّل فعلًا.
+          buttons?.classList.add('d-none');
+          passwordDiv?.classList.add('d-none');
+          skipVerifyBtn?.classList.add('d-none');
+          checkRegistrationEligibility(cpr);
+          return;
+        }
+
+        buttons?.classList.remove('d-none');
+        noAccountNote?.classList.remove('d-none');
+        providerNote?.classList.add('d-none');
+        const hasPassword = !!res.hasPassword;
+        AUTH_CPR_MASKED_EMAIL = res.maskedEmail || '';
+        passwordDiv?.classList.toggle('d-none', !hasPassword);
+        passwordBtn?.classList.toggle('d-none', !hasPassword);
+        forgotBtn?.classList.toggle('d-none', !hasPassword);
+        rememberWrap?.classList.toggle('d-none', !hasPassword);
+        // متاح فقط لمن لا يملك كلمة مرور بعد (نفس نطاق إرسال رمز التحقق/أزرار المزوّدين) —
+        // من يملك كلمة مرور له مسار دخول طبيعي فعلًا ولا حاجة له لهذا المخرج إطلاقًا.
+        skipVerifyBtn?.classList.toggle('d-none', hasPassword);
+
+        if (hasPassword) {
+          sendCodeBtn?.classList.add('d-none');
+          AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) { document.getElementById(id)?.classList.add('d-none'); });
+        } else {
+          const domain = (AUTH_CPR_MASKED_EMAIL.split('@')[1] || '').toLowerCase();
+          const matchedBtnId = AUTH_LOGIN_PROVIDER_BTN_[domain];
+          AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) {
+            document.getElementById(id)?.classList.toggle('d-none', id !== matchedBtnId);
+          });
+          // "إرسال رمز التحقق" يبقى ظاهرًا دائمًا كبديل، حتى عند وجود زر مزوّد مطابق — بعض
+          // الطلاب اشتكوا من التعليق في منتصف مسار OAuth (النافذة الوسيطة لا تعود للصفحة
+          // الأصلية) دون أي مخرج بديل ظاهر أمامهم سوى إغلاق الصفحة والمحاولة من جديد.
+          sendCodeBtn?.classList.remove('d-none');
+          // زر "تسجيل الدخول عبر..." كان يوهم كثيرًا من المستخدمين لأول مرة بأنه دخول بحساب
+          // جوجل/ياهو/مايكروسوفت منفصل، بينما هو تحقق من نفس بريدهم المسجَّل مسبقًا فقط —
+          // لذا يوضَّح النص + يظهر جزء من البريد نفسه، ويختفي "ليس لديك حساب؟" لأن CPR موجود فعلًا.
+          noAccountNote?.classList.toggle('d-none', !!matchedBtnId);
+          providerNote?.classList.toggle('d-none', !matchedBtnId);
+          if (providerNote) providerNote.textContent = matchedBtnId ? AUTH_CPR_MASKED_EMAIL : '';
+        }
+      }).withFailureHandler(function () {
+        if (myToken !== AUTH_CPR_CHECK_TOKEN) return;
+        // If the check itself fails, still let the user try to send a code.
+        status?.classList.add('d-none');
+        buttons?.classList.remove('d-none');
+        passwordDiv?.classList.add('d-none');
+        passwordBtn?.classList.add('d-none');
+        forgotBtn?.classList.add('d-none');
+        rememberWrap?.classList.add('d-none');
+        sendCodeBtn?.classList.remove('d-none');
+        skipVerifyBtn?.classList.remove('d-none');
+        noAccountNote?.classList.remove('d-none');
+        providerNote?.classList.add('d-none');
+        AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) { document.getElementById(id)?.classList.add('d-none'); });
+      }).checkCprStatus(cpr);
+    }, 350);
+  }
+
+  // فحص آمن (بلا منح أي وصول) لرقم شخصي لم يُعثر عليه في نظام auth: نتحقق هل هو مسجَّل
+  // فعليًا عبر checkStudentRegistered() لسبب غير ظاهر في فحص auth (مشكلة بيانات تحتاج الإدارة)،
+  // أو أنه غير مسجَّل فعلًا (فنعرض دعوة تسجيل حقيقية). لا نستدعي getPersons() هنا عمدًا: هذه
+  // الصفحة قبل أي مصادقة، وتلك الدالة تُرجع جدول الطلاب كاملًا (أرقام شخصية، هواتف، بريد...)
+  // لأي زائر؛ الدالة البديلة تُرجع نعم/لا فقط.
+  function checkRegistrationEligibility(cpr) {
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.found) {
+        alertMSG('حسابك مسجَّل لدينا لكنه يحتاج إعدادًا إضافيًا قبل تسجيل الدخول، يرجى التواصل مع الإدارة عبر واتساب لإتمام ذلك.', 'warning');
+        return;
+      }
+      offerNewRegistration(cpr);
+    }).withFailureHandler(function () {
+      offerNewRegistration(cpr);
+    }).checkStudentRegistered(cpr);
+  }
+
+  function offerNewRegistration(cpr) {
+    if (cpr.length != 9) {
+      alertMSG('يرجى التحقق من بيانات الدخول', 'error');
+      return;
+    }
+    if (typeof statusData !== 'undefined' && statusData && !statusData.registration) {
+      alertMSG('بارك الله فيك .. نعتذر منك جدًا، فقد انتهى وقت التسجيل.<br>نراك بإذن الله في الدورات القادمة، تابع حسابنا على (انستقرام)', 'info');
+      return;
+    }
+    Swal.fire({
+      title: 'غير مسجل',
+      text: 'هل تود الانضمام إلى بصائر؟',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'نعم، أودّ التسجيل',
+      cancelButtonText: 'لا، شكرًا'
+    }).then(function (result) {
+      if (result.isConfirmed) {
+        newRegCpr = cpr;
+        loadRegistration();
+      }
+    });
+  }
+
+  function loadLoginDataForAuthedUser(cpr) {
+    loadingStart();
+    google.script.run.withSuccessHandler(function (dr) {
+      userData = dr;
+      loadingEnd();
+      if (userData != 0) {
+        const thisEmp = userData[0];
+        // نحفظ نسخة من بيانات الإداري نفسه وقت الدخول (وليس بعد أي معاينة لاحقة) لاستعادتها
+        // عند الخروج من "وضع معاينة" صفحة موظف/طالب — راجع js.html (adminOwnUserData_).
+        if (thisEmp.manage && typeof adminOwnUserData_ !== 'undefined') adminOwnUserData_ = userData;
+        thisEmp.manage ? loadDashboard() : loadEmp();
+      } else {
+        handleStudentPostLogin(cpr);
+        checkStlecAttend(cpr);
+      }
+    }).withFailureHandler(function (err) {
+      swal.fire("خطأ في تحميل البيانات", "يرجى التواصل مع القائمين على البرنامج" + err, "error");
+      loadingEnd();
+    }).loginData(cpr);
+  }
+
+  // مَن نجح في تسجيل الدخول (أثبت هويته برقمه الشخصي) لكنه ليس موظفًا ولا طالبًا
+  // نشِطًا حاليًا: نميّز بين مَن رُفض طلب انضمامه سابقًا (folder === 'no') — وهو
+  // مسجَّل فعلًا ولا ينبغي إعادة عرض دعوة "هل تودّ الانضمام" عليه من جديد كأنه
+  // شخص جديد — وبين مَن لم يسجّل نهائيًا (checkStLogin يتكفّل بتلك الحالة).
+  function handleStudentPostLogin(cpr) {
+    google.script.run.withSuccessHandler(function (status) {
+      if (status && status.found && status.folder === 'no') {
+        showRegistrationRejectedMessage();
+        return;
+      }
+      checkStLogin(cpr);
+    }).withFailureHandler(function () {
+      checkStLogin(cpr);
+    }).checkPersonFolderStatus(cpr);
+  }
+
+  function showRegistrationRejectedMessage() {
+    Swal.fire({
+      title: 'تعذّر قبول طلب انضمامك',
+      html:
+        'نعتذر، فقد تعذّر قبول طلب انضمامك إلى أكاديمية بصائر.' +
+        '<br><br>للاستفسار عن التفاصيل، يرجى التواصل مع الإدارة عبر البريد الإلكتروني ' +
+        '<a href="mailto:basaerbah@gmail.com">basaerbah@gmail.com</a>' +
+        ' أو عبر واتساب <a href="https://wa.me/97334440790" target="_blank">97334440790</a>.',
+      icon: 'info',
+      confirmButtonText: 'حسنًا'
+    });
+  }
+
+  // يُعطّل زر "إعادة الإرسال" (أو أي زر مشابه) مع عدّاد تنازلي ظاهر بالثواني، بدل قفل كامل
+  // اليوم كما كان سابقًا — يُستخدم بعد كل إرسال ناجح لرمز تحقق، وأيضًا عند صدّ الخادم لطلب
+  // مبكر جدًا (cooldown) حتى تبقى الواجهة صادقة مع ما يحدث فعليًا على الخادم.
+  let AUTH_COOLDOWN_TIMER = null;
+  function startResendCooldown(btn, seconds, baseLabel) {
+    if (!btn || !seconds) return;
+    clearInterval(AUTH_COOLDOWN_TIMER);
+    const label = baseLabel || btn.textContent;
+    let remaining = Math.max(1, Math.round(seconds));
+    btn.disabled = true;
+    btn.textContent = label + ' (' + remaining + ')';
+    AUTH_COOLDOWN_TIMER = setInterval(function () {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(AUTH_COOLDOWN_TIMER);
+        btn.disabled = false;
+        btn.textContent = label;
+      } else {
+        btn.textContent = label + ' (' + remaining + ')';
+      }
+    }, 1000);
+  }
+
+  async function sendLoginCode() {
+    const btn = document.querySelector('#sendCodeBtn');
+    if (btn?.disabled) return; // already in flight, ignore repeat clicks
+
+    const cpr = document.querySelector('#userId').value.trim();
+    if (!cpr) { alertMSG('يرجى إدخال الرقم الشخصي', 'error'); return; }
+    AUTH_CPR = cpr;
+
+    const emailDiv = document.querySelector('#emailCaptureDiv');
+    let emailVal = emailDiv && !emailDiv.classList.contains('d-none')
+      ? document.querySelector('#emailCapture').value.trim()
+      : '';
+
+    // بريد التفعيل الأول (طالب جديد يدخل لأول مرة ولم يفعّل بريده بعد): نفس حارس التحقق من
+    // مزوّد البريد المستخدم في صفحة التسجيل — لا إرسال قبل التأكد من عدم وجود خطأ إملائي شائع.
+    if (emailVal) {
+      const emailGate_ = await confirmEmailProviderOk(emailVal);
+      if (!emailGate_.proceed) return;
+      if (emailGate_.correctedEmail) {
+        emailVal = emailGate_.correctedEmail;
+        document.querySelector('#emailCapture').value = emailVal;
+      }
+    }
+
+    const googleBtn = document.querySelector('#googleLoginBtn');
+    if (btn) btn.disabled = true;
+    if (googleBtn) googleBtn.disabled = true; // تفادي أي ضغط على مسار آخر أثناء الانتظار
+    document.querySelector('#sendCodeSpin')?.classList.remove('d-none');
+    loadingStart();
+    google.script.run.withSuccessHandler(function (res) {
+      if (btn) btn.disabled = false;
+      if (googleBtn) googleBtn.disabled = false;
+      document.querySelector('#sendCodeSpin')?.classList.add('d-none');
+
+      if (!res.ok) {
+        loadingEnd();
+        if (res.notFound) {
+          // نفس معالجة مسار فحص الرقم أعلاه (سطر checkRegistrationEligibility): checkStLogin تستدعي
+          // getPersons() قبل أي مصادقة وتمنح وصولًا كاملًا للوحة الطالب إن وُجد الرقم بها.
+          checkRegistrationEligibility(cpr);
+          return;
+        }
+        if (res.needsEmail) {
+          document.querySelector('#emailCaptureDiv').classList.remove('d-none');
+          if (res.prefillEmail) document.querySelector('#emailCapture').value = res.prefillEmail;
+          const noteEl = document.querySelector('#emailCaptureNote');
+          if (noteEl) {
+            if (AUTH_CPR_MASKED_EMAIL) {
+              noteEl.textContent = 'سيتم إرسال رمز التحقق إلى ' + AUTH_CPR_MASKED_EMAIL;
+              noteEl.classList.remove('d-none');
+            } else {
+              noteEl.classList.add('d-none');
+            }
+          }
+          // نافذة SweetAlert بدل التوست العلوي هنا تحديدًا: هذا أول تسجيل دخول للمستخدم ولم
+          // يفعّل بريده بعد — رسالة سهلة الفوات (خصوصًا في الوضع الليلي على الهاتف) قد تعني
+          // ضياع تسجيله بالكامل، فتحتاج نافذة واضحة تحجب الشاشة حتى يقرأها.
+          Swal.fire({
+            icon: 'info',
+            title: 'يلزم تفعيل بريدك الإلكتروني',
+            text: 'هذا أول تسجيل دخول لك، يرجى إدخال بريدك الإلكتروني في الحقل الظاهر أدناه لإرسال رمز التفعيل إليه.',
+            confirmButtonText: 'حسنًا'
+          }).then(function(){ document.querySelector('#emailCapture')?.focus(); });
+          return;
+        }
+        if (res.cooldown) {
+          alertMSG('تم إرسال رمز مؤخرًا، يرجى الانتظار ' + res.retryAfterSeconds + ' ثانية قبل طلب رمز جديد.', 'warning');
+          // كان هناك رمز صالح بالفعل من الطلب السابق: انتقل مباشرة لخطوة إدخاله بدل تكرار
+          // نفس رسالة "تم الإرسال" أو ترك المستخدم بلا أي مسار للمتابعة.
+          document.querySelector('#cprStepForm').classList.add('d-none');
+          document.querySelector('#codeStepForm').classList.remove('d-none');
+          startResendCooldown(document.querySelector('#resendCodeBtn'), res.retryAfterSeconds, 'إعادة إرسال الرمز');
+          return;
+        }
+        alertMSG(res.message || 'حدث خطأ، يرجى المحاولة مرة أخرى', 'error');
+        return;
+      }
+
+      loadingEnd();
+      document.querySelector('#cprStepForm').classList.add('d-none');
+      document.querySelector('#codeStepForm').classList.remove('d-none');
+      document.querySelector('#codeSentNote').textContent =
+        (AUTH_RESET_MODE ? 'لإعادة تعيين كلمة المرور، تم إرسال رمز التحقق إلى ' : 'تم إرسال رمز التحقق إلى ') + res.maskedEmail;
+      document.querySelector('#otpCode').value = '';
+      document.querySelector('#otpCode').focus();
+      startResendCooldown(document.querySelector('#resendCodeBtn'), res.cooldownSeconds, 'إعادة إرسال الرمز');
+    }).withFailureHandler(function (err) {
+      loadingEnd();
+      if (btn) btn.disabled = false;
+      if (googleBtn) googleBtn.disabled = false;
+      document.querySelector('#sendCodeSpin')?.classList.add('d-none');
+      alertMSG('تعذّر إرسال الرمز: ' + err, 'error');
+    }).requestLoginCode(cpr, emailVal);
+  }
+
+  // يُنهي تسجيل الدخول بعد الحصول على Firebase custom token من أي مسار (رمز بريد، تجاوز
+  // الحد اليومي، أو تحقّق جوجل) — نقطة نهاية واحدة مشتركة بدل تكرار نفس المنطق 3 مرات.
+  // نُبقي علامة التحميل العامة ظاهرة طوال هذه الخطوة (تمنع أي ضغط متكرر)، وتنتهي إما هنا عند
+  // الفشل، أو تُترك لمن يستدعينا لاحقًا (نافذة كلمة المرور تُدير تحميلها الخاص، وكذلك
+  // loadLoginDataForAuthedUser).
+  // onError (اختيارية) تُستدعى مع بقاء الواجهة قابلة لإعادة المحاولة عند فشل تسجيل الدخول نفسه.
+  function completeLoginWithToken(res, spinnerSelector, onError) {
+    loadingStart();
+    initFirebaseAuth();
+    applyAuthPersistence(!!res.hasPassword).then(function () {
+      return firebase.auth().signInWithCustomToken(res.token);
+    }).then(function () {
+      if (spinnerSelector) document.querySelector(spinnerSelector)?.classList.add('d-none');
+      loadingEnd();
+      AUTH_FRESH_LOGIN = true;
+      if (AUTH_RESET_MODE) {
+        AUTH_RESET_MODE = false;
+        promptForNewPassword(res.email, true, function () {
+          loadLoginDataForAuthedUser(AUTH_CPR);
+        });
+      } else {
+        maybeOfferSetPassword(res.email, res.hasPassword, function () {
+          loadLoginDataForAuthedUser(AUTH_CPR);
+        });
+      }
+    }).catch(function (err) {
+      if (spinnerSelector) document.querySelector(spinnerSelector)?.classList.add('d-none');
+      loadingEnd();
+      alertMSG('تعذر إتمام تسجيل الدخول: ' + err.message, 'error');
+      if (typeof onError === 'function') onError();
+    });
+  }
+
+  function verifyLoginCode() {
+    const verifyBtn = document.querySelector('#verifyCodeBtn');
+    if (verifyBtn?.disabled) return;
+
+    const code = document.querySelector('#otpCode').value.trim();
+    if (!code) { alertMSG('يرجى إدخال الرمز', 'error'); return; }
+
+    if (verifyBtn) verifyBtn.disabled = true;
+    document.querySelector('#verifySpin')?.classList.remove('d-none');
+    loadingStart();
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res.ok) {
+        loadingEnd();
+        if (verifyBtn) verifyBtn.disabled = false;
+        document.querySelector('#verifySpin')?.classList.add('d-none');
+        alertMSG(res.message || 'الرمز غير صحيح', 'error');
+        return;
+      }
+      completeLoginWithToken(res, '#verifySpin', function () {
+        if (verifyBtn) verifyBtn.disabled = false;
+      });
+    }).withFailureHandler(function (err) {
+      loadingEnd();
+      if (verifyBtn) verifyBtn.disabled = false;
+      document.querySelector('#verifySpin')?.classList.add('d-none');
+      alertMSG('تعذّر التحقق من الرمز: ' + err, 'error');
+    }).verifyLoginCode(AUTH_CPR, code);
+  }
+
+  // After a fresh CPR+code login, require creating a password (mandatory —
+  // cannot be dismissed or skipped) so future logins can use the CPR +
+  // password directly instead of waiting for a code every time.
+  function maybeOfferSetPassword(email, hasPassword, done) {
+    if (hasPassword || !email) { done(); return; }
+    promptForNewPassword(email, false, done);
+  }
+
+  // hasPassword = false → first-time activation (link a new password credential).
+  // hasPassword = true  → password reset (update the existing credential).
+  function promptForNewPassword(email, hasPassword, done) {
+    Swal.fire({
+      title: hasPassword ? 'إعادة تعيين كلمة المرور' : 'إنشاء كلمة المرور',
+      width: 620,
+      customClass: { popup: 'authResetModalPopup' },
+      html:
+        '<p class="mb-5">' + (hasPassword
+          ? 'يرجى اختيار كلمة مرور جديدة لحسابك'
+          : 'يجب عليك إنشاء كلمة مرور لحسابك لإتمام العملية، لتتمكّن في المرة القادمة من الدخول بالرقم الشخصي وكلمة المرور مباشرةً بدلًا من انتظار الرمز.') +
+        '</p>' +
+        '<div class="position-relative mb-3 mx-auto" style="max-width:340px;">' +
+          '<input id="swalNewPassword" type="password" class="form-control text-center fs-5 rounded-5" style="height:56px;padding-inline-end:45px;" placeholder="كلمة المرور (٦ أحرف على الأقل)">' +
+          '<i class="fas fa-eye position-absolute" id="toggleSwalNewPassword" style="top:50%; inset-inline-end:20px; transform:translateY(-50%); cursor:pointer; color:#888;"></i>' +
+        '</div>' +
+        '<div class="position-relative mb-0 mx-auto" style="max-width:340px;">' +
+          '<input id="swalConfirmPassword" type="password" class="form-control text-center fs-5 rounded-5" style="height:56px;padding-inline-end:45px;" placeholder="تأكيد كلمة المرور">' +
+          '<i class="fas fa-eye position-absolute" id="toggleSwalConfirmPassword" style="top:50%; inset-inline-end:20px; transform:translateY(-50%); cursor:pointer; color:#888;"></i>' +
+        '</div>',
+      icon: 'info',
+      confirmButtonText: hasPassword ? 'حفظ كلمة المرور' : 'إنشاء كلمة المرور',
+      confirmButtonColor: '#df2336',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showCancelButton: false,
+      focusConfirm: false,
+      didOpen: function () {
+        document.querySelector('#toggleSwalNewPassword')?.addEventListener('click', function () {
+          togglePasswordVisibility('swalNewPassword', 'toggleSwalNewPassword');
+        });
+        document.querySelector('#toggleSwalConfirmPassword')?.addEventListener('click', function () {
+          togglePasswordVisibility('swalConfirmPassword', 'toggleSwalConfirmPassword');
+        });
+      },
+      preConfirm: function () {
+        const pass = document.getElementById('swalNewPassword').value;
+        const confirmPass = document.getElementById('swalConfirmPassword').value;
+        if (!pass || pass.length < 6) {
+          Swal.showValidationMessage('يجب أن تتكوّن كلمة المرور من ٦ أحرف على الأقل');
+          return false;
+        }
+        if (pass !== confirmPass) {
+          Swal.showValidationMessage('كلمتا المرور غير متطابقتين');
+          return false;
+        }
+        return pass;
+      }
+    }).then(function (result) {
+      if (!result.isConfirmed || !result.value) { promptForNewPassword(email, hasPassword, done); return; }
+      // يُحفَظ من طرف الخادم مباشرةً (لا نستخدم linkWithCredential/updatePassword في
+      // المتصفح) لأنهما يتطلبان جلسة "حديثة الدخول"، وقد تنتهي صلاحية ذلك بينما
+      // يكتب المستخدم كلمة المرور في هذه النافذة (auth/requires-recent-login).
+      loadingStart(); // تفاديًا لأي ضغط متكرر أثناء انتظار حفظ كلمة المرور على الخادم
+      google.script.run.withSuccessHandler(function (res) {
+        if (!res || !res.ok) {
+          loadingEnd();
+          alertMSG('تعذّر حفظ كلمة المرور: ' + ((res && res.message) || 'خطأ غير متوقع'), 'error');
+          done();
+          return;
+        }
+        // الآن أصبح الحساب مكتمل الإعداد (بريد مفعَّل + كلمة مرور)، فيمكن تذكّر
+        // الجهاز فعليًا من هذه اللحظة.
+        applyAuthPersistence(true).then(function () {
+          loadingEnd();
+          alertMSG(hasPassword ? 'تم تحديث كلمة المرور بنجاح' : 'تم إنشاء كلمة المرور بنجاح', 'success');
+          done();
+        });
+      }).withFailureHandler(function (err) {
+        loadingEnd();
+        alertMSG('تعذّر حفظ كلمة المرور: ' + err, 'error');
+        done();
+      }).setPassword(AUTH_CPR, result.value);
+    });
+  }
+
+  function passwordLogin() {
+    const btn = document.querySelector('#passwordLoginBtn');
+    if (btn?.disabled) return;
+
+    const cpr = document.querySelector('#userId').value.trim();
+    const password = document.querySelector('#loginPassword').value;
+    if (!cpr || !password) { alertMSG('يرجى إدخال الرقم الشخصي وكلمة المرور', 'error'); return; }
+    AUTH_CPR = cpr;
+
+    initFirebaseAuth();
+    if (btn) btn.disabled = true;
+    document.querySelector('#passwordLoginSpin')?.classList.remove('d-none');
+    loadingStart();
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res.ok) {
+        loadingEnd();
+        if (btn) btn.disabled = false;
+        document.querySelector('#passwordLoginSpin')?.classList.add('d-none');
+        alertMSG(res.message || 'كلمة المرور غير صحيحة', 'error');
+        return;
+      }
+      // نُبقي الزر معطَّلًا والتحميل ظاهرًا طوال خطوة تسجيل الدخول الفعلية في Firebase، فلا
+      // يُعاد تفعيلهما إلا عند فشلها (النجاح ينقل المستخدم لصفحة أخرى فلا داعي لذلك).
+      // تذكّر الجهاز مرتبط الآن بمربع "تذكرني" الذي يتحكم به المستخدم صراحةً، وليس تلقائيًا.
+      const rememberMe = !!document.querySelector('#rememberMeCheck')?.checked;
+      applyAuthPersistence(rememberMe).then(function () {
+        return firebase.auth().signInWithCustomToken(res.token);
+      }).then(function () {
+        document.querySelector('#passwordLoginSpin')?.classList.add('d-none');
+        loadingEnd();
+        AUTH_FRESH_LOGIN = true;
+        loadLoginDataForAuthedUser(AUTH_CPR);
+      }).catch(function (err) {
+        loadingEnd();
+        if (btn) btn.disabled = false;
+        document.querySelector('#passwordLoginSpin')?.classList.add('d-none');
+        alertMSG('تعذر إتمام تسجيل الدخول: ' + err.message, 'error');
+      });
+    }).withFailureHandler(function (err) {
+      loadingEnd();
+      if (btn) btn.disabled = false;
+      document.querySelector('#passwordLoginSpin')?.classList.add('d-none');
+      alertMSG('تعذّر تسجيل الدخول: ' + err, 'error');
+    }).loginWithPassword(cpr, password);
+  }
+
+  // Reuses the existing OTP send/verify flow to re-authenticate the user,
+  // then forces the password-reset variant of the set-password dialog.
+  function forgotPasswordClick() {
+    const btn = document.querySelector('#forgotPasswordBtn');
+    if (btn?.disabled) return;
+    // رسالة ثابتة تظهر دائمًا فور الضغط، بغضّ النظر عمّا يحدث لاحقًا (رمز جديد أو صدّ الخادم
+    // لطلب مبكر) — الزر الفعلي المسؤول عن الإرسال (#sendCodeBtn) مخفي في هذا السياق، فبدون
+    // تنبيه فوري هنا لا يظهر للمستخدم أي مؤشر أن شيئًا يحدث، فيضغط عدة مرات.
+    alertMSG('سيتم إرسال كود التحقق إلى بريدك ' + (AUTH_CPR_MASKED_EMAIL || 'المسجَّل'), 'info');
+    if (btn) {
+      btn.disabled = true;
+      setTimeout(function () { btn.disabled = false; }, 4000);
+    }
+    AUTH_RESET_MODE = true;
+    sendLoginCode();
+  }
+
+  function forLogin() {
+    const cprStepForm = document.querySelector('#cprStepForm');
+    // حارس ضد الربط المزدوج: لو استُدعيت forLogin أكثر من مرة على نفس عناصر DOM (بدل عناصر
+    // جديدة أُنشئت من جديد عند إعادة تحميل الصفحة)، لا نُضيف نفس المستمعين مرة أخرى — كان هذا
+    // يتسبب أحيانًا بإرسال رمز التحقق مرتين عند ضغطة واحدة على "إرسال رمز التحقق".
+    if (cprStepForm && cprStepForm.dataset.bound) return;
+    if (cprStepForm) cprStepForm.dataset.bound = '1';
+
+    document.querySelector('#sendCodeBtn')?.addEventListener('click', sendLoginCode);
+    document.querySelector('#verifyCodeBtn')?.addEventListener('click', verifyLoginCode);
+    document.querySelector('#resendCodeBtn')?.addEventListener('click', sendLoginCode);
+    document.querySelector('#passwordLoginBtn')?.addEventListener('click', passwordLogin);
+    document.querySelector('#forgotPasswordBtn')?.addEventListener('click', forgotPasswordClick);
+    document.querySelector('#toggleLoginPassword')?.addEventListener('click', function () {
+      togglePasswordVisibility('loginPassword', 'toggleLoginPassword');
+    });
+
+    document.querySelector('#userId')?.addEventListener('input', checkCprStatusOnInput);
+    document.querySelector('#otpCode')?.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault(); // تفاديًا لأي إرسال إضافي للنموذج بسلوك المتصفح الافتراضي لمفتاح Enter
+      verifyLoginCode();
+    });
+    document.querySelector('#userId')?.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const passwordDiv = document.querySelector('#passwordLoginDiv');
+      if (passwordDiv && !passwordDiv.classList.contains('d-none')) {
+        document.querySelector('#loginPassword')?.focus();
+      } else {
+        sendLoginCode();
+      }
+    });
+    document.querySelector('#loginPassword')?.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      passwordLogin();
+    });
+  }
+
+  // ===================================================================
+  // Logout — single implementation used everywhere (nav-link#logOut and
+  // any onclick="logout()" button). Signs out of Firebase, clears server
+  // + client storage, then does a full top-level reload back to the
+  // login screen (which also resets every JS global back to its initial
+  // state, since it's a fresh page load).
+  // ===================================================================
+  function logout() {
+    Swal.fire({
+      title: 'هل أنت متأكد؟',
+      text: "سيتم تسجيل الخروج",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#df2336',
+      confirmButtonText: 'نعم، خروج',
+      cancelButtonText: 'إلغاء'
+    }).then((result) => {
+      if (result.isConfirmed) performLogout();
+    });
+  }
+
+  function performLogout() {
+    const finish = function () {
+      sessionStorage.clear();
+      localStorage.clear();
+      const baseUrl = window.location.href.split('?')[0];
+      const redirect = function () { window.top.location = baseUrl + '?logout=1&t=' + Date.now(); };
+      google.script.run.withSuccessHandler(redirect).withFailureHandler(redirect).clearUserData();
+    };
+
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      firebase.auth().signOut().catch(function () {}).then(finish);
+    } else {
+      finish();
+    }
+  }
+</script>
+

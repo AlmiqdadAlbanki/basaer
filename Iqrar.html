@@ -1,0 +1,124 @@
+<!-- صفحة "إقرار" — أُعيد تصميمها لتطابق تصميمًا مرجعيًا (لقطة شاشة) بطلب المستخدم: بطاقة يسرى
+     "ملخّص الاختبار" (اسم الاختبار + مدة + عدد محاولات + تنبيه) وبطاقة يمنى "ضوابط أداء الاختبار"
+     (4 بنود توضيحية + مربع إقرار أحمر بزر بدء يتعطّل حتى يُفعَّل الإقرار)، فوق نفس رأس sp-exam-header
+     المستخدم بصفحة أداء الاختبار questions.html. نص الإقرار محفوظ حرفيًا دون أي تغيير بطلب صريح
+     من المستخدم. **تكييف واحد أمين عن المرجع**: "عدد الأسئلة" حُذف من بطاقة الملخص عمدًا — العدد
+     الحقيقي غير معروف بهذه المرحلة أصلًا (يُحدَّد فقط بعد اختيار نموذج عشوائي عند الضغط على "ابدأ
+     الاختبار"، ومعرفته الآن تتطلب إما تخمينًا قد يكون خاطئًا لو تعدّدت النماذج بأعداد مختلفة، أو
+     بدء جلسة الاختبار الفعلية مبكرًا وهو ما يجب ألا يحدث قبل ضغط الطالب فعليًا على الزر). "مقرر..."
+     كنص فرعي تحت اسم الاختبار حُذف أيضًا لعدم وجود بيانات "مقرر أب" منفصلة بهذا النظام.
+     تعتمد على نفس المتغيرات العامة الضمنية branch/hd/md (تُضبَط في exams-tab-pane عند اختيار
+     اختبار)، ولا تُغيَّر آلية العمل الأساسية: تأكيد الإقرار عبر #acceptIqrar ثم #iqrarBtn ينادي
+     loadQuestions() مباشرة (js.html). مُضمَّنة في #studentPortal.sp-embedded كبقية الصفحات
+     المستقلة (loadPage يستبدل #app بالكامل). -->
+<div id="studentPortal" class="sp-embedded">
+<div class="sp-exam-app">
+
+  <header class="sp-exam-header">
+    <div class="sp-exam-header-inner">
+      <a class="sp-exam-brand" href="#" onclick="return false" aria-label="أكاديمية بصائر">
+        <img src="https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&amp;sz=w1000" alt="بصائر">
+      </a>
+
+      <div class="sp-exam-copy">
+        <span id="spExamLevelLabel"></span>
+        <strong id="spExamNameLabel"></strong>
+      </div>
+
+      <div class="sp-exam-header-status">
+        <div class="sp-exam-student-chip" title="الطالب الحالي">
+          <span id="spExamStudentInitial"></span>
+          <div>
+            <small>الطالب</small>
+            <strong id="spExamStudentName"></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="sp-exam-intro">
+      <div class="sp-exam-intro-inner">
+        <div>
+          <span class="sp-exam-eyebrow"><i></i>قبل بدء الاختبار</span>
+          <h1>اقرأ التعليمات وأكّد التزامك</h1>
+          <p>لن يبدأ احتساب الوقت إلا بعد تفعيل الإقرار والضغط على زر بدء الاختبار.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="sp-iqrar-grid">
+      <aside class="sp-iqrar-summary">
+        <div class="sp-iqrar-summary-icon"><i class="bi bi-clipboard2-check"></i></div>
+        <span class="sp-exam-section-kicker">اختبار المقرر</span>
+        <h2 id="spExamTitle" class="sp-iqrar-summary-title"></h2>
+
+        <div class="sp-iqrar-stat-list">
+          <div class="sp-iqrar-stat-row"><span><i class="bi bi-hourglass-split"></i>مدة الاختبار</span><b id="spIqrarDuration">—</b></div>
+          <div class="sp-iqrar-stat-row"><span><i class="bi bi-send-check"></i>المحاولة</span><b>مرة واحدة</b></div>
+        </div>
+
+        <div class="sp-iqrar-tip">
+          <i class="bi bi-clock-history"></i>
+          <div><strong>تنبيه مهم</strong><span>لا تضغط على البدء إلا حين تكون مستعدًا؛ سيبدأ احتساب الوقت مباشرة.</span></div>
+        </div>
+      </aside>
+
+      <section class="sp-exam-questions-region">
+        <article class="sp-exam-question-card">
+          <div class="sp-exam-overview-heading" style="border:0; padding-bottom:0; margin-bottom:16px;">
+            <div>
+              <span>إقرار الطالب</span>
+              <h2>ضوابط أداء الاختبار</h2>
+            </div>
+            <i class="bi bi-shield-check"></i>
+          </div>
+
+          <div class="sp-iqrar-rules-grid">
+            <div class="sp-iqrar-rule-item text-end">
+              <span class="sp-iqrar-rule-icon"><i class="bi bi-ui-checks-grid"></i></span>
+              <div><strong>اختيار من متعدد</strong><span>لكل سؤال إجابة صحيحة واحدة، ويمكنك تعديل اختيارك قبل التسليم.</span></div>
+            </div>
+            <div class="sp-iqrar-rule-item text-end">
+              <span class="sp-iqrar-rule-icon"><i class="bi bi-arrow-repeat"></i></span>
+              <div><strong>راجع إجاباتك</strong><span>تظهر جميع الأسئلة في صفحة واحدة، ويمكنك الرجوع إليها قبل التسليم النهائي.</span></div>
+            </div>
+            <div class="sp-iqrar-rule-item text-end">
+              <span class="sp-iqrar-rule-icon"><i class="bi bi-clock"></i></span>
+              <div><strong>الوقت يبدأ عند الدخول</strong><span id="dText">يبدأ المؤقت فور الضغط على البدء، ويستمر لمدة </span></div>
+            </div>
+            <div class="sp-iqrar-rule-item text-end">
+              <span class="sp-iqrar-rule-icon"><i class="bi bi-cloud-check"></i></span>
+              <div><strong>الحفظ أثناء التقدّم</strong><span>تُحفظ اختياراتك أثناء الاختبار، وتُرسل الإجابات فقط بعد تأكيد التسليم.</span></div>
+            </div>
+          </div>
+
+          <!-- بند مميز وموضح عن سياسة تكرار الدخول لهذا الاختبار (allowReentry بشيت rules) —
+               يُملَأ ديناميكيًا (setIqrarData، funcs-js.html) حسب إعداد هذا الاختبار تحديدًا. -->
+          <div class="sp-iqrar-reentry-notice" id="spIqrarReentryNotice">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div><strong id="spIqrarReentryTitle"></strong><span id="spIqrarReentryText"></span></div>
+          </div>
+
+          <label class="sp-iqrar-check">
+            <div class="sp-iqrar-check-head">
+              <input type="radio" name="acceptIqrar" id="acceptIqrar">
+              <span class="sp-iqrar-check-title">أقرّ وأتعهد</span>
+            </div>
+            <span class="sp-iqrar-check-text">طالب/ـة العلم .. استعن بالله وتوكّل عليه، واعتمد على نفسك دون الرجوع إلى أي وسيلة مساعدة؛ بالإضافة إلى عدم مشاركة أسئلة الاختبار أو تصويرها.</span>
+          </label>
+
+          <p class="sp-iqrar-hint"><i class="bi bi-info-circle"></i>فعّل الإقرار للانتقال إلى الاختبار.</p>
+
+          <div class="sp-iqrar-actions">
+            <button id="iqrarExit" type="button" class="sp-exam-secondary-btn"><i class="bi bi-arrow-right"></i>العودة</button>
+            <button id="iqrarBtn" type="button" class="sp-exam-primary-btn" disabled><i class="bi bi-play-fill"></i>استعن بالله وابدأ الاختبار</button>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+</div>
+</div>

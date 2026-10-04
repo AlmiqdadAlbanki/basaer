@@ -1,0 +1,160 @@
+<script>
+/*
+ * استبيان الطلاب — بوابتان إلزاميتان (لا يمكن تخطّيهما، Swal.fire بـallowOutsideClick:false
+ * وallowEscapeKey:false وشوCancelButton:false، بنفس نمط promptForNewPassword بـauth-js.html):
+ * قبل بدء أي اختبار (المادة المقررة/المحاضر/تقييم عام للإدارة) وقبل رؤية نتيجته (الاختبار
+ * نفسه). استبانة عامة واحدة لكل نوع تتكرر لكل اختبار وليست مخصَّصة له — لكن اسم الاختبار
+ * والمرحلة يُخزَّنان مع كل إجابة (شيت surveys) ويظهران بوضوح أعلى المودال.
+ *
+ * ملاحظة تصميم مهمة: التقييم الآن أزرار راديو HTML أصلية (مخفية بصريًا، مع <label for="">
+ * مرتبطة بها تُنقَر بدلًا منها) بدل أي عنصر يعتمد نقرًا مُبرمَجًا (onclick أو addEventListener
+ * مفوَّض). كلا الأسلوبين السابقين (تفويض نقر عبر closest()، ثم onclick مباشر) ظلّا لا
+ * يستجيبان فعليًا لنقر المستخدم رغم وصول الكود سليمًا للمتصفح (تحقَّق بمقارنة السحب/الدفع)،
+ * فتقرَّر الاعتماد على تفاعل المتصفح الأصلي (native) الذي لا يحتاج أي جافاسكربت مخصَّص لالتقاط
+ * النقر إطلاقًا — فقط قراءة القيمة المحدَّدة (:checked) عند preConfirm.
+ *
+ * **تعريف الأسئلة هنا يجب مطابقته يدويًا لنفس التعريف بجانب الخادم (code.js:
+ * SURVEY_PRE_GROUPS_/SURVEY_PRE_STANDALONE_/SURVEY_POST_STANDALONE_)** — Apps Script HTML
+ * Service لا تسمح بمشاركة كائن واحد بين كود الخادم وكود العميل.
+ */
+
+var SURVEY_PRE_GROUPS = [
+  { title: 'المادة المقررة', fields: [
+    { key: 'subject_need', label: 'مدى الحاجة إلى هذه المادة' },
+    { key: 'subject_difficulty', label: 'مستوى صعوبة المادة' },
+    { key: 'subject_society_need', label: 'مدى حاجة المجتمع إلى هذه المادة' },
+    { key: 'subject_added_value', label: 'مقدار الإضافة العلمية التي حقّقتها المادة لمعلوماتك' },
+    { key: 'subject_size', label: 'مدى مناسبة حجم المادة وكمّها' }
+  ] },
+  { title: 'المحاضر', fields: [
+    { key: 'lecturer_adherence', label: 'مدى التزام المحاضر بالمقرر' },
+    { key: 'lecturer_style', label: 'أسلوب المحاضر في الشرح' },
+    { key: 'lecturer_time', label: 'التزام المحاضر بالوقت المحدَّد' },
+    { key: 'lecturer_communication', label: 'تواصل المحاضر مع الطلاب' }
+  ] }
+];
+var SURVEY_PRE_ADMIN_FIELD = { key: 'admin', label: 'تقييمك لإدارة الأكاديمية بشكل عام' };
+var SURVEY_POST_FIELDS = [
+  { key: 'exam_level', label: 'مستوى الاختبار', options: ['سهل جدًا', 'سهل', 'متوسط', 'صعب', 'صعب جدًا'] },
+  { key: 'exam_length', label: 'مدى مناسبة طول الاختبار' },
+  { key: 'exam_comprehensiveness', label: 'مدى شمول الاختبار لمحتوى المادة' },
+  { key: 'exam_clarity', label: 'وضوح صياغة أسئلة الاختبار' }
+];
+
+function buildSurveyRatingField(fieldKey, label, options) {
+  var name = 'survey_' + fieldKey;
+  var opts = (options || ['1', '2', '3', '4', '5']).map(function (opt, i) {
+    var id = name + '_' + (i + 1);
+    return '<input type="radio" name="' + name + '" id="' + id + '" value="' + (i + 1) + '"><label for="' + id + '">' + opt + '</label>';
+  }).join('');
+  return '<div class="survey-field"><label class="survey-field-title">' + label + '</label>' +
+    '<div class="survey-scale" data-field="' + fieldKey + '">' + opts + '</div></div>';
+}
+
+// مجموعة أسئلة تحت عنوان فرعي واحد (المادة المقررة/المحاضر) — نفس buildSurveyRatingField
+// مكرَّرة لكل سؤال بالمجموعة، ملفوفة ببطاقة بعنوان.
+function buildSurveyFieldGroup(title, fields) {
+  return '<div class="survey-field-group"><span class="survey-group-title">' + title + '</span>' +
+    fields.map(function (f) { return buildSurveyRatingField(f.key, f.label, f.options); }).join('') +
+    '</div>';
+}
+
+function surveyAllPreFieldKeys() {
+  var keys = SURVEY_PRE_GROUPS.reduce(function (acc, g) { return acc.concat(g.fields.map(function (f) { return f.key; })); }, []);
+  keys.push(SURVEY_PRE_ADMIN_FIELD.key);
+  return keys;
+}
+
+function readSurveyRatings(fields) {
+  var values = {}, missing = [];
+  fields.forEach(function (f) {
+    var checked = document.querySelector('input[name="survey_' + f + '"]:checked');
+    var val = checked ? +checked.value : 0;
+    if (!val) missing.push(f);
+    values[f] = val;
+  });
+  return { values: values, missing: missing };
+}
+
+// شارة "الاختبار — المرحلة" أعلى كل مودال، لأن اسم الاختبار وحده مش كافٍ لتمييز نفس المادة
+// بمراحل مختلفة — تُخزَّن نفس القيمتين مع كل صف بشيت surveys أصلًا، وهذا العرض فقط توضيح
+// للطالب وتأكيد بصري إنه بيقيّم الاختبار/المرحلة الصحيحة.
+function surveyContextBadgeHtml(examName, level) {
+  var levelName = (typeof getLevelName === 'function') ? getLevelName(level) : '';
+  return '<div class="survey-context-badge"><i class="bi bi-journal-check"></i><span>' + examName + (levelName ? ' — ' + levelName : '') + '</span></div>';
+}
+
+function showPreExamSurveyGate(examName, level, done) {
+  var html =
+    surveyContextBadgeHtml(examName, level) +
+    '<p class="mb-4 text-muted">قبل بدء الاختبار، شاركنا رأيك (١ = ضعيف، ٥ = ممتاز):</p>' +
+    SURVEY_PRE_GROUPS.map(function (g) { return buildSurveyFieldGroup(g.title, g.fields); }).join('') +
+    buildSurveyFieldGroup('تقييم عام', [SURVEY_PRE_ADMIN_FIELD]) +
+    '<div class="survey-field"><label class="survey-field-title">ملاحظات إضافية (اختياري)</label><textarea id="surveyPreComment" class="form-control" rows="2" maxlength="500"></textarea></div>';
+
+  Swal.fire({
+    title: 'استبيان قبل الاختبار',
+    width: 620,
+    customClass: { popup: 'surveyModalPopup' },
+    html: html,
+    confirmButtonText: 'متابعة إلى الاختبار',
+    confirmButtonColor: '#df2336',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showCancelButton: false,
+    focusConfirm: false,
+    preConfirm: function () {
+      var res = readSurveyRatings(surveyAllPreFieldKeys());
+      if (res.missing.length) { Swal.showValidationMessage('يرجى تقييم جميع العناصر قبل المتابعة'); return false; }
+      return { ratings: res.values, comment: (document.getElementById('surveyPreComment').value || '').trim() };
+    }
+  }).then(function (result) {
+    if (!result.isConfirmed) { showPreExamSurveyGate(examName, level, done); return; }
+    // المودال يُغلَق فورًا هنا، لكن loadQuestions() (اللي بتبدأ مؤشر التحميل) مش بتُستدعى إلا
+    // بعد رد submitExamSurvey — فبدون هذا السطر تظهر فجوة صامتة بلا أي مؤشر انتقال أثناء رحلة
+    // الشبكة دي تحديدًا. loadingEnd() الفعلي بيحصل لاحقًا تلقائيًا جوّة setExamBody() بمجرد
+    // وصول الأسئلة (funcs-js.html) — استدعاء loadQuestions() لـloadingStart() مرة تانية هناك
+    // غير ضار (يزيل نفس الكلاس مرتين بلا أثر).
+    loadingStart();
+    google.script.run
+      .withSuccessHandler(function () { done(); })
+      .withFailureHandler(function () { done(); }) // خلل مؤقت بالخادم لا يجوز أن يمنع الطالب من دخول اختباره
+      .submitExamSurvey(studentData[0].cpr, studentData[0].name, examName, level, 'pre', result.value.ratings, result.value.comment);
+  });
+}
+
+function showPostExamSurveyGate(examName, level, done) {
+  var html =
+    surveyContextBadgeHtml(examName, level) +
+    '<p class="mb-4 text-muted">قبل عرض نتيجتك، شاركنا رأيك:</p>' +
+    SURVEY_POST_FIELDS.map(function (f) { return buildSurveyRatingField(f.key, f.label, f.options); }).join('') +
+    '<div class="survey-field"><label class="survey-field-title">ملاحظات إضافية (اختياري)</label><textarea id="surveyPostComment" class="form-control" rows="2" maxlength="500"></textarea></div>';
+
+  Swal.fire({
+    title: 'استبيان بعد الاختبار',
+    width: 560,
+    customClass: { popup: 'surveyModalPopup' },
+    html: html,
+    confirmButtonText: 'عرض النتيجة',
+    confirmButtonColor: '#df2336',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showCancelButton: false,
+    focusConfirm: false,
+    preConfirm: function () {
+      var res = readSurveyRatings(SURVEY_POST_FIELDS.map(function (f) { return f.key; }));
+      if (res.missing.length) { Swal.showValidationMessage('يرجى تقييم جميع العناصر قبل المتابعة'); return false; }
+      return { ratings: res.values, comment: (document.getElementById('surveyPostComment').value || '').trim() };
+    }
+  }).then(function (result) {
+    if (!result.isConfirmed) { showPostExamSurveyGate(examName, level, done); return; }
+    // نفس فجوة المودال القبلي أثناء رحلة الشبكة، لكن هنا done (revealExamResult) عرض محلي
+    // فوري بلا مسار loadingEnd() خاص به — لازم إغلاق المؤشر يدويًا هنا بعد وصول الرد مباشرة.
+    loadingStart();
+    google.script.run
+      .withSuccessHandler(function () { loadingEnd(); done(); })
+      .withFailureHandler(function () { loadingEnd(); done(); }) // خلل مؤقت بالخادم لا يجوز أن يمنع الطالب من رؤية نتيجته
+      .submitExamSurvey(studentData[0].cpr, studentData[0].name, examName, level, 'post', result.value.ratings, result.value.comment);
+  });
+}
+</script>

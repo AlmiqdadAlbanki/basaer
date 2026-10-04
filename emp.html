@@ -1,0 +1,502 @@
+<div class="emp-admin-preview-bar d-none" id="empAdminPreviewBar">
+  <i class="bi bi-eye"></i>
+  <span>وضع معاينة الإدارة — تُعرَض الآن صفحة المتعاون: <strong id="empAdminPreviewName"></strong></span>
+  <button type="button" id="empAdminPreviewExitBtn"><i class="bi bi-box-arrow-left"></i> العودة إلى لوحة الإدارة</button>
+</div>
+<style>
+  .emp-admin-preview-bar {
+    display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 16px; margin-bottom: 6px;
+    color: #fff; background: linear-gradient(90deg, #a76a14, #c98a1f);
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  }
+  .emp-admin-preview-bar strong { font-weight: 800; }
+  .emp-admin-preview-bar button {
+    border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.12); color: #fff;
+    border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .emp-admin-preview-bar button:hover { background: rgba(255,255,255,0.22); }
+</style>
+
+<!-- الغلاف مطابق حرفيًا لنفس مكوّنات المرجع basair-admin-suite/index.html (نفس البنية
+     المستخدَمة أصلًا في adminDashboard.html). عناصر القائمة الجانبية تُبنى ديناميكيًا في
+     setEmpDash() (funcs-js.html) حسب صلاحيات المتعاون الحالي، ومسارات emp-* مسجَّلة هناك
+     داخل نفس ADMIN_ROUTE_TITLES_/ADMIN_ROUTE_LOADERS_ المستخدَمة للوحة الإدارة الكاملة. -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand-wrap">
+    <img src="https://drive.google.com/thumbnail?id=1zgseX_0_TPsyQlCjiTjKzxJ4dR5lZ1_7&sz=w1000" alt="أكاديمية بصائر">
+    <button class="icon-button sidebar-close" id="sidebarClose" type="button" aria-label="إغلاق القائمة"><i data-icon="x"></i></button>
+  </div>
+
+  <nav class="main-nav" aria-label="التنقل الرئيسي" id="empMainNav">
+    <span class="nav-caption">نظرة عامة</span>
+    <button class="nav-link active" type="button" data-route="emp-home"><i data-icon="layout-dashboard"></i><span>الرئيسة</span></button>
+    <!-- باقي العناصر تُضاف هنا ديناميكيًا من setEmpDash() حسب صلاحيات المتعاون -->
+  </nav>
+
+  <div class="sidebar-status">
+    <div class="live-content">
+      <span class="status-dot"></span>
+      <div><strong>النظام يعمل بصورة طبيعية</strong><small id="sidebarSyncTime">آخر مزامنة الآن</small></div>
+    </div>
+  </div>
+
+  <div class="sidebar-user">
+    <span class="avatar" id="sidebarUserAvatar">–</span>
+    <div><strong id="sidebarUserName">—</strong><small id="sidebarUserRole">متعاون</small></div>
+    <button class="icon-button" id="logOut" type="button" title="تسجيل الخروج" onclick="logout()"><i data-icon="log-out"></i></button>
+  </div>
+</aside>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-start">
+      <button class="icon-button mobile-menu" id="mobileMenu" type="button" aria-label="فتح القائمة"><i data-icon="menu"></i></button>
+      <div class="breadcrumb"><span>بوابة المتعاون</span><i data-icon="chevron-left"></i><strong id="breadcrumbTitle">الرئيسة</strong></div>
+    </div>
+    <div class="topbar-actions">
+      <div class="font-control">
+        <button class="icon-button" id="fontSizeButton" type="button" aria-label="حجم الخط" aria-expanded="false" title="تغيير حجم الخط"><i data-icon="text-height"></i></button>
+        <div class="font-size-menu" id="fontSizeMenu" hidden>
+          <header><i data-icon="text-height"></i><span><strong>حجم خط الواجهة</strong><small>يُحفظ اختيارك على هذا الجهاز</small></span></header>
+          <div class="font-size-options" role="group" aria-label="اختيار حجم الخط">
+            <button type="button" data-font-size="small" aria-pressed="false"><b>أ</b><span>صغير</span></button>
+            <button class="active" type="button" data-font-size="medium" aria-pressed="true"><b>أ</b><span>متوسط</span></button>
+            <button type="button" data-font-size="large" aria-pressed="false"><b>أ</b><span>كبير</span></button>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="qrButton" class="icon-button qr-button" title="تحضير طالب عبر QR" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i></button>
+      <button class="user-button" id="userButton" type="button"><span class="avatar" id="topbarUserAvatar">–</span><span><strong id="topbarUserName">—</strong><small id="topbarUserRole">متعاون</small></span><i data-icon="chevron-down"></i></button>
+    </div>
+    <div class="user-menu" id="userMenu" hidden>
+      <button type="button" data-route="emp-profile"><i data-icon="user-round"></i>الملف الشخصي</button>
+      <button type="button" onclick="logout()"><i data-icon="log-out"></i>تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- الرئيسة -->
+    <section class="page-view active" data-page="emp-home">
+      <header class="page-heading">
+        <div><span class="eyebrow" id="dashboardEyebrow">—</span><h1 id="empHomeGreeting">أهلًا بك</h1><p>اختر قسمًا من القائمة الجانبية للبدء، أو من الوصول السريع بالأسفل.</p></div>
+      </header>
+      <section class="panel quick-panel" id="empQuickLinksPanel" style="display:none;">
+        <header class="panel-header"><div><h2>الوصول السريع</h2><p>الأقسام المتاحة لك حسب صلاحيتك</p></div></header>
+        <div class="quick-actions" id="empQuickLinks"></div>
+      </section>
+    </section>
+
+    <!-- تسجيل الحضور: صفحة مدمجة داخل نفس الغلاف (بلا استبدال #app بالكامل) تمامًا كالتسميع —
+         مُحمِّل المسار (emp-attendreg في registerEmpRoutes) يستدعي loadEmpAttendRegRoute()
+         التي تعرض مؤشر التحميل العام (loadingStart/loadingEnd) أثناء الجلب، بنفس قالب الجداول
+         القابلة للفرز/الترقيم المستخدَم في بقية لوحة الإدارة (renderPagination/updateSortIndicator). -->
+    <section class="page-view" data-page="emp-attendreg">
+      <header class="page-heading">
+        <div><span class="eyebrow">تسجيل الحضور</span><h1>تسجيل الحضور</h1><p>ابحث عن الطالب لفتح بطاقته أو تواصل معه واتساب، أو افتح قارئ QR مباشرة.</p></div>
+        <div class="heading-actions">
+          <button type="button" class="primary-button" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i>فتح قارئ QR</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="table-toolbar">
+          <label class="table-search" style="flex:1;"><i data-icon="search"></i><input id="attendRegSearchInput" type="search" placeholder="اكتب جزءًا من الاسم"></label>
+        </div>
+        <div class="responsive-table">
+          <table id="attendRegTable">
+            <thead>
+              <tr>
+                <th scope="col" style="width:44px;">#</th>
+                <th scope="col" data-sort="name">الاسم</th>
+                <th scope="col" data-sort="level">المرحلة</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="attendRegRowsContainer">
+
+            </tbody>
+          </table>
+        </div>
+        <footer class="table-footer">
+          <div class="page-size">
+            <label for="attendRegPageSize">عدد الصفوف</label>
+            <select id="attendRegPageSize"><option value="50">50</option><option value="100">100</option></select>
+          </div>
+          <div class="pagination" id="attendRegPagination"></div>
+        </footer>
+      </section>
+    </section>
+
+    <!-- التسميع -->
+    <section class="page-view" data-page="emp-dictation">
+      <style>
+        .page-view[data-page="emp-dictation"] .dec-form-grid { display: grid; grid-template-columns: minmax(200px,1.6fr) minmax(200px,1.6fr) minmax(100px,.8fr) minmax(90px,.7fr) minmax(120px,.9fr); gap: 12px; align-items: end; padding: 18px; }
+        .page-view[data-page="emp-dictation"] .dec-submit-btn { height: 39px; }
+        .page-view[data-page="emp-dictation"] .panel + .panel { margin-top: 16px; }
+        @media (max-width: 760px) { .page-view[data-page="emp-dictation"] .dec-form-grid { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .page-view[data-page="emp-dictation"] .dec-form-grid { grid-template-columns: 1fr; } }
+      </style>
+
+      <header class="page-heading">
+        <div><span class="eyebrow">التقييم والمتابعة</span><h1>التسميع</h1><p>سجّل تقييم تسميع الطالب للوِرد، وراجع محاولاته السابقة لكل متن.</p></div>
+        <div class="heading-actions" id="followUpDiv">
+          <button id="followUpBtn" class="secondary-button" type="button"><i data-icon="list-checks"></i>متابعة التسميع</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header"><div><h2>تسجيل تسميع جديد</h2><p>اختر الطالب والمتن والوِرد، ثم أدخل الدرجة</p></div></div>
+        <form id="dectationForm" class="dec-form-grid" novalidate onsubmit="return false">
+          <label class="field">
+            <span>اسم الطالب</span>
+            <input type="text" id="stuName_dec" list="stuNames_dec_list" placeholder="اكتب أي جزء من الاسم" required>
+            <datalist id="stuNames_dec_list"></datalist>
+          </label>
+          <label class="field">
+            <span>اختر المتن</span>
+            <select id="matn_dec" required>
+              <option selected disabled>الأربعون النووية مع الزيادة الرجبية</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>اختر الوِرد</span>
+            <select id="werd_dec" required>
+              <option selected disabled value=""></option>
+              <option>1</option>
+              <option>2</option>
+              <option>3</option>
+              <option>4</option>
+              <option>5</option>
+              <option>6</option>
+              <option>7</option>
+            </select>
+            <small class="werdDetails"></small>
+          </label>
+          <label class="field">
+            <span>الدرجة</span>
+            <select id="degree_dec" required>
+              <option selected disabled value=""></option>
+              <option>1</option>
+              <option>2</option>
+              <option>3</option>
+              <option>4</option>
+            </select>
+          </label>
+          <button class="primary-button dec-submit-btn" type="submit"><i data-icon="circle-check-big"></i>تسجيل</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><div><h2>محاولات سابقة</h2><p>سجل محاولات الطالب المختار للمتن المختار</p></div></div>
+        <div class="responsive-table">
+          <table id="dec_Table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">المتن</th>
+                <th scope="col">الورد</th>
+                <th scope="col">الدرجة</th>
+                <th scope="col">المُسمّع</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="stuDectationTable">
+
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- الاختبارات: لا توجد وظيفة حقيقية مبنية لهذا القسم بعد لجانب المتعاون (بخلاف مسار
+         أداء الطالب للاختبار Iqrar.html/questions.html المنفصل تمامًا) -->
+    <section class="page-view" data-page="emp-exams">
+      <header class="page-heading">
+        <div><span class="eyebrow">التقييم والمتابعة</span><h1>الاختبارات</h1><p></p></div>
+      </header>
+      <section class="panel">
+        <p class="empty-note" style="padding:26px;text-align:center;">لا توجد بيانات بعد.</p>
+      </section>
+    </section>
+
+    <!-- الإدارة: نفس الوجهات القديمة (7 صفحات منفصلة موجودة فعلًا)، بقالب "إجراءات سريعة"
+         من المرجع (dashboard quick-panel) بدل بطاقات Bootstrap القديمة -->
+    <section class="page-view" data-page="emp-manage">
+      <header class="page-heading">
+        <div><span class="eyebrow">الإدارة</span><h1>الإدارة</h1><p>الوصول لأقسام إدارة الأكاديمية.</p></div>
+      </header>
+      <section class="panel quick-panel">
+        <div class="quick-actions">
+          <button type="button" onclick="empOpenCertificates()"><i data-icon="award"></i><span><strong>الشهادات</strong><small>تجهيز الشهادات ومتابعتها</small></span><i data-icon="chevron-left"></i></button>
+          <button type="button" onclick="empOpenCurrentStudents()"><i data-icon="users-round"></i><span><strong>الطلاب الحاليون</strong><small>قوائم الطلاب وبياناتهم</small></span><i data-icon="chevron-left"></i></button>
+          <button type="button" onclick="empOpenNewRegistrations()"><i data-icon="user-round-plus"></i><span><strong>طلبات الالتحاق</strong><small>مراجعة طلبات التسجيل الجديدة</small></span><i data-icon="chevron-left"></i></button>
+          <button type="button" onclick="empOpenStaffManage()"><i data-icon="shield-check"></i><span><strong>القائمون</strong><small>المتعاونون والصلاحيات</small></span><i data-icon="chevron-left"></i></button>
+          <button type="button" onclick="empOpenAllAttendance()"><i data-icon="calendar-check-2"></i><span><strong>حضور الطلاب</strong><small>سجلات الحضور والانضباط</small></span><i data-icon="chevron-left"></i></button>
+          <button type="button" onclick="empOpenStudentWorks()"><i data-icon="scroll-text"></i><span><strong>أعمال الطلاب</strong><small>شهادات الدورات والأعمال</small></span><i data-icon="chevron-left"></i></button>
+        </div>
+      </section>
+    </section>
+
+    <!-- متابعة التسميع: صفحة مدمجة (بلا استبدال #app بالكامل) — تُفتح من زر "متابعة التسميع"
+         داخل صفحة التسميع، ومن بطاقة "الطلاب الحاليون" بقسم الإدارة. زر إرسال واتساب الجماعي
+         (ومجموعة الجنس المرتبطة به) مخفيان مؤقتًا بطلب صريح من المستخدم — الكود باقٍ كاملًا
+         بلا حذف لتفعيلهما لاحقًا بسهولة (فقط إزالة d-none). -->
+    <section class="page-view" data-page="emp-followup">
+      <style>
+        .page-view[data-page="emp-followup"] .curstu-gender-group { display: flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: #f7f9fa; margin-top: 10px; }
+        .page-view[data-page="emp-followup"] .curstu-gender-group input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .page-view[data-page="emp-followup"] .curstu-gender-group label { min-height: 29px; display: flex; align-items: center; padding: 5px 12px; border-radius: 5px; cursor: pointer; color: #687481; font-size: calc(11px + var(--font-adjust)); white-space: nowrap; }
+        .page-view[data-page="emp-followup"] .curstu-gender-group input:checked + label { color: #fff; background: var(--primary); font-weight: 600; }
+      </style>
+
+      <header class="page-heading">
+        <div><span class="eyebrow">التقييم والمتابعة</span><h1>متابعة التسميع</h1><p>راجع سجلات تسميع الطلاب الحاليين حسب المرحلة.</p></div>
+        <div class="heading-actions">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button type="button" class="icon-button excel" onclick="exportCurStuExcel()" title="تصدير Excel"><i data-icon="file-spreadsheet"></i></button>
+            <button type="button" class="icon-button" onclick="exportCurStuPDF()" title="تصدير PDF"><i data-icon="file-pdf"></i></button>
+          </div>
+          <span class="d-none" id="curStuWhatsAppBlock">
+            <button id="sendWhatsMSG" type="button" class="whatsapp-button"><i data-icon="message-circle"></i>إرسال رسالة واتساب</button>
+          </span>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="table-toolbar">
+          <div class="segmented" id="curStuStageGroup">
+            <button class="active" type="button" data-stage="0">التأهيلية</button>
+            <button type="button" data-stage="1">التأسيسية</button>
+            <button type="button" data-stage="2">التأصيلية</button>
+            <button type="button" data-stage="3">التحصيلية</button>
+          </div>
+        </div>
+        <div class="responsive-table">
+          <table id="curStuTable">
+            <thead>
+              <tr>
+                <th style="width:44px;">#</th>
+                <th data-sort="name">الاسم</th>
+                <th data-sort="gender">الجنس</th>
+                <th data-sort="phone">الهاتف</th>
+                <th data-sort="decCount">سجلات التسميع</th>
+              </tr>
+            </thead>
+            <tbody id="curStuTableBody"></tbody>
+          </table>
+        </div>
+        <footer class="table-footer">
+          <div class="page-size">
+            <label for="curStuPageSize">عدد الصفوف</label>
+            <select id="curStuPageSize"><option value="50">50</option><option value="100">100</option></select>
+          </div>
+          <div class="pagination" id="curStuPagination"></div>
+        </footer>
+      </section>
+
+      <!-- مخفية مؤقتًا مع زر الإرسال أعلاه (ميزة واحدة: اختيار مجموعة مستلمي رسالة الواتساب) -->
+      <div class="curstu-gender-group d-none" id="curStuGenderGroup">
+        <input type="radio" name="countCurrStu" id="Count" autocomplete="off" checked>
+        <label for="Count" id="CountL"></label>
+        <input type="radio" name="countCurrStu" id="mCount" autocomplete="off">
+        <label for="mCount" id="mCountL"></label>
+        <input type="radio" name="countCurrStu" id="fCount" autocomplete="off">
+        <label for="fCount" id="fCountL"></label>
+      </div>
+    </section>
+
+    <!-- الملف الشخصي: نفس تصميم/هيكل تبويب "الملف الشخصي" في student.html حرفيًا (نفس أصناف
+         sp- ونفس CSS)، مُضمَّن هنا داخل #studentPortal.sp-embedded ليعمل نفس الـCSS رغم أن
+         غلاف emp.html بالكامل من نظام admin-suite (وليس بوابة الطالب). الفروق عن نسخة الطالب
+         مُقرَّرة صراحة في مناقشات.md: بلا حقول مجمع/منطقة/هاتف بديل (غير موجودة في بيانات
+         المتعاون)، وبطاقة "معلومات العمل" (الوظيفة + الصلاحيات) بدل الملخص الأكاديمي. باقي
+         الأقسام (الأمان، التواصل بالبريد، الإشعارات) مطابقة تمامًا. تصميم فقط، بلا اتصال فعلي
+         بالخادم بعد — راجع design-guidelines.md قبل أي تعديل إضافي. -->
+    <section class="page-view" data-page="emp-profile">
+      <div id="studentPortal" class="sp-embedded">
+
+        <section class="sp-profile-page-heading">
+          <div>
+            <span class="sp-section-kicker">إدارة الحساب</span>
+            <h1>الملف الشخصي</h1>
+            <p>حدّث معلوماتك ووسائل التواصل وإعدادات الأمان من مكان واحد.</p>
+          </div>
+          <div class="sp-save-state" id="empPfSaveState"><span></span><strong>جميع التغييرات محفوظة</strong></div>
+        </section>
+
+        <section class="sp-identity-banner">
+          <div class="sp-profile-avatar-wrap">
+            <div class="sp-profile-avatar" id="empPfProfileAvatar"><img id="empPfAvatarPreview" alt="الصورة الشخصية" src="https://drive.google.com/thumbnail?id=1BifdUAOo6594jxvnkxOUiwXonhetUPpm&sz=w500"></div>
+            <label class="sp-avatar-edit" for="empPfAvatarInput" title="تغيير الصورة"><i class="bi bi-camera-fill"></i><input id="empPfAvatarInput" type="file" accept="image/png,image/jpeg" hidden></label>
+          </div>
+          <div class="sp-identity-copy">
+            <div class="sp-identity-name"><h2 id="empPfDisplayName">—</h2><span class="sp-verified-badge"><i class="bi bi-patch-check-fill"></i>حساب موثّق</span></div>
+            <p id="empPfIdentitySub">متعاون · —</p>
+            <div class="sp-identity-tags"><span><i class="bi bi-geo-alt"></i>مملكة البحرين</span><span><i class="bi bi-calendar-week"></i>عضو في أكاديمية بصائر</span></div>
+          </div>
+          <div class="sp-completion-block">
+            <div><span>اكتمال الملف</span><strong id="empPfCompletionPercent">0%</strong></div>
+            <div class="sp-linear-progress"><span id="empPfCompletionBar" style="width:0%"></span></div>
+            <small id="empPfCompletionHint">أضف صورة شخصية وتاريخ ميلاد</small>
+          </div>
+        </section>
+
+        <section class="sp-settings-layout">
+          <aside class="sp-settings-tabs" aria-label="أقسام إعدادات الحساب">
+            <button class="sp-settings-tab active" type="button" data-emp-tab="personal"><span class="sp-tab-icon"><i class="bi bi-person-vcard"></i></span><span><strong>البيانات الشخصية</strong><small>الهوية والمعلومات الأساسية</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="contact"><span class="sp-tab-icon"><i class="bi bi-at"></i></span><span><strong>التواصل</strong><small>البريد والهاتف</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="security"><span class="sp-tab-icon"><i class="bi bi-shield-check"></i></span><span><strong>الأمان والدخول</strong><small>كلمة المرور وطرق الدخول</small></span><i class="bi bi-chevron-left"></i></button>
+            <button class="sp-settings-tab" type="button" data-emp-tab="notifications"><span class="sp-tab-icon"><i class="bi bi-bell"></i></span><span><strong>الإشعارات</strong><small>اختر ما تريد استلامه</small></span><i class="bi bi-chevron-left"></i></button>
+            <div class="sp-settings-help"><span><i class="bi bi-headset"></i></span><div><strong>تحتاج إلى مساعدة؟</strong><p>فريق بصائر جاهز لمساعدتك في تحديث بياناتك.</p><button type="button" id="empPfHelpBtn">تواصل مع الدعم</button></div></div>
+          </aside>
+
+          <form class="sp-settings-content" id="empProfileForm" novalidate>
+            <section class="sp-settings-panel active" data-emp-panel="personal">
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">المعلومات الأساسية</span><h2>بياناتك الشخصية</h2><p>يُرجى مطابقة الاسم وتاريخ الميلاد مع البطاقة السكانية.</p></div><span class="sp-panel-status"><i class="bi bi-check-circle"></i>مكتمل</span></div>
+              <div class="sp-form-grid">
+                <label class="sp-form-field sp-span-2"><span>الاسم كاملًا</span><div class="sp-input-wrap"><i class="bi bi-person"></i><input id="empFullName" name="fullName" type="text" required minlength="6"><i class="sp-field-check bi bi-check"></i></div><small class="sp-field-message">اكتب الاسم كما يظهر في البطاقة السكانية</small></label>
+                <label class="sp-form-field"><span>الرقم الشخصي</span><div class="sp-input-wrap sp-readonly"><i class="bi bi-credit-card-2-front"></i><input id="empCpr" name="cpr" type="text" readonly><i class="bi bi-lock"></i></div><small class="sp-field-message">لا يمكن تعديل الرقم الشخصي</small></label>
+                <label class="sp-form-field"><span>تاريخ الميلاد</span><div class="sp-input-wrap"><i class="bi bi-calendar3"></i><input id="empDob" name="dob" type="date"></div></label>
+                <label class="sp-form-field"><span>الجنس</span><div class="sp-input-wrap"><i class="bi bi-people"></i><select id="empGender" name="gender"><option value="">— اختر —</option><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select><i class="bi bi-chevron-down"></i></div></label>
+                <label class="sp-form-field sp-span-2"><span>الجنسية</span><div class="sp-input-wrap"><i class="bi bi-flag"></i><select id="empNationality" name="nationality"><option value="">— اختر —</option><option>البحرين</option><option>أذربيجان</option><option>أرمينيا</option><option>أسبانيا</option><option>أستراليا</option><option>أفغانستان</option><option>ألبانيا</option><option>ألمانيا</option><option>أنتيجوا وبربودا</option><option>أنجولا</option><option>أنجويلا</option><option>أندورا</option><option>أورجواي</option><option>أوزبكستان</option><option>أوغندا</option><option>أوكرانيا</option><option>أيرلندا</option><option>أيسلندا</option><option>اثيوبيا</option><option>اريتريا</option><option>استونيا</option><option>الأرجنتين</option><option>الأردن</option><option>الاكوادور</option><option>الامارات العربية المتحدة</option><option>الباهاما</option><option>البرازيل</option><option>البرتغال</option><option>البوسنة والهرسك</option><option>الجابون</option><option>الجبل الأسود</option><option>الجزائر</option><option>الدانمرك</option><option>الرأس الأخضر</option><option>السلفادور</option><option>السنغال</option><option>السودان</option><option>السويد</option><option>الصحراء الغربية</option><option>الصومال</option><option>الصين</option><option>العراق</option><option>الفاتيكان</option><option>الفيلبين</option><option>القطب الجنوبي</option><option>الكاميرون</option><option>الكونغو - برازافيل</option><option>الكويت</option><option>المجر</option><option>المحيط الهندي البريطاني</option><option>المغرب</option><option>المقاطعات الجنوبية الفرنسية</option><option>المكسيك</option><option>المملكة العربية السعودية</option><option>المملكة المتحدة</option><option>النرويج</option><option>النمسا</option><option>النيجر</option><option>الهند</option><option>الولايات المتحدة الأمريكية</option><option>اليابان</option><option>اليمن</option><option>اليونان</option><option>اندونيسيا</option><option>ايران</option><option>ايطاليا</option><option>بابوا غينيا الجديدة</option><option>باراجواي</option><option>باكستان</option><option>بالاو</option><option>بتسوانا</option><option>بتكايرن</option><option>بربادوس</option><option>برمودا</option><option>بروناي</option><option>بلجيكا</option><option>بلغاريا</option><option>بليز</option><option>بنجلاديش</option><option>بنما</option><option>بنين</option><option>بوتان</option><option>بورتوريكو</option><option>بوركينا فاسو</option><option>بوروندي</option><option>بولندا</option><option>بوليفيا</option><option>بولينيزيا الفرنسية</option><option>بيرو</option><option>تانزانيا</option><option>تايلند</option><option>تايوان</option><option>تركمانستان</option><option>تركيا</option><option>ترينيداد وتوباغو</option><option>تشاد</option><option>توجو</option><option>توفالو</option><option>توكيلو</option><option>تونجا</option><option>تونس</option><option>تيمور الشرقية</option><option>جامايكا</option><option>جبل طارق</option><option>جرينادا</option><option>جرينلاند</option><option>جزر أولان</option><option>جزر الأنتيل الهولندية</option><option>جزر الترك وجايكوس</option><option>جزر القمر</option><option>جزر الكايمن</option><option>جزر المارشال</option><option>جزر الملديف</option><option>جزر الولايات المتحدة البعيدة الصغيرة</option><option>جزر سليمان</option><option>جزر فارو</option><option>جزر فرجين الأمريكية</option><option>جزر فرجين البريطانية</option><option>جزر فوكلاند</option><option>جزر كوك</option><option>جزر كوكوس</option><option>جزر ماريانا الشمالية</option><option>جزر والس وفوتونا</option><option>جزيرة الكريسماس</option><option>جزيرة بوفيه</option><option>جزيرة مان</option><option>جزيرة نورفوك</option><option>جزيرة هيرد وماكدونالد</option><option>جمهورية افريقيا الوسطى</option><option>جمهورية التشيك</option><option>جمهورية الدومينيك</option><option>جمهورية الكونغو الديمقراطية</option><option>جمهورية جنوب افريقيا</option><option>جواتيمالا</option><option>جوادلوب</option><option>جوام</option><option>جورجيا</option><option>جورجيا الجنوبية وجزر ساندويتش الجنوبية</option><option>جيبوتي</option><option>جيرسي</option><option>دومينيكا</option><option>رواندا</option><option>روسيا</option><option>روسيا البيضاء</option><option>رومانيا</option><option>روينيون</option><option>زامبيا</option><option>زيمبابوي</option><option>ساحل العاج</option><option>ساموا</option><option>ساموا الأمريكية</option><option>سان مارينو</option><option>سانت بيير وميكولون</option><option>سانت فنسنت وغرنادين</option><option>سانت كيتس ونيفيس</option><option>سانت لوسيا</option><option>سانت مارتين</option><option>سانت هيلنا</option><option>ساو تومي وبرينسيبي</option><option>سريلانكا</option><option>سفالبارد وجان مايان</option><option>سلوفاكيا</option><option>سلوفينيا</option><option>سنغافورة</option><option>سوازيلاند</option><option>سوريا</option><option>سورينام</option><option>سويسرا</option><option>سيراليون</option><option>سيشل</option><option>شيلي</option><option>صربيا</option><option>صربيا والجبل الأسود</option><option>طاجكستان</option><option>عمان</option><option>غامبيا</option><option>غانا</option><option>غويانا</option><option>غيانا</option><option>غينيا</option><option>غينيا الاستوائية</option><option>غينيا بيساو</option><option>فانواتو</option><option>فرنسا</option><option>فلسطين</option><option>فنزويلا</option><option>فنلندا</option><option>فيتنام</option><option>فيجي</option><option>قبرص</option><option>قرغيزستان</option><option>قطر</option><option>كازاخستان</option><option>كاليدونيا الجديدة</option><option>كرواتيا</option><option>كمبوديا</option><option>كندا</option><option>كوبا</option><option>كوريا الجنوبية</option><option>كوريا الشمالية</option><option>كوستاريكا</option><option>كولومبيا</option><option>كيريباتي</option><option>كينيا</option><option>لاتفيا</option><option>لاوس</option><option>لبنان</option><option>لوكسمبورج</option><option>ليبيا</option><option>ليبيريا</option><option>ليتوانيا</option><option>ليختنشتاين</option><option>ليسوتو</option><option>مارتينيك</option><option>ماكاو الصينية</option><option>مالطا</option><option>مالي</option><option>ماليزيا</option><option>مايوت</option><option>مدغشقر</option><option>مصر</option><option>مقدونيا</option><option>ملاوي</option><option>منطقة غير معرفة</option><option>منغوليا</option><option>موريتانيا</option><option>موريشيوس</option><option>موزمبيق</option><option>مولدافيا</option><option>موناكو</option><option>مونتسرات</option><option>ميانمار</option><option>ميكرونيزيا</option><option>ناميبيا</option><option>نورو</option><option>نيبال</option><option>نيجيريا</option><option>نيكاراجوا</option><option>نيوزيلاندا</option><option>نيوي</option><option>هايتي</option><option>هندوراس</option><option>هولندا</option><option>هونج كونج الصينية</option></select><i class="bi bi-chevron-down"></i></div></label>
+              </div>
+              <div class="sp-academic-summary">
+                <div class="sp-academic-icon"><i class="bi bi-briefcase"></i></div>
+                <div><span>معلومات العمل</span><h3 id="empPfJobSummary">—</h3><p id="empPfPermsSummary">الصلاحيات الممنوحة لحسابك تُدار من قِبل الإدارة.</p></div>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="contact" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">الوصول إليك</span><h2>التواصل</h2><p>نستخدم هذه البيانات للتنبيهات المهمة والتواصل الرسمي.</p></div><span class="sp-panel-status"><i class="bi bi-shield-check"></i>بيانات محمية</span></div>
+              <div class="sp-form-grid">
+                <div class="sp-email-verification sp-span-2">
+                  <div class="sp-email-verification-head">
+                    <div><span>البريد الإلكتروني</span><small>اختر طريقة إضافة البريد والتحقق منه</small></div>
+                    <span class="sp-email-status unverified" id="empEmailStatus"><i class="bi bi-exclamation-circle"></i><b>غير متحقق</b></span>
+                  </div>
+                  <div class="sp-email-method-picker" role="tablist" aria-label="طريقة التحقق من البريد">
+                    <button class="sp-email-method" type="button" data-emp-email-method="google" role="tab" aria-selected="false"><span class="sp-provider-mark sp-google-mark">G</span><span><strong>Google</strong><small>استخدام حساب Google</small></span><i class="bi bi-chevron-left"></i></button>
+                    <button class="sp-email-method" type="button" data-emp-email-method="yahoo" role="tab" aria-selected="false"><span class="sp-provider-mark sp-yahoo-mark">Y!</span><span><strong>Yahoo</strong><small>استخدام حساب Yahoo</small></span><i class="bi bi-chevron-left"></i></button>
+                    <button class="sp-email-method active" type="button" data-emp-email-method="manual" role="tab" aria-selected="true"><span class="sp-provider-mark sp-manual-mark"><i class="bi bi-envelope"></i></span><span><strong>إدخال يدوي</strong><small>التحقق بواسطة رمز</small></span><i class="bi bi-chevron-left"></i></button>
+                  </div>
+                  <div class="sp-provider-email-panel" id="empProviderEmailPanel" hidden>
+                    <span class="sp-provider-connected-icon sp-google-mark" id="empProviderConnectedIcon">G</span>
+                    <div><small id="empProviderLabel">حساب Google المرتبط</small><strong id="empProviderEmailText">—</strong></div>
+                    <button class="sp-btn-secondary" id="empSwitchProviderAccount" type="button">تغيير الحساب</button>
+                  </div>
+                  <div class="sp-manual-email-panel" id="empManualEmailPanel">
+                    <label class="sp-form-field"><span>اكتب البريد الإلكتروني</span><div class="sp-input-wrap" id="empEmailInputWrap"><i class="bi bi-envelope"></i><input id="empEmail" name="email" type="email" required autocomplete="email" placeholder="name@example.com"><i class="sp-field-check bi bi-patch-check-fill"></i></div><small class="sp-field-message" id="empEmailMessage">سنرسل رمز تحقق مكوّنًا من 6 أرقام</small></label>
+                    <button class="sp-btn-secondary sp-send-code-button" id="empSendEmailCode" type="button"><i class="bi bi-send"></i><span>إرسال رمز التحقق</span></button>
+                    <div class="sp-verification-code-area" id="empVerificationCodeArea" hidden>
+                      <label class="sp-form-field"><span>رمز التحقق</span><div class="sp-input-wrap sp-code-input"><i class="bi bi-key"></i><input id="empEmailVerificationCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="— — — — — —" aria-describedby="empCodeHint"></div><small class="sp-field-message" id="empCodeHint">للمعاينة استخدم الرمز 123456</small></label>
+                      <button class="sp-btn-primary sp-verify-code-button" id="empVerifyEmailCode" type="button"><i class="bi bi-shield-check"></i>تأكيد الرمز</button>
+                      <button class="sp-btn-text sp-resend-code-button" id="empResendEmailCode" type="button" disabled>إعادة الإرسال بعد <b id="empCodeCountdown">30</b> ثانية</button>
+                    </div>
+                  </div>
+                  <input id="empEmailVerificationMethod" name="emailVerificationMethod" type="hidden" value="manual">
+                  <input id="empEmailVerifiedState" name="emailVerifiedState" type="hidden" value="false">
+                </div>
+                <label class="sp-form-field sp-span-2"><span>رقم الهاتف</span><div class="sp-input-wrap"><select class="sp-phone-country-select" id="empPhoneCountrySelect" aria-label="مفتاح الدولة"></select><input id="empPhone" name="phone" type="tel" inputmode="numeric" pattern="[0-9]{8}" required style="direction:ltr;"></div></label>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="security" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">حماية الحساب</span><h2>الأمان وتسجيل الدخول</h2><p>استخدم كلمة مرور قوية وراجع طرق الدخول المرتبطة بحسابك.</p></div><span class="sp-security-score"><i class="bi bi-shield-check"></i><span><strong>غير مُفعّلة</strong><small>مستوى الأمان</small></span></span></div>
+              <div class="sp-security-section">
+                <div class="sp-subsection-heading"><div><h3>تغيير كلمة المرور</h3><p>يجب ألا تقل كلمة المرور الجديدة عن 6 أحرف.</p></div></div>
+                <div class="sp-form-grid">
+                  <label class="sp-form-field sp-span-2"><span>كلمة المرور الحالية</span><div class="sp-input-wrap"><i class="bi bi-lock"></i><input id="empCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" placeholder="أدخل كلمة المرور الحالية"><button class="sp-input-action" type="button" data-emp-toggle-password="empCurrentPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div></label>
+                  <label class="sp-form-field"><span>كلمة المرور الجديدة</span><div class="sp-input-wrap"><i class="bi bi-key"></i><input id="empNewPassword" name="newPassword" type="password" autocomplete="new-password" placeholder="6 أحرف على الأقل" minlength="6"><button class="sp-input-action" type="button" data-emp-toggle-password="empNewPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><div class="sp-password-strength"><span></span><span></span><span></span><span></span><small id="empPasswordStrengthText">لم تُدخل كلمة مرور</small></div></label>
+                  <label class="sp-form-field"><span>تأكيد كلمة المرور</span><div class="sp-input-wrap"><i class="bi bi-key-fill"></i><input id="empConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور"><button class="sp-input-action" type="button" data-emp-toggle-password="empConfirmPassword" aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button></div><small class="sp-field-message" id="empPasswordMatch"></small></label>
+                </div>
+              </div>
+              <div class="sp-security-section">
+                <div class="sp-subsection-heading"><div><h3>طرق تسجيل الدخول</h3><p>الطرق المرتبطة حاليًا بحسابك.</p></div></div>
+                <div class="sp-login-methods">
+                  <article><span class="sp-method-icon sp-email-method-icon"><i class="bi bi-key-fill"></i></span><div><strong>الرقم الشخصي وكلمة المرور</strong><small>الدخول الأساسي باستخدام رقمك الشخصي</small></div><span class="sp-status-pill warning">غير مُفعّلة</span></article>
+                  <article><span class="sp-method-icon sp-google-method-icon">G</span><div><strong>حساب Google</strong><small>غير مرتبط بعد</small></div><button class="sp-btn-secondary" type="button" data-emp-action="connect-google" disabled>عبر الإيميل</button></article>
+                </div>
+              </div>
+              <div class="sp-security-section sp-sessions-section d-none">
+                <div class="sp-subsection-heading"><div><h3>الأجهزة النشطة</h3><p>راجع الأجهزة التي تستخدم حسابك الآن.</p></div><button class="sp-btn-text" type="button" data-emp-action="signout-all">تسجيل الخروج من الكل</button></div>
+                <div class="sp-session-list">
+                  <article><span class="sp-session-icon"><i class="bi bi-laptop"></i></span><div><strong>Chrome على Windows</strong><small>المنامة، البحرين · هذا الجهاز</small></div><span class="sp-current-device"><i></i>نشط الآن</span></article>
+                  <article><span class="sp-session-icon"><i class="bi bi-phone"></i></span><div><strong>Safari على iPhone</strong><small>المحرق، البحرين · منذ يومين</small></div><button class="sp-icon-btn" type="button" aria-label="إنهاء جلسة الهاتف" title="إنهاء الجلسة" data-emp-action="end-session"><i class="bi bi-box-arrow-left"></i></button></article>
+                </div>
+              </div>
+            </section>
+
+            <section class="sp-settings-panel" data-emp-panel="notifications" hidden>
+              <div class="sp-settings-panel-head"><div><span class="sp-section-kicker">ابق على اطلاع</span><h2>إعدادات الإشعارات</h2><p>حدد التنبيهات التي تهمك والطريقة المناسبة لاستلامها.</p></div></div>
+              <div style="position:relative;">
+                <div style="filter:blur(5px);pointer-events:none;user-select:none;">
+                  <div class="sp-notification-channel-grid">
+                    <article class="sp-channel-card active"><span class="sp-channel-icon whatsapp"><i class="bi bi-whatsapp"></i></span><div><strong>واتساب</strong><small>على رقمك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" checked><span></span></label></article>
+                    <article class="sp-channel-card active"><span class="sp-channel-icon email"><i class="bi bi-envelope"></i></span><div><strong>البريد الإلكتروني</strong><small>بريدك المسجَّل</small></div><label class="sp-switch"><input type="checkbox" checked><span></span></label></article>
+                  </div>
+                  <div class="sp-notification-settings">
+                    <div class="sp-notification-group-title"><h3>تنبيهات العمل</h3><p>المهام والتحديثات المرتبطة بصلاحياتك.</p></div>
+                    <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-clipboard2-check"></i></span><span><strong>طلبات جديدة</strong><small>تسجيل/تسميع/اختبارات بانتظار المتابعة</small></span><span class="sp-channel-pills"><em>واتساب</em><em>البريد</em></span><span class="sp-switch"><input type="checkbox" checked><span></span></span></label>
+                    <label class="sp-notification-setting"><span class="sp-setting-icon"><i class="bi bi-megaphone"></i></span><span><strong>إعلانات الأكاديمية</strong><small>التعاميم الإدارية المهمة</small></span><span class="sp-channel-pills"><em>البريد</em></span><span class="sp-switch"><input type="checkbox" checked><span></span></span></label>
+                  </div>
+                </div>
+                <div class="sp-coming-soon-overlay" style="border-radius:8px;"><i class="bi bi-bell-slash"></i><span>تفضيلات الإشعارات — قريبًا</span></div>
+              </div>
+            </section>
+
+            <div class="sp-settings-actions">
+              <div class="sp-unsaved-indicator" id="empUnsavedIndicator"><span></span><p><strong>لا توجد تغييرات غير محفوظة</strong><small>لم يُحفظ شيء بعد في هذه الجلسة</small></p></div>
+              <div><button class="sp-btn-secondary" id="empDiscardButton" type="button" disabled>تراجع</button><button class="sp-btn-primary" id="empSaveButton" type="submit" disabled><i class="bi bi-check-lg"></i>حفظ التغييرات</button></div>
+            </div>
+          </form>
+        </section>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- سجلات تسميع طالب واحد — تُفتح من عمود "سجلات التسميع" بصفحة "متابعة التسميع". خارج
+     .app-shell عمدًا (وليست جوه أي page-view) حتى لا يُخفيها display:none لأي قسم غير نشط. -->
+<div class="modal fade" id="dectationModal" tabindex="-1" aria-labelledby="dectationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="dectationModalLabel">سجلات التسميع</h1>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button type="button" class="icon-button excel" onclick="exportCurStuDecExcel()" title="تصدير Excel"><i data-icon="file-spreadsheet"></i></button>
+            <button type="button" class="icon-button" onclick="exportCurStuDecPDF()" title="تصدير PDF"><i data-icon="file-pdf"></i></button>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="responsive-table">
+          <table id="curStuDecTable">
+            <thead>
+              <tr>
+                <th style="width:36px;">#</th>
+                <th data-sort="matn">المتن</th>
+                <th data-sort="werd">الورد</th>
+                <th data-sort="rate">الدرجة</th>
+                <th data-sort="resp">المُسمّع</th>
+              </tr>
+            </thead>
+            <tbody id="curStuDecTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="secondary-button" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,2 @@
+# Keep the clasp files byte-identical so `clasp pull` diffs stay clean.
+* -text

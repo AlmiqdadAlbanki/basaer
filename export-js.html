@@ -1,0 +1,283 @@
+<script>
+/*
+ * نظام التصدير الموحّد للمشروع بالكامل (Excel + PDF).
+ * أي صفحة تحتاج تصدير جدول بيانات تستخدم exportRowsToExcel() أو exportRowsToPDF()
+ * بدل تنفيذ منطق تصدير خاص بها من الصفر — راجع design-guidelines.md لتفاصيل القاعدة.
+ */
+
+function exportRowsToExcel(options) {
+  options = options || {};
+  var title = options.title || 'تقرير';
+  var filename = options.filename || title;
+
+  if (!(options.rows || []).length) {
+    if (typeof alertMSG === 'function') alertMSG('لا يوجد بيانات لتصديرها', 'warning');
+    return;
+  }
+
+  // أي قيمة عمود قد تكون كائن رابط قابل للنقر { text, link } بدل نص عادي (مثال: عمود واتساب
+  // بصفحة "مرشّحو الاجتياز" — يفتح محادثة مباشرة عند الضغط). json_to_sheet لا يدعم كائنات
+  // كهذه كقيمة خلية مباشرة، فنستخرج نصها العادي لبناء الشيت أولًا، ونُسجِّل موضع كل رابط
+  // لنُطبِّقه (cell.l) على الخلية الفعلية بعد بناء الشيت مباشرة.
+  var linkRefs = [];
+  var rows = options.rows.map(function (rowObj, rIdx) {
+    var plain = {};
+    Object.keys(rowObj).forEach(function (key) {
+      var val = rowObj[key];
+      if (val && typeof val === 'object' && typeof val.link === 'string') {
+        linkRefs.push({ rIdx: rIdx, key: key, target: val.link });
+        plain[key] = val.text != null ? val.text : val.link;
+      } else {
+        plain[key] = val;
+      }
+    });
+    return plain;
+  });
+
+  var reportDate = new Intl.DateTimeFormat('ar-BH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
+
+  var ws = XLSX.utils.json_to_sheet(rows, { origin: 'A4' });
+  XLSX.utils.sheet_add_aoa(ws, [
+    ['تقرير: ' + title],
+    ['تاريخ التقرير: ' + reportDate],
+    []
+  ], { origin: 'A1' });
+
+  // اتجاه RTL — ثلاث طبقات مطلوبة معًا لضمان فتح الملف باتجاه صحيح في كل البرامج
+  if (!ws['!views']) ws['!views'] = [];
+  ws['!views'].push({ rightToLeft: true });
+  ws['!dir'] = 'rtl';
+
+  // تنسيق حقيقي (بولد/ألوان/حدود) — مكتبة xlsx-js-style فقط هي اللي بتحترم خاصية cell.s،
+  // النسخة المجانية العادية من SheetJS بتتجاهلها بصمت.
+  var headerKeys = Object.keys(rows[0]);
+  var headerRowIdx = 3; // صف 4 (origin A4) بترقيم صفري
+  var thinBorder = { style: 'thin', color: { rgb: 'DDDDDD' } };
+
+  var titleStyle = { font: { bold: true, sz: 14, color: { rgb: '8D1D22' } }, alignment: { horizontal: 'right' } };
+  var dateStyle = { font: { bold: true, color: { rgb: 'B5262C' } }, alignment: { horizontal: 'right' } };
+  if (ws['A1']) ws['A1'].s = titleStyle;
+  if (ws['A2']) ws['A2'].s = dateStyle;
+
+  var headerStyle = {
+    font: { bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: 'B5262C' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }
+  };
+  var colWidths = headerKeys.map(function (key) { return { wch: Math.max(String(key).length + 2, 10) }; });
+  headerKeys.forEach(function (key, colIdx) {
+    var ref = XLSX.utils.encode_cell({ r: headerRowIdx, c: colIdx });
+    if (ws[ref]) ws[ref].s = headerStyle;
+  });
+
+  rows.forEach(function (rowObj, rIdx) {
+    headerKeys.forEach(function (key, colIdx) {
+      var ref = XLSX.utils.encode_cell({ r: headerRowIdx + 1 + rIdx, c: colIdx });
+      var cell = ws[ref];
+      if (!cell) return;
+      cell.s = { border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, alignment: { vertical: 'center', horizontal: 'right' } };
+      var len = cell.v != null ? String(cell.v).length : 0;
+      if (len + 4 > colWidths[colIdx].wch) colWidths[colIdx].wch = Math.min(len + 4, 45);
+    });
+  });
+
+  // تطبيق الروابط القابلة للنقر المُسجَّلة أعلاه (linkRefs) — بعد اكتمال تنسيق كل الخلايا،
+  // كي يبقى تنسيقها الأساسي (حدود/محاذاة) قائمًا مع إضافة لون/تسطير رابط فوقه.
+  linkRefs.forEach(function (item) {
+    var colIdx = headerKeys.indexOf(item.key);
+    if (colIdx === -1) return;
+    var ref = XLSX.utils.encode_cell({ r: headerRowIdx + 1 + item.rIdx, c: colIdx });
+    var cell = ws[ref];
+    if (!cell) return;
+    cell.l = { Target: item.target };
+    cell.s = Object.assign({}, cell.s, { font: { color: { rgb: '128C3E' }, bold: true } });
+  });
+
+  ws['!cols'] = colWidths;
+  ws['!merges'] = (ws['!merges'] || []).concat([
+    { s: { r: 0, c: 0 }, e: { r: 0, c: headerKeys.length - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: headerKeys.length - 1 } }
+  ]);
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'data');
+  if (!wb.Workbook) wb.Workbook = {};
+  if (!wb.Workbook.Views) wb.Workbook.Views = [];
+  wb.Workbook.Views.push({ RTL: true });
+
+  // نبني الملف يدويًا كمصفوفة بايتات (type:'array') وننزّله بأنفسنا، بدل XLSX.writeFile()
+  // مباشرة — داخل إطار Apps Script المعزول (iframe) كانت XLSX.writeFile() بترجع أحيانًا ملفًا
+  // تالفًا (على الأرجح بسبب اختلاف كشف بيئة المتصفح داخل الـ sandbox)، بينما التنزيل اليدوي
+  // بمصفوفة بايتات + Blob هو نفس الأسلوب المستخدم بنجاح لتصدير CSV في المشروع أصلًا.
+  var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  var blob = new Blob([wbout], { type: 'application/octet-stream' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = filename + '_' + reportDate + '.xlsx';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 1200);
+}
+
+function exportRowsToPDF(options) {
+  options = options || {};
+  var title = options.title || 'تقرير';
+  var subtitle = options.subtitle || '';
+  var columns = options.columns || []; // [{ key, label }]
+  var rows = options.rows || [];
+  var exportedBy = options.exportedBy || '';
+
+  if (!rows.length) {
+    if (typeof alertMSG === 'function') alertMSG('لا يوجد بيانات لتصديرها', 'warning');
+    return;
+  }
+
+  var PX_PER_MM = 96 / 25.4; // تحويل ثابت في CSS (1in=96px)، مش محتاج قياس فعلي
+  var SIDE_MARGIN_MM = 12, TOP_MARGIN_MM = 16, BOTTOM_MARGIN_MM = 16;
+
+  // نبني الصفحات يدويًا (مش بالاعتماد على تقسيم المتصفح التلقائي للطباعة) عشان نضمن
+  // 3 حاجات كان صعب نضمنها بأسلوب thead/tfoot المتكرر: (1) هامش علوي/سفلي ثابت وصحيح
+  // في كل صفحة بلا أي تلاصق مع المحتوى (كان فيه خلل معروف في محركات المتصفح عند تكرار
+  // tfoot مع تقسيم صفحات تلقائي)، (2) رقم صفحة حقيقي "X من Y" (مستحيل تقنيًا مع التقسيم
+  // التلقائي لأن المتصفح مايعرفش عدد الصفحات مقدّمًا)، (3) تقسيم دقيق حسب الارتفاع
+  // الفعلي لكل صف (بعض الصفوف بتلتف على أكثر من سطر فيبقى أطول من غيره) بدل عدد صفوف
+  // ثابت. الطريقة: نرسم كل المحتوى في حاوية مخفية بنفس عرض الطباعة، نقيس الارتفاع
+  // الحقيقي لكل صف وللترويسة والتذييل، ثم نوزّع الصفوف على صفحات بمعرفتنا الكاملة
+  // بعدد الصفحات النهائي قبل ما نطبع فعليًا.
+  function buildAndOpen(orientation) {
+    var reportDate = new Intl.DateTimeFormat('ar-BH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
+    var logoUrl = 'https://drive.google.com/thumbnail?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&sz=w300';
+    var metaLine = (subtitle ? escapeHtml(subtitle) + ' ' : '') + '<span class="date-accent">' + reportDate + '</span>' + (exportedBy ? ' · بواسطة ' + escapeHtml(exportedBy) : '');
+    var pageWmm = orientation === 'landscape' ? 297 : 210;
+    var pageHmm = orientation === 'landscape' ? 210 : 297;
+    var contentWmm = pageWmm - SIDE_MARGIN_MM * 2;
+
+    var baseCss =
+      "body{font-family:'IBM Plex Sans Arabic',sans-serif;margin:0;color:#20252d;}" +
+      'table{width:100%;border-collapse:collapse;font-size:12px;}' +
+      'th,td{border:1px solid #c7c7c7;padding:6px 8px;text-align:right;vertical-align:top;}' +
+      '.col-head th{background:#fff1f2;}' +
+      '.brand-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #b5262c;padding-bottom:10px;margin-bottom:10px;}' +
+      '.brand-header h2{margin:0;font-size:19px;color:#8d1d22;}' +
+      '.brand-header h4{margin:5px 0 0;font-size:12px;color:#555;font-weight:600;}' +
+      '.date-accent{font-weight:bold;color:#b5262c;}' +
+      '.brand-header img{height:52px;}' +
+      '.pdf-footer{display:flex;justify-content:space-between;font-size:10px;color:#777;border-top:1px solid #ddd;padding-top:4px;}';
+
+    // لا عمود ترقيم تلقائي هنا — بترسم بس الأعمدة المُمرَّرة، بالظبط زي exportRowsToExcel
+    var headHtml = columns.map(function (col) { return '<th>' + escapeHtml(col.label) + '</th>'; }).join('');
+    var brandHtml = '<div class="brand-header"><div><h2>' + escapeHtml(title) + '</h2><h4>' + metaLine + '</h4></div><div><img id="mLogo" src="' + logoUrl + '" alt="بصائر"></div></div>';
+    function rowHtml(row) {
+      return '<tr>' + columns.map(function (col) {
+        var value = row[col.key];
+        return '<td>' + escapeHtml(value != null ? value : '') + '</td>';
+      }).join('') + '</tr>';
+    }
+
+    var printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      if (typeof alertMSG === 'function') alertMSG('تعذّر فتح نافذة المعاينة؛ يرجى السماح بالنوافذ المنبثقة ثم إعادة المحاولة', 'error');
+      return;
+    }
+
+    // مرحلة القياس: نفس العرض الفعلي لمنطقة الطباعة، بصريًا مخفية (visibility:hidden
+    // تشارك في التخطيط وتُقاس، بعكس display:none)
+    printWindow.document.open();
+    printWindow.document.write(
+      '<html lang="ar" dir="rtl"><head><meta charset="utf-8">' +
+      '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">' +
+      '<style>' + baseCss + '#measureBox{position:absolute;visibility:hidden;width:' + contentWmm + 'mm;}</style>' +
+      '</head><body><div id="measureBox">' +
+        '<div id="mHeader">' + brandHtml + '<table><thead><tr class="col-head">' + headHtml + '</tr></thead></table></div>' +
+        '<div id="mFooter" class="pdf-footer"><span>أكاديمية بصائر للعلوم الشرعية</span><span>صفحة 1 من 1</span></div>' +
+        '<table id="mRows"><tbody>' + rows.map(rowHtml).join('') + '</tbody></table>' +
+      '</div></body></html>'
+    );
+    printWindow.document.close();
+
+    function afterReady(cb) {
+      var d = printWindow.document;
+      var fontsPromise = (d.fonts && d.fonts.ready) ? d.fonts.ready.catch(function () {}) : Promise.resolve();
+      var imgEl = d.getElementById('mLogo');
+      var imgPromise = new Promise(function (resolve) {
+        if (!imgEl || imgEl.complete) { resolve(); return; }
+        imgEl.addEventListener('load', resolve);
+        imgEl.addEventListener('error', resolve);
+        setTimeout(resolve, 1500); // سقف زمني أماني لو الشعار اتأخر تحميله لأي سبب
+      });
+      Promise.all([fontsPromise, imgPromise]).then(cb, cb);
+    }
+
+    afterReady(function () {
+      var d = printWindow.document;
+      var headerH = d.getElementById('mHeader').getBoundingClientRect().height;
+      var footerH = d.getElementById('mFooter').getBoundingClientRect().height;
+      var rowEls = d.getElementById('mRows').querySelectorAll('tr');
+      var rowHeights = Array.prototype.map.call(rowEls, function (tr) { return tr.getBoundingClientRect().height; });
+
+      // هامش أمان يتعمّد ترك القليل من الفراغ آخر كل صفحة بدل محاولة ملئها لآخر بكسل —
+      // أي فرق بسيط بين بيئة القياس والطباعة الفعلية (تحميل خط/صورة، فروق حدود الجداول
+      // عند تقسيمها لاحقًا) كان بيسبب فيض صف واحد أحيانًا لصفحة تالية غير مقصودة بترقيم
+      // خاطئ. أفضل نضيّع القليل من المساحة على إننا نخاطر بفيض غير محسوب.
+      var SAFETY_PX = 48;
+      var availablePx = (pageHmm * PX_PER_MM) - ((TOP_MARGIN_MM + BOTTOM_MARGIN_MM) * PX_PER_MM) - headerH - footerH - SAFETY_PX;
+      if (availablePx < 60) availablePx = 60; // حد أدنى أماني يمنع أي حساب غير منطقي
+
+      var pages = [[]];
+      var used = 0;
+      rowHeights.forEach(function (h, i) {
+        if (used + h > availablePx && pages[pages.length - 1].length > 0) { pages.push([]); used = 0; }
+        pages[pages.length - 1].push(i);
+        used += h;
+      });
+
+      var totalPages = pages.length;
+      var pagesHtml = pages.map(function (idxs, pageIdx) {
+        var body = idxs.map(function (i) { return rowHtml(rows[i]); }).join('');
+        return '<div class="pdf-page">' + brandHtml +
+          '<table><thead><tr class="col-head">' + headHtml + '</tr></thead><tbody>' + body + '</tbody></table>' +
+          '<div class="pdf-footer"><span>أكاديمية بصائر للعلوم الشرعية</span><span>صفحة ' + (pageIdx + 1) + ' من ' + totalPages + '</span></div>' +
+        '</div>';
+      }).join('');
+
+      d.open();
+      d.write(
+        '<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>' + escapeHtml(title) + ' - ' + reportDate + '</title>' +
+        '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">' +
+        '<style>' +
+          '@page { size: ' + (orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait') + '; margin: 0; }' +
+          baseCss +
+          '.pdf-page{width:' + pageWmm + 'mm;min-height:' + pageHmm + 'mm;padding:' + TOP_MARGIN_MM + 'mm ' + SIDE_MARGIN_MM + 'mm ' + BOTTOM_MARGIN_MM + 'mm;box-sizing:border-box;display:flex;flex-direction:column;page-break-after:always;}' +
+          '.pdf-page .pdf-footer{margin-top:auto;padding-top:8px;}' +
+        '</style></head><body>' + pagesHtml +
+        '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},400);}<\/script>' +
+        '</body></html>'
+      );
+      d.close();
+    });
+  }
+
+  // اتجاه الصفحة: يُؤخذ من options.orientation لو مُمرَّرًا صراحةً، وإلا يُسأل المستخدم مباشرة
+  if (options.orientation === 'portrait' || options.orientation === 'landscape') {
+    buildAndOpen(options.orientation);
+    return;
+  }
+  if (typeof Swal === 'undefined') { buildAndOpen('portrait'); return; }
+  Swal.fire({
+    title: 'اتجاه صفحة الملف',
+    text: 'اختر شكل الصفحة قبل تجهيز ملف PDF',
+    icon: 'question',
+    showDenyButton: true,
+    confirmButtonText: 'طولي',
+    denyButtonText: 'عرضي',
+    confirmButtonColor: '#b5262c',
+    denyButtonColor: '#8d1d22'
+  }).then(function (result) {
+    if (result.isDismissed) return;
+    buildAndOpen(result.isConfirmed ? 'portrait' : 'landscape');
+  });
+}
+</script>
