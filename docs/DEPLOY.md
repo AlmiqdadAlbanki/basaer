@@ -306,8 +306,12 @@ Everything below is typed in that shell until step 11.
     node tools/import-firebase-users.js --users data/firebase-users.json \
       --hash-params data/firebase-hash-params.txt --dry-run
     node tools/import-firebase-users.js --users data/firebase-users.json \
-      --hash-params data/firebase-hash-params.txt
+      --hash-params data/firebase-hash-params.txt --mark-verified
     ```
+    `--mark-verified` also sets `emailVerified = true` in the `students` and `emp` sheets for every
+    account Firebase had verified. Firebase was the authority for that flag and the sheets did not
+    always follow; the page signs out any account whose cell is not true on every load, so without
+    this those users are logged out at each refresh until they sign in once with a code.
     It prints counts only, never hashes. Imported accounts keep their Firebase hash until their
     first login, and are then re-hashed locally. Accounts with no password hash (Google-only
     accounts, for example) or no email are skipped, and an account that already has a local
