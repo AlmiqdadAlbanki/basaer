@@ -15,12 +15,12 @@ function makeFixture() {
   const storage = new Storage(':memory:');
   const driveShims = makeDriveShims({ storage, filesDir, baseUrl: 'http://localhost:3000' });
   const folderId = driveShims.DriveApp.getFolderById('legacyFolder1').createFolder('Student').getId();
-  return { runtime: { driveShims }, driveShims, folderId };
+  return { driveShims, folderId };
 }
 
 test('storeStudentWork creates a public file inside the folder', () => {
-  const { runtime, driveShims, folderId } = makeFixture();
-  const result = storeStudentWork(runtime, { folderId, fileName: 'stWork-1-123456789', mime: 'application/pdf', bytes: Buffer.from('%PDF-1.4 hi'), originalName: 'a.pdf' });
+  const { driveShims, folderId } = makeFixture();
+  const result = storeStudentWork(driveShims, { folderId, fileName: 'stWork-1-123456789', mime: 'application/pdf', bytes: Buffer.from('%PDF-1.4 hi'), originalName: 'a.pdf' });
   assert.match(result.id, /^f_[0-9a-f]{32}$/);
   assert.strictEqual(result.name, 'stWork-1-123456789');
   assert.ok(result.url.includes(result.id));
@@ -44,10 +44,10 @@ test('isOwnFolder handles local, legacy Google and bare folder URLs', () => {
 });
 
 test('storeStudentWork rejects executables, empty files and missing folders', () => {
-  const { runtime, folderId } = makeFixture();
+  const { driveShims, folderId } = makeFixture();
   const base = { folderId, fileName: 'x', mime: 'application/octet-stream' };
-  assert.throws(() => storeStudentWork(runtime, { ...base, bytes: Buffer.from('hello'), originalName: 'run.exe' }), { status: 415 });
-  assert.throws(() => storeStudentWork(runtime, { ...base, bytes: Buffer.from([0x4d, 0x5a, 0, 0]), originalName: 'a.pdf' }), { status: 415 });
-  assert.throws(() => storeStudentWork(runtime, { ...base, bytes: Buffer.alloc(0), originalName: 'a.pdf' }), { status: 400 });
+  assert.throws(() => storeStudentWork(driveShims, { ...base, bytes: Buffer.from('hello'), originalName: 'run.exe' }), { status: 415 });
+  assert.throws(() => storeStudentWork(driveShims, { ...base, bytes: Buffer.from([0x4d, 0x5a, 0, 0]), originalName: 'a.pdf' }), { status: 415 });
+  assert.throws(() => storeStudentWork(driveShims, { ...base, bytes: Buffer.alloc(0), originalName: 'a.pdf' }), { status: 400 });
   assert.strictEqual(isBlockedUpload('photo.JPG', Buffer.from([0xff, 0xd8, 0xff])), false);
 });

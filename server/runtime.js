@@ -6,6 +6,7 @@
 // scope (function declarations and `var`s hoist across files, exactly as GAS
 // concatenates them).
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -59,10 +60,20 @@ function notYetProxy(serviceName) {
   return new Proxy(function () {}, handler);
 }
 
+// The gas code draws OTP codes with Math.random (SECURITY-FINDINGS #13), which
+// is predictable. The sandbox gets a Math whose random() comes from the
+// CSPRNG; everything else is inherited from the real Math. (QR session ids
+// already use Utilities.getUuid, i.e. crypto.randomUUID.)
+const SafeMath = Object.create(Math);
+SafeMath.random = () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
+
 class Runtime {
   constructor(opts) {
     this.gasDir = opts.gasDir;
     this.storage = opts.storage;
+    // { int32 } over a SharedArrayBuffer shared with the other workers, or
+    // null when running single-threaded (tools, tests). See makeLockService.
+    this.sharedLock = opts.sharedLock || null;
     this.ownerEmail = opts.ownerEmail || 'admin@basaerbh.com';
     this.tz = opts.tz || 'Asia/Qatar';
     this.logSink = opts.logSink || null;
@@ -95,6 +106,8 @@ class Runtime {
     // Runtime for role resolution), breaking the construction cycle.
     this.identity = null;
     this.identityService = null;
+    // Per-call metadata from the HTTP boundary (see call()).
+    this.callContext = {};
   }
 
   // Called by the host once the identity layer exists. Enables the auth-host
@@ -114,7 +127,7 @@ class Runtime {
       SpreadsheetApp: makeSpreadsheetApp(this.storage),
       PropertiesService: makePropertiesService(this.storage),
       CacheService: makeCacheService(this.storage),
-      LockService: makeLockService(),
+      LockService: makeLockService(this.sharedLock),
       Session: makeSession(this.ownerEmail, this.tz),
       Logger: makeLogger(this.logSink),
       Utilities,
@@ -142,7 +155,7 @@ class Runtime {
       // Standard globals the gas code assumes are present.
       console,
       JSON,
-      Math,
+      Math: SafeMath,
       Date,
       Array,
       Object,
@@ -185,6 +198,7 @@ class Runtime {
       storage: this.storage,
       mode: this.outboundMode,
       log: this.outboundLog,
+      getCallContext: () => this.callContext,
     });
   }
 
@@ -197,13 +211,23 @@ class Runtime {
   }
 
   // Run a top-level gas function by name with the given argument array.
-  call(fnName, args) {
+  // `context` ({ clientIp } for a browser call) is visible to the shims for the
+  // duration of the call, never to the gas code itself.
+  call(fnName, args, context) {
     this._ensureContext();
     this._refreshPerCall();
     if (typeof this._sandbox[fnName] !== 'function') {
       throw new Error('No such server function: ' + fnName);
     }
-    return this._sandbox.__invoke__.call(this._sandbox, fnName, args || []);
+    this.callContext = context || {};
+    try {
+      return this._sandbox.__invoke__.call(this._sandbox, fnName, args || []);
+    } finally {
+      this.callContext = {};
+      // Apps Script frees the script lock when an execution ends, whether or
+      // not the code released it (e.g. it threw while holding it).
+      this._sandbox.LockService._releaseIfHeld();
+    }
   }
 
   // Introspection: the set of top-level function names the bundle defines.

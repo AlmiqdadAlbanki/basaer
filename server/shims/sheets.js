@@ -68,9 +68,12 @@ class Range {
   }
 
   getValues() {
+    // Read the grid once per call: `_grid` is a live, version-checked view of
+    // the storage master, and the check is per access.
+    const grid = this.sheet._grid;
     const out = [];
     for (let r = 0; r < this.numRows; r++) {
-      const gridRow = this.sheet._grid[this.row - 1 + r] || [];
+      const gridRow = grid[this.row - 1 + r] || [];
       const line = [];
       for (let c = 0; c < this.numCols; c++) {
         const v = gridRow[this.col - 1 + c];
@@ -94,14 +97,15 @@ class Range {
     if (!Array.isArray(values) || !Array.isArray(values[0])) {
       throw new Error('setValues expects a 2D array');
     }
+    const grid = this.sheet._grid;
     for (let r = 0; r < values.length; r++) {
       const gr = this.row - 1 + r;
-      if (!this.sheet._grid[gr]) this.sheet._grid[gr] = [];
+      if (!grid[gr]) grid[gr] = [];
       for (let c = 0; c < values[r].length; c++) {
-        this.sheet._grid[gr][this.col - 1 + c] = values[r][c];
+        grid[gr][this.col - 1 + c] = values[r][c];
       }
     }
-    this.sheet._persistRange(this.row, this.numRows);
+    this.sheet._persistRange(grid, this.row, this.numRows);
     return this;
   }
 
@@ -114,12 +118,15 @@ class Range {
   }
 
   clearContent() {
+    const grid = this.sheet._grid;
     for (let r = 0; r < this.numRows; r++) {
       const gr = this.row - 1 + r;
-      if (!this.sheet._grid[gr]) continue;
-      for (let c = 0; c < this.numCols; c++) this.sheet._grid[gr][this.col - 1 + c] = '';
+      if (!grid[gr]) continue;
+      for (let c = 0; c < this.numCols; c++) grid[gr][this.col - 1 + c] = '';
     }
-    this.sheet._persistAll();
+    // Only the touched rows need persisting; a whole-sheet rewrite would be
+    // O(sheet) for every small clear.
+    this.sheet._persistRange(grid, this.row, this.numRows);
     return this;
   }
   clear() { return this.clearContent(); }
@@ -130,7 +137,8 @@ class Range {
     const specs = Array.isArray(spec) ? spec : [spec];
     const keys = specs.map((s) => (typeof s === 'object' ? { col: s.column, asc: s.ascending !== false } : { col: s, asc: true }));
     const start = this.row - 1;
-    const slice = this.sheet._grid.slice(start, start + this.numRows);
+    const grid = this.sheet._grid;
+    const slice = grid.slice(start, start + this.numRows);
     slice.sort((a, b) => {
       for (const k of keys) {
         const av = a[k.col - 1];
@@ -141,8 +149,8 @@ class Range {
       }
       return 0;
     });
-    for (let i = 0; i < slice.length; i++) this.sheet._grid[start + i] = slice[i];
-    this.sheet._persistAll();
+    for (let i = 0; i < slice.length; i++) grid[start + i] = slice[i];
+    this.sheet._persistRange(grid, this.row, slice.length);
     return this;
   }
 
@@ -174,7 +182,14 @@ class Sheet {
   constructor(spreadsheet, name) {
     this.spreadsheet = spreadsheet;
     this.name = name;
-    this._grid = spreadsheet._storage.loadGrid(spreadsheet.id, name);
+  }
+
+  // The storage master grid (0-based rows), revalidated against writes from
+  // other worker threads on each access. Mutations made through it must be
+  // persisted at once with the storage write methods, which is what every
+  // method below does.
+  get _grid() {
+    return this.spreadsheet._storage.loadGrid(this.spreadsheet.id, this.name);
   }
 
   getName() { return this.name; }
@@ -182,8 +197,9 @@ class Sheet {
   getParent() { return this.spreadsheet; }
 
   getLastRow() {
-    for (let r = this._grid.length - 1; r >= 0; r--) {
-      const row = this._grid[r];
+    const grid = this._grid;
+    for (let r = grid.length - 1; r >= 0; r--) {
+      const row = grid[r];
       if (row && row.some((v) => !isEmpty(v))) return r + 1;
     }
     return 0;
@@ -248,15 +264,14 @@ class Sheet {
     return new Range(this, 1, 1, rows, cols);
   }
 
+  // The storage computes the target row inside the write transaction, so two
+  // threads appending at once never land on the same row.
   appendRow(rowArray) {
-    const at = this.getLastRow() + 1;
-    this._grid[at - 1] = rowArray.slice();
-    this.spreadsheet._storage.putRow(this.spreadsheet.id, this.name, at, this._grid[at - 1]);
+    this.spreadsheet._storage.appendRow(this.spreadsheet.id, this.name, rowArray.slice());
     return this;
   }
 
   deleteRow(rowNum) {
-    this._grid.splice(rowNum - 1, 1);
     this.spreadsheet._storage.deleteRowShift(this.spreadsheet.id, this.name, rowNum);
     return this;
   }
@@ -266,14 +281,14 @@ class Sheet {
   }
 
   deleteColumn(colNum) {
-    for (const row of this._grid) if (row) row.splice(colNum - 1, 1);
-    this._persistAll();
+    const grid = this._grid;
+    for (const row of grid) if (row) row.splice(colNum - 1, 1);
+    this.spreadsheet._storage.saveGrid(this.spreadsheet.id, this.name, grid);
     return this;
   }
 
   clearContents() {
-    this._grid = [];
-    this._persistAll();
+    this.spreadsheet._storage.saveGrid(this.spreadsheet.id, this.name, []);
     return this;
   }
   clear() { return this.clearContents(); }
@@ -292,13 +307,15 @@ class Sheet {
     return this;
   }
 
-  _persistAll() {
-    this.spreadsheet._storage.saveGrid(this.spreadsheet.id, this.name, this._grid);
-  }
-  _persistRange(startRow, numRows) {
-    for (let r = startRow; r < startRow + numRows; r++) {
-      this.spreadsheet._storage.putRow(this.spreadsheet.id, this.name, r, this._grid[r - 1] || []);
-    }
+  // Persist rows startRow..startRow+numRows-1 (1-based) of `grid` in one
+  // transaction. `grid` is the array the caller just mutated; it is passed in
+  // rather than re-read through `_grid`, because a commit from the other
+  // worker in between would make the getter return a freshly reloaded array
+  // without the caller's changes.
+  _persistRange(grid, startRow, numRows) {
+    const rows = [];
+    for (let r = startRow; r < startRow + numRows; r++) rows.push(grid[r - 1] || []);
+    this.spreadsheet._storage.putRows(this.spreadsheet.id, this.name, startRow, rows);
   }
 }
 

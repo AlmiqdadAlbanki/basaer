@@ -12,10 +12,27 @@
  *   [data-bs-toggle="tab"][data-bs-target]  student-portal Bootstrap tabs
  *   [data-tab], [data-emp-tab]              sub-tabs inside a page
  * Nothing else is recorded, so a refresh can never replay a save, send, delete
- * or logout. The current view is written to the URL hash (bookmarkable), e.g.
- *   #v=data-page:emp-profile|data-emp-tab:security
- * and replayed once, after the role's main view has rendered, by clicking the
- * same elements again in order.
+ * or logout. The current view is written to the URL and replayed once, after
+ * the role's main view has rendered, by clicking the same elements again in
+ * order.
+ *
+ * The two top levels live in the path and the lower levels in the hash, so the
+ * address bar (and a bookmark) reads like a real location, e.g.
+ *   /p/students#v=data-emp-tab:security
+ *   data-page "X"              -> /p/X
+ *   data-bs-target "#Y"        -> /p/Y   (the "#" is dropped; replay adds it back)
+ *   data-tab, data-emp-tab     -> #v=data-tab:...|data-emp-tab:...
+ *   nothing recorded           -> /      (no hash)
+ * The server serves the same page for "/" and any "/p/*" path, so a refresh
+ * or a pasted link lands on the app instead of a 404. Only the first segment
+ * after /p/ is meaningful and any other path is ignored. A path alone cannot
+ * say whether X is a data-page or a Bootstrap tab id, so replay tries
+ * [data-page="X"] first and then the tab with data-bs-target="#X".
+ * The URL is updated with history.replaceState (never pushState) so the back
+ * button does not walk through tabs, and location.search is left untouched
+ * (the app appends ?logout=1 on logout and reads it at startup). Old-style
+ * bookmarks that carry data-page: / data-bs-target: inside the hash are still
+ * honoured on read.
  */
 (function () {
   'use strict';
@@ -23,25 +40,62 @@
   // Precedence: clicking a higher level clears everything below it.
   var LEVELS = ['data-page', 'data-bs-target', 'data-tab', 'data-emp-tab'];
   var MAIN_VIEWS = { loadPageStudent: 1, loadPageEmp: 1, loadPageAdminDashboard: 1 };
+  var PATH_PREFIX = '/p/';
   var state = {};        // level -> value
   var restored = false;  // replay happens at most once per page load
+
+  function decode(s) {
+    try { return decodeURIComponent(s); } catch (e) { return ''; }
+  }
 
   function readHash() {
     var m = /(?:^|[#&])v=([^&]*)/.exec(location.hash || '');
     var out = {};
     if (!m) return out;
-    decodeURIComponent(m[1]).split('|').forEach(function (pair) {
+    decode(m[1]).split('|').forEach(function (pair) {
       var i = pair.indexOf(':');
       if (i > 0) out[pair.slice(0, i)] = pair.slice(i + 1);
     });
     return out;
   }
 
-  function writeHash() {
+  // First segment after /p/, decoded ('' for "/" and for any unknown path).
+  function readPath() {
+    var m = /^\/p\/([^\/]+)/.exec(location.pathname || '');
+    return m ? decode(m[1]) : '';
+  }
+
+  // Path (page or tab id) merged with the hash levels. The path value is kept
+  // under "path" because it is not yet known whether it is a data-page or a tab.
+  function readState() {
+    var out = readHash();
+    var top = readPath();
+    if (top) {
+      delete out['data-page']; // the path is the page; ignore a stale old-style entry
+      out.path = top;
+    }
+    return out;
+  }
+
+  function writeUrl() {
+    // Top level goes into the path: the page, else the Bootstrap tab id.
+    // A tab id that cannot be a path ('#' missing or nothing after it) stays in the hash.
+    var topLevel = null;
+    var topValue = '';
+    if (state['data-page']) {
+      topLevel = 'data-page';
+      topValue = state['data-page'];
+    } else if (/^#./.test(state['data-bs-target'] || '')) {
+      topLevel = 'data-bs-target';
+      topValue = state['data-bs-target'].slice(1);
+    }
+    // Everything else goes into the hash. A tab inside a page (both data-page
+    // and data-bs-target set) cannot share the path, so it uses the old-style entry.
     var parts = [];
-    LEVELS.forEach(function (k) { if (state[k]) parts.push(k + ':' + state[k]); });
+    LEVELS.forEach(function (k) { if (state[k] && k !== topLevel) parts.push(k + ':' + state[k]); });
+    var path = topLevel ? PATH_PREFIX + encodeURIComponent(topValue) : '/';
     var hash = parts.length ? '#v=' + encodeURIComponent(parts.join('|')) : '';
-    try { history.replaceState(null, '', location.pathname + location.search + hash); } catch (e) { /* ignore */ }
+    try { history.replaceState(null, '', path + location.search + hash); } catch (e) { /* ignore */ }
   }
 
   function markerOf(el) {
@@ -63,15 +117,20 @@
     var idx = LEVELS.indexOf(mk.level);
     for (var i = idx + 1; i < LEVELS.length; i++) delete state[LEVELS[i]];
     state[mk.level] = mk.value;
-    writeHash();
+    writeUrl();
   }, true);
 
-  function waitFor(selector, timeoutMs) {
+  // Resolves with the first match, trying the selectors in the order given
+  // (a plain string is a single selector).
+  function waitFor(selectors, timeoutMs) {
+    if (typeof selectors === 'string') selectors = [selectors];
     return new Promise(function (resolve) {
       var start = Date.now();
       (function poll() {
-        var el = document.querySelector(selector);
-        if (el) return resolve(el);
+        for (var i = 0; i < selectors.length; i++) {
+          var el = document.querySelector(selectors[i]);
+          if (el) return resolve(el);
+        }
         if (Date.now() - start > timeoutMs) return resolve(null);
         setTimeout(poll, 100);
       })();
@@ -82,14 +141,25 @@
     return (window.CSS && CSS.escape) ? CSS.escape(v) : String(v).replace(/["\\]/g, '\\$&');
   }
 
+  function selectorFor(level, value) {
+    var sel = '[' + level + '="' + cssEscape(value) + '"]';
+    if (level === 'data-bs-target') sel = '[data-bs-toggle="tab"]' + sel;
+    return sel;
+  }
+
   // Replay the stored view by clicking each recorded element in order.
+  // The steps are built up front: every click re-records into `state` and
+  // clears the levels below it, so replay must not read from the live state.
   async function replay(saved) {
-    for (var i = 0; i < LEVELS.length; i++) {
-      var k = LEVELS[i];
-      if (!saved[k]) continue;
-      var sel = '[' + k + '="' + cssEscape(saved[k]) + '"]';
-      if (k === 'data-bs-target') sel = '[data-bs-toggle="tab"]' + sel;
-      var el = await waitFor(sel, 8000);
+    var steps = []; // each step: candidate selectors, tried in order
+    if (saved.path) {
+      steps.push([selectorFor('data-page', saved.path), selectorFor('data-bs-target', '#' + saved.path)]);
+    }
+    LEVELS.forEach(function (k) {
+      if (saved[k]) steps.push([selectorFor(k, saved[k])]);
+    });
+    for (var i = 0; i < steps.length; i++) {
+      var el = await waitFor(steps[i], 8000);
       if (!el) return; // view no longer exists (different role, removed page): stop quietly
       el.click();
       await new Promise(function (r) { setTimeout(r, 250); });
@@ -99,9 +169,8 @@
   function onMainViewReady() {
     if (restored) return;
     restored = true;
-    var saved = readHash();
+    var saved = readState();
     if (!Object.keys(saved).length) return;
-    state = saved;
     // Give the view's own setup callback a moment to finish painting first.
     setTimeout(function () { replay(saved); }, 300);
   }
@@ -129,6 +198,6 @@
 
   // Expose a tiny hook so the auth shim can clear the stored view on logout.
   window.__basaerViewRestore = {
-    clear: function () { state = {}; writeHash(); },
+    clear: function () { state = {}; writeUrl(); },
   };
 })();

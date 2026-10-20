@@ -52,8 +52,8 @@ async function rpc(fnName, args, token) {
 }
 
 // Same sequence the browser runs: gas loginWithPassword -> custom token ->
-// POST /api/auth/exchange -> session token.
-async function tryLogin(cpr, password) {
+// POST /api/auth/exchange -> { accessToken (bearer), session cookie }.
+async function exchangeLogin(cpr, password) {
   const login = await rpc('loginWithPassword', [cpr, password]);
   if (!login.body || !login.body.ok || !login.body.result || !login.body.result.ok) return null;
   const res = await fetch(`${BASE}/api/auth/exchange`, {
@@ -62,7 +62,14 @@ async function tryLogin(cpr, password) {
     body: JSON.stringify({ customToken: login.body.result.token }),
   });
   if (res.status !== 200) return null;
-  return (await res.json()).sessionToken;
+  const setCookie = res.headers.get('set-cookie') || '';
+  const cookieMatch = /basaer_session=([^;]+)/.exec(setCookie);
+  return { accessToken: (await res.json()).accessToken, sessionCookie: cookieMatch ? 'basaer_session=' + cookieMatch[1] : null, setCookie };
+}
+
+async function tryLogin(cpr, password) {
+  const session = await exchangeLogin(cpr, password);
+  return session ? session.accessToken : null;
 }
 
 async function loginAs(cpr, password) {
@@ -91,11 +98,11 @@ function signJwt(privateKey, payload) {
   return header + '.' + body + '.' + b64url(sig);
 }
 
-async function upload(token, { folderId, fileName, bytes }) {
+async function upload(token, { folderId, fileName, bytes, declaredType }) {
   const form = new FormData();
   form.append('folderId', folderId);
   form.append('fileName', fileName);
-  form.append('file', new Blob([bytes], { type: 'application/octet-stream' }), fileName);
+  form.append('file', new Blob([bytes], { type: declaredType || 'application/octet-stream' }), fileName);
   const res = await fetch(`${BASE}/api/upload/student-work`, {
     method: 'POST',
     headers: token ? { Authorization: 'Bearer ' + token } : {},
@@ -259,6 +266,26 @@ test('student-work upload is confined to the caller folder and blocks executable
   expectStatus(mz, 415, 'MZ signature upload');
 });
 
+// The browser-declared content type of an upload must never decide how the
+// file is served back: a "pdf" declared as text/html would be stored XSS on
+// the app's own origin.
+test('uploaded files are served with a server-chosen content type, markup never inline', async () => {
+  const fakePdf = await upload(tokens.studentA, { folderId: 'SEED', fileName: 'homework.pdf', bytes: Buffer.from('<script>alert(1)</script>'), declaredType: 'text/html' });
+  expectStatus(fakePdf, 200, 'upload');
+  const served = await fetch(fakePdf.body.url);
+  assert.strictEqual(served.headers.get('content-type'), 'application/pdf');
+
+  const unknown = await upload(tokens.studentA, { folderId: 'SEED', fileName: 'thing.xyz', bytes: Buffer.from('<html>'), declaredType: 'text/html' });
+  expectStatus(unknown, 200, 'upload unknown type');
+  const download = await fetch(unknown.body.url);
+  assert.strictEqual(download.headers.get('content-type'), 'application/octet-stream');
+  assert.match(download.headers.get('content-disposition') || '', /^attachment/);
+  assert.match(download.headers.get('content-security-policy') || '', /sandbox/);
+
+  expectStatus(await upload(tokens.studentA, { folderId: 'SEED', fileName: 'page.html', bytes: Buffer.from('<b>x</b>') }), 415, '.html upload');
+  expectStatus(await upload(tokens.studentA, { folderId: 'SEED', fileName: 'img.svg', bytes: Buffer.from('<svg/>') }), 415, '.svg upload');
+});
+
 test('file serving: unknown ids 404 and non-public files need authentication', async () => {
   expectStatus({ status: (await fetch(`${BASE}/files/f_doesnotexist/x.pdf`)).status }, 404, 'unknown file');
 
@@ -280,4 +307,100 @@ test('file serving: unknown ids 404 and non-public files need authentication', a
 
   const folder = await fetch(`${BASE}/files/folder/anything`);
   assert.strictEqual(folder.status, 401);
+});
+
+// A cookie-authenticated POST needs the custom header (cross-site pages cannot
+// add it); GET file links work with the cookie alone; logout revokes the
+// cookie server-side so a copied value stops working too.
+test('session cookie: httpOnly, CSRF rule on POST, usable for GET links, revoked by logout', async () => {
+  const session = await exchangeLogin(TEACHER, PASSWORD);
+  assert.ok(session && session.sessionCookie, 'exchange must set the session cookie');
+  assert.match(session.setCookie, /HttpOnly/i);
+  assert.match(session.setCookie, /SameSite=Lax/i);
+
+  const withHeader = await fetch(`${BASE}/api/rpc/getStaffList`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'basaer', Cookie: session.sessionCookie },
+    body: JSON.stringify({ args: [] }),
+  });
+  assert.strictEqual(withHeader.status, 200, 'cookie + header');
+
+  const withoutHeader = await fetch(`${BASE}/api/rpc/getStaffList`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: session.sessionCookie },
+    body: JSON.stringify({ args: [] }),
+  });
+  assert.strictEqual(withoutHeader.status, 401, 'cookie without header');
+
+  const crossSite = await fetch(`${BASE}/api/rpc/getStaffList`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'basaer', 'Sec-Fetch-Site': 'cross-site', Cookie: session.sessionCookie },
+    body: JSON.stringify({ args: [] }),
+  });
+  assert.strictEqual(crossSite.status, 401, 'cross-site fetch metadata');
+
+  // The session cookie value is not an access token and vice versa.
+  const cookieAsBearer = await rpc('getStaffList', [], session.sessionCookie.split('=')[1]);
+  expectStatus(cookieAsBearer, 401, 'session cookie used as bearer');
+
+  // A fresh access token comes from the cookie.
+  const refreshed = await fetch(`${BASE}/api/auth/session`, { method: 'POST', headers: { 'X-Requested-With': 'basaer', Cookie: session.sessionCookie } });
+  assert.strictEqual(refreshed.status, 200);
+  assert.ok((await refreshed.json()).accessToken);
+
+  const logout = await fetch(`${BASE}/api/auth/logout`, { method: 'POST', headers: { 'X-Requested-With': 'basaer', Cookie: session.sessionCookie } });
+  assert.strictEqual(logout.status, 200);
+  const replayed = await fetch(`${BASE}/api/auth/session`, { method: 'POST', headers: { 'X-Requested-With': 'basaer', Cookie: session.sessionCookie } });
+  assert.strictEqual(replayed.status, 401, 'revoked cookie replayed');
+});
+
+test('login gates: CPR-only login is off, Google-verified login needs a server-verified email', async () => {
+  expectStatus(await rpc('skipEmailVerificationLogin', [STUDENT_A]), 403, 'skipEmailVerificationLogin');
+  // Knowing a CPR and the email on file must not be enough (SECURITY-FINDINGS #6).
+  expectStatus(await rpc('loginWithGoogleVerifiedEmail', [STUDENT_A, 'student1@example.com']), 403, 'loginWithGoogleVerifiedEmail');
+});
+
+test('/exec: oauthVerify is refused without a verifiable ID token; saveFcmToken needs a session', async () => {
+  const exec = (body, headers) => fetch(`${BASE}/exec`, {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}),
+    body: JSON.stringify(body),
+  });
+  const forgedVerify = await exec({ action: 'oauthVerify', verifyToken: 'abc', ok: true, email: 'student1@example.com' });
+  assert.ok(forgedVerify.status === 401 || forgedVerify.status === 503, 'oauthVerify without token got ' + forgedVerify.status);
+  // Even if the relay result had been accepted, the login must not be.
+  expectStatus(await rpc('checkOauthVerifyResult', ['abc']), 200, 'poll is public');
+  expectStatus(await rpc('loginWithGoogleVerifiedEmail', [STUDENT_A, 'student1@example.com']), 403, 'login after forged verify');
+
+  const anonymousFcm = await exec({ action: 'saveFcmToken', studentId: STUDENT_B, token: 'tok' });
+  assert.strictEqual(anonymousFcm.status, 401, 'anonymous saveFcmToken');
+  const studentFcm = await exec({ action: 'saveFcmToken', studentId: STUDENT_B, token: 'tok' }, { Authorization: 'Bearer ' + tokens.studentA });
+  assert.strictEqual(studentFcm.status, 200, 'student saveFcmToken');
+});
+
+// The browser's emailVerified flag on registration is only honoured for an
+// email the server itself saw verified (OTP or Google); otherwise the student
+// is stored unverified and verifies at first login, as the gas code intends.
+test('newStuReg cannot self-declare a verified email', async () => {
+  const cpr = '004444444';
+  const registration = await rpc('newStuReg', [{
+    cpr, name: 'Fake Verified', gender: 'ذكر', dob: '2000-01-01', nationality: 'بحريني', phone: '33333333',
+    mail: 'fake-verified@example.com', block: '101', area: 'x', pastStudies: '', didYou: '', emailVerified: true,
+  }]);
+  expectStatus(registration, 200, 'newStuReg');
+  const persons = await rpc('getPersons', [], tokens.admin);
+  const stored = (persons.body.result || []).find((p) => String(p.cpr) === cpr);
+  assert.ok(stored, 'student was registered');
+  assert.strictEqual(!!stored.emailVerified, false, 'emailVerified must not come from the browser');
+});
+
+// Last: it spends most of the per-IP credential budget.
+test('repeated wrong passwords are throttled', async () => {
+  let last = null;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    last = await rpc('loginWithPassword', [TEACHER, 'definitely-wrong-' + attempt]);
+    if (last.status === 429) break;
+  }
+  const lockedByService = last.status === 200 && last.body && last.body.result && /TOO_MANY|كثير/.test(JSON.stringify(last.body.result));
+  assert.ok(last.status === 429 || lockedByService, 'expected 429 or a lockout reply, got ' + last.status + ' ' + JSON.stringify(last.body));
 });

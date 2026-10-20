@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { POLICY, enforce, scopeResult } = require('./policy.js');
+const { POLICY, enforce, scopeResult, rpcKinds } = require('./policy.js');
 
 // The authoritative set of server functions the client invokes (from the
 // call-site inventory). Every one must have an explicit policy entry, so a new
@@ -113,6 +113,26 @@ test('staff may target any CPR (not rescoped)', () => {
   assert.strictEqual(r.args[0], '999999999');
 });
 
+// submitStWRK's subject is "stWork-<cpr>" (gas splits on '-'); a student is
+// rescoped to their own prefixed id, never to a bare CPR, and the original
+// argument array is left untouched.
+test('submitStWRK is rescoped to "stWork-<callerCpr>" for students', () => {
+  const original = ['stWork-999999999', 'work-1', 'f_abc'];
+  const student = enforce('submitStWRK', original, STUDENT);
+  assert.strictEqual(student.allow, true);
+  assert.strictEqual(student.args[0], 'stWork-' + STUDENT.cpr);
+  assert.strictEqual(original[0], 'stWork-999999999');
+  const staff = enforce('submitStWRK', original, TEACHER);
+  assert.strictEqual(staff.args[0], 'stWork-999999999');
+});
+
+test('exam-state reads are scoped to the caller (getExams arg 2, studentFailedExam arg 0)', () => {
+  assert.strictEqual(enforce('getExams', [null, null, '999999999'], STUDENT).args[2], STUDENT.cpr);
+  assert.strictEqual(enforce('getExams', ['x', 1], STUDENT).args[2], STUDENT.cpr);
+  assert.strictEqual(enforce('getExams', [null, null, '999999999'], TEACHER).args[2], '999999999');
+  assert.strictEqual(enforce('studentFailedExam', ['999999999', 'x', 1], STUDENT).args[0], STUDENT.cpr);
+});
+
 test('setPassword can only set the caller\'s own password (#2)', () => {
   const r = enforce('setPassword', ['999999999', 'newpass'], STUDENT);
   assert.strictEqual(r.allow, true);
@@ -158,4 +178,31 @@ test('loginData: self for anyone, "all" for admin only', () => {
   assert.strictEqual(enforce('loginData', ['001234567'], STUDENT).allow, true);
   assert.strictEqual(enforce('loginData', ['all'], STUDENT).allow, false);
   assert.strictEqual(enforce('loginData', ['all'], ADMIN).allow, true);
+});
+
+// ---- RPC cache kinds (read / live / write) ----------------------------------
+
+test('every policy entry has a valid cache kind', () => {
+  const bad = Object.keys(POLICY).filter((n) => !['read', 'live', 'write'].includes(POLICY[n].kind));
+  assert.deepStrictEqual(bad, [], 'entries without a valid kind: ' + bad.join(', '));
+});
+
+test('rpcKinds: omits denied functions and maps names to kinds', () => {
+  const kinds = rpcKinds();
+  const denied = Object.keys(POLICY).filter((n) => POLICY[n].level === 'denied');
+  assert.ok(denied.length > 0); // the check below is only meaningful if something is denied
+  for (const n of denied) assert.ok(!(n in kinds), n + ' must not be exposed to the client cache');
+  assert.ok(!('getOAuthToken' in kinds));
+  assert.strictEqual(Object.keys(kinds).length, Object.keys(POLICY).length - denied.length);
+  assert.strictEqual(kinds.getPersons, 'read');
+  assert.strictEqual(kinds.getWPQueueStatus, 'live');
+  assert.strictEqual(kinds.saveExam, 'write');
+});
+
+test('rpcKinds: sanity counts per kind', () => {
+  const counts = { read: 0, live: 0, write: 0 };
+  for (const k of Object.values(rpcKinds())) counts[k]++;
+  assert.ok(counts.read >= 60, 'read count ' + counts.read);
+  assert.ok(counts.live >= 15, 'live count ' + counts.live);
+  assert.ok(counts.write >= 90, 'write count ' + counts.write);
 });

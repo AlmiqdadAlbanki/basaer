@@ -379,3 +379,181 @@ Steps 1 to 3 are small edits. Step 4 is the start of the full fix described in f
 
 Each row will have an automated test that makes the unauthenticated call and confirms it is
 refused.
+
+---
+
+## Addendum (2026-10-20): production hardening
+
+**Date:** 20 October 2026
+**Basis:** a second read of the Node server in `server/` and of the Apps Script code it runs
+(`gas/`), made before go-live. Same limits as above: nothing was tried against a live
+deployment, and each statement is what the code allows, with the file and line that shows it.
+Line numbers are those of the `gas/` files in this repository.
+
+Five weaknesses were confirmed in this pass. Four of them are the same ones as findings 5, 6, 9
+and 13 above, now with the exact path through the server and what closes it. The fifth, A4, is
+new. All five are closed in the server and none needs a change to the `gas/` files, but A1 and A3
+also depend on changes to pages outside this repository (named in each entry).
+
+| # | Severity | Finding | Earlier finding |
+|---|---|---|---|
+| A1 | High | A login could be minted from a CPR and the email on file, without Google | 6 |
+| A2 | High | Login by CPR alone had no switch | 5 |
+| A3 | High | Anyone could overwrite a student's push token | 9 |
+| A4 | Medium | Guessing passwords and login codes had no reliable server-side limit | new |
+| A5 | Low | Login codes were drawn with `Math.random` | 13 |
+
+### A1. A login could be minted from a CPR and the email on file (High)
+
+**Evidence.** `gas/auth.js:291`, `loginWithGoogleVerifiedEmail(cpr, verifiedEmail)`, returns a
+login token when the email it is given equals the email on file for the CPR. It never sees proof
+from Google. The email it compares can be planted through `/exec` with `action: 'oauthVerify'`:
+`gas/auth.js:379` (`handleOauthVerifyResult_`) stores the `ok` and `email` fields exactly as
+posted.
+
+**What it allowed.** Anyone who knew a CPR and the email registered to it could call the
+function, or post a made-up "verified" result, and receive a working login for that person. Both
+values were readable before login (finding 3).
+
+**Fix.** `/exec` with `oauthVerify` now requires an `idToken`. `server/auth/google-token.js`
+checks its signature against Google's published keys, its issuer, audience, expiry and
+`email_verified`, and the server replaces whatever `email` and `ok` the page sent with the
+verified email. That email is remembered in the server's memory for 5 minutes, and
+`loginWithGoogleVerifiedEmail` is refused (403) for any email not remembered; the entry is used
+up by one successful login. With neither `FIREBASE_PROJECT_ID` nor `GOOGLE_OAUTH_CLIENT_ID` set,
+the whole path is refused (503 on `/exec`). The `google-signin-relay` page (outside this
+repository) must send the ID token; until it does, Google sign-in fails closed and users sign in
+with the emailed code or a password (`docs/DEPLOY.md`, section 5). Tests: `server/security.test.js`
+("login gates", "/exec") and `server/auth/google-token.test.js`.
+
+---
+
+### A2. Login by CPR alone had no switch (High)
+
+**Evidence.** `gas/auth.js:330`, `skipEmailVerificationLogin(cpr)`, returns a login token for any
+CPR on file. The Apps Script version had no way to turn it off (see finding 5).
+
+**What it allowed.** A working session as any student or staff member for anyone who knew or
+guessed their CPR.
+
+**Fix.** The server refuses the call (403) unless `ALLOW_CPR_ONLY_LOGIN=1` is set in
+`/etc/basaer.env`. It is off by default, and the server prints a WARNING line at start-up while it
+is on. Test: `server/security.test.js` ("login gates").
+
+---
+
+### A3. Anyone could overwrite a student's push token (High)
+
+**Evidence.** `gas/FCMService.js:107`, `handleSaveFcmTokenRequest_(body)`, reached through
+`/exec` with `action: 'saveFcmToken'`, takes `body.studentId` and saves `body.token` for that
+student. Nothing checked who was calling.
+
+**What it allowed.** Pointing a student's push notifications at an attacker's device (and so
+reading them), or replacing a working token to stop the student receiving any.
+
+**Fix.** `/exec` with `saveFcmToken` now needs a logged-in session (401 otherwise). For anyone who
+is not staff, the server overwrites `studentId` with the caller's own CPR, so a student can only
+register their own device. Because the session is a same-origin cookie, the `platform.html` push
+page must be served from the app's own domain (`docs/DEPLOY.md`, sections 5 and 8). Test:
+`server/security.test.js` ("/exec").
+
+---
+
+### A4. Guessing passwords and login codes had no reliable server-side limit (Medium)
+
+**Evidence.**
+
+- `gas/auth.js:271-277`: the limit of 5 wrong tries per login code is a counter read from the
+  script cache, incremented and written back. Concurrent requests each read the same value, so
+  parallel guesses are not all counted.
+- The password store that stands in for Firebase Auth (`server/auth/identity-service.js`) had no
+  limit on wrong passwords.
+- The server put no limit, per client or per target, on calls that prove an identity or send a
+  code. Only the legacy code's own cache-based counters and resend cooldown applied.
+
+**What it allowed.** A script could try many codes against one CPR in parallel, or many passwords
+against one email, at the speed of the server.
+
+**Fix.** Limits at the HTTP boundary (`server/index.js`), counted in memory per process and
+answered with 429 and a `Retry-After` header:
+
+| Limit | Per | Allowed |
+|---|---|---|
+| `/api/auth/*` | IP | 30 per minute |
+| RPC, not logged in | IP | 120 per minute |
+| RPC, logged in | user | 600 per minute |
+| Identity-proving calls (password login, code checks, Google and skip-verification login) | IP | 30 per 10 minutes |
+| The same calls | CPR or email entered, from one IP | 10 per 10 minutes |
+| The same calls | CPR or email entered, from any IP | 60 per 10 minutes |
+| Asking for a login or registration code | CPR or email entered, from one IP | 5 per 10 minutes |
+| Asking for a login or registration code | CPR or email entered, from any IP | 20 per 10 minutes |
+| `/exec` | IP | 60 per minute |
+
+And a lockout kept in the database table `auth_attempts`, so it is shared by all worker threads
+and survives restarts: 10 wrong passwords for one email from one client address within 15
+minutes lock that pair for 15 minutes, even for the right password. The lock is per address on
+purpose: CPRs are not secret, and a lock on the email alone would let a stranger shut its owner
+out by guessing wrong ten times. Guessing from many addresses is bounded by the "from any IP"
+rows above. Unknown emails are counted and answered identically, so the reply does not show which
+emails have accounts. An administrator lifts a lock with one SQL statement (`docs/DEPLOY.md`,
+section 9). Tests: `server/security.test.js` ("repeated wrong passwords"),
+`server/auth/identity-service.test.js`, `server/rate-limit.test.js`.
+
+---
+
+### A5. Login codes were drawn with `Math.random` (Low)
+
+**Evidence.** `gas/auth.js:178`: `Math.floor(100000 + Math.random() * 900000)`. `Math.random` is
+not designed for secrets and its output can be predicted from earlier output.
+
+**Fix.** The `gas/` file is unchanged. The sandbox that runs it (`server/runtime.js`) gives it a
+`Math` whose `random()` is backed by Node's cryptographic generator, so every `Math.random` in
+the legacy code, the codes included, is now unpredictable.
+
+---
+
+### New defences in the server
+
+| Area | What the server does |
+|---|---|
+| Sessions | Login sets an httpOnly cookie `basaer_session` (SameSite=Lax, Secure in production). It slides for `SESSION_TTL_DAYS` (default 7) up to an absolute 30 days. The page also gets a 15-minute access token that it keeps in memory only; the browser stores no token in localStorage. Logout revokes the session on the server, so a copied cookie stops working. |
+| CSRF | A POST authenticated by the cookie must carry `X-Requested-With: basaer`, and is refused if the browser says it is cross-site (`Sec-Fetch-Site`). A cross-site page cannot add that header. |
+| Headers | `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'`, `Permissions-Policy: camera=(self), microphone=(), geolocation=()`. This ends the framing weakness in finding 13. HSTS is left to nginx once HTTPS works. |
+| Error masking | In production a database error, crashed worker, timeout or code error reaches the user only as a generic message with a reference. The Arabic messages the legacy code writes for users still pass through. |
+| Logging | One JSON line per API request in the journal: time, IP, method, path, status, duration, caller CPR and, on a server error, the reference. No request bodies. |
+| Isolation | The HTTP thread never runs the legacy code. It runs on worker threads, and a call that hangs for 5 minutes is cut off by replacing its worker (any script lock it held is freed). |
+| Uploaded files | The content type of a student upload is decided by the server from the file name, never taken from the browser; `.html`, `.svg` and executables are refused. Files are shown inline only when they are PDF, image, audio, video or plain text; anything else is a download with a sandboxing `Content-Security-Policy`. Without this, a file called `homework.pdf` uploaded as `text/html` would have run as a page on the app's origin for whoever opened it. |
+| Registration | `newStuReg` records `emailVerified` only for an email this server saw verified (the registration code exchange, or Google); the browser's own flag is otherwise overridden to `false` and the student verifies at first login. This is the server-side half of finding 12. |
+
+### Residual risks
+
+What the administrator should know after the above:
+
+1. **The QR attendance token is a shared secret, valid for 6 hours.** `startQrSession`
+   (`gas/dataPost.js:152`) issues a random token that travels in the scanner page's link and
+   authorizes `/exec` with `action: 'qrAttend'` (`gas/dataPost.js:159`). The request carries a
+   CPR, and the server does not check that the CPR belongs to the person scanning. Anyone who
+   sees the link while it is shown to a class can mark any CPR present until it expires, as many
+   times as they like. The code has no function that cancels a session early. The only server
+   limit is `/exec` at 60 requests a minute per IP. Start a session per class, do not share or
+   photograph the link, and compare attendance against who was present.
+2. **The data races in the legacy code are the legacy code's.** Check-then-write patterns (find
+   a duplicate, then append; remember a row number, then delete) are still there. With the
+   default of one interactive worker, users' calls never overlap each other. A call can still
+   overlap a background job wherever the legacy code takes no lock, as on Apps Script, and
+   raising `BASAER_RPC_WORKERS` brings back overlap between users. See `docs/DEPLOY.md`,
+   [section 10](DEPLOY.md#10-capacity-and-scaling).
+3. **`ALLOW_CPR_ONLY_LOGIN=1` reopens finding 5.** It exists because the academy chose that
+   feature on Apps Script. While it is on, anyone who knows or guesses a CPR can log in as that
+   person, and CPRs are not secret. Leave it off.
+4. **The Google sign-in record is keyed by email, not by browser.** After a real Google check
+   the server holds the verified email for up to 5 minutes. In that window, someone who knows the
+   CPR and that email could call `loginWithGoogleVerifiedEmail` first. It needs both values and
+   a victim who has just signed in with Google and not finished.
+5. **The lockout can be used to lock someone out.** Anyone who knows an email can send 10 wrong
+   passwords and lock it for 15 minutes. The lock expires by itself, and an administrator can lift
+   it at once (`docs/DEPLOY.md`, section 9).
+6. **The Content-Security-Policy is deliberately small.** The legacy page needs inline scripts and
+   third-party assets, so the policy sets only framing, base-URI and plugin rules. It does not
+   stop injected script. The session cookie cannot be read by script, and the in-memory access
+   token lasts 15 minutes, which limits what injected script can do.

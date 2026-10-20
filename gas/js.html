@@ -208,14 +208,10 @@ const result = parser.getResult();
   document.addEventListener("mouseover",hoverEvent);
   document.addEventListener("dblclick",dblclickEvent);
 */
-window.addEventListener("beforeunload", function(e){
-   //alert('Do something');
-}, false);
-
-window.onbeforeunload = function(){
-  //alert('Do something');
-  return 'festek';
-};
+// The unconditional window.onbeforeunload handler that used to live here made the
+// browser ask "reload site?" on every refresh and on logout. Removed in the
+// self-hosted build; the exam-only guard (examBeforeUnload in funcs-js.html) is
+// the one that should stay.
 ///////////////////////////////////////////////////////////////
 function setMainData(){
   loadingStart();

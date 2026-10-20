@@ -111,10 +111,13 @@ function liveFetch(url, params) {
   return makeResponse(statusCode, responseBody);
 }
 
-// opts: { identityService, identity, storage, mode: 'dry-run'|'live', log }
+// opts: { identityService, identity, storage, mode: 'dry-run'|'live', log,
+//         getCallContext } — getCallContext() returns the current call's
+//         { clientIp } so the login lockout can be keyed per client.
 function makeUrlFetchApp(opts) {
   const mode = opts.mode || 'dry-run';
   const log = opts.log || (() => {});
+  const getCallContext = opts.getCallContext || (() => ({}));
 
   function record(url, params, code, responseText) {
     if (!opts.storage) return;
@@ -143,9 +146,11 @@ function makeUrlFetchApp(opts) {
     }
     if (identityService && urlText.startsWith('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword')) {
       const requestBody = parsePayload(params);
-      const uid = identityService.verifyPassword(requestBody.email, requestBody.password);
-      if (!uid) return makeResponse(400, { error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } });
-      return makeResponse(200, { localId: uid, email: requestBody.email, idToken: 'local-signin', registered: true });
+      const result = identityService.verifyPassword(requestBody.email, requestBody.password, { clientIp: (getCallContext() || {}).clientIp });
+      // Firebase-style failures: INVALID_LOGIN_CREDENTIALS, or
+      // TOO_MANY_ATTEMPTS_TRY_LATER while the email is locked out.
+      if (result.error) return makeResponse(400, { error: { code: 400, message: result.error } });
+      return makeResponse(200, { localId: result.uid, email: requestBody.email, idToken: 'local-signin', registered: true });
     }
     if (identityService && urlText.startsWith('https://identitytoolkit.googleapis.com/v1/accounts:update')) {
       const requestBody = parsePayload(params);

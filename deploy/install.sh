@@ -51,6 +51,9 @@ chmod 700 "$data_dir/keys"
 if [ -d "$app_dir" ]; then
   echo "==> App dependencies"
   chown -R "$app_user:$app_user" "$app_dir"
+  # npm writes its cache to the service user's home. The home can be root-owned when the
+  # directory was created (for the clone) before the user existed, which makes npm ci fail with EACCES.
+  chown "$app_user:$app_user" "$app_home"
   (cd "$app_dir" && sudo -u "$app_user" npm ci --omit=dev)
 else
   echo "NOTE: $app_dir not found. Clone the repo there, then run this script again."

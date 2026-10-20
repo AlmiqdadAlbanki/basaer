@@ -52,23 +52,82 @@ function makeCacheService(storage) {
   };
 }
 
-// A single RPC runs start-to-finish synchronously in the worker's vm, so within
-// one invocation there is no interleaving to guard against. Cross-invocation
-// serialisation (the thing the queue tick code really wants) is enforced one
-// level up by the trigger scheduler running one job at a time — see phase 4.
-// Here the lock simply always succeeds.
-function makeLockService() {
-  const lock = {
-    tryLock: () => true,
-    waitLock: () => {},
-    releaseLock: () => {},
-    hasLock: () => true,
-  };
+// LockService. The gas code takes the script lock around exam start/submit,
+// question edits and every queue tick, expecting it to exclude *other
+// executions*. Executions now run on several worker threads (interactive RPCs
+// on one, triggers on another), so the lock is a real mutex over a
+// SharedArrayBuffer shared by every worker: slot 0 is 0 when free, 1 when held.
+//
+// `sharedLock` is { int32: Int32Array, holderId } over that buffer, or null
+// for the single-threaded case (tools, unit tests), where the lock trivially
+// succeeds as before. Slot 1 records the holder's id so that the pool can free
+// the lock if the holding worker dies or is terminated mid-execution
+// (forceReleaseLockHeldBy). Apps Script releases a lock when the execution
+// ends even if the code forgot to; Runtime.call() does the same through
+// `_releaseIfHeld`.
+const LOCK_STATE_SLOT = 0;
+const LOCK_HOLDER_SLOT = 1;
+const LOCK_BUFFER_BYTES = 8;
+
+function makeLockService(sharedLock) {
+  const int32 = sharedLock ? sharedLock.int32 : null;
+  const holderId = sharedLock && sharedLock.holderId ? sharedLock.holderId : 0;
+  let heldByThisExecution = false;
+
+  function tryLock(timeoutMs) {
+    if (!int32) return true;
+    if (heldByThisExecution) return true; // re-entry within one execution
+    const deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+    for (;;) {
+      if (Atomics.compareExchange(int32, LOCK_STATE_SLOT, 0, 1) === 0) {
+        Atomics.store(int32, LOCK_HOLDER_SLOT, holderId);
+        heldByThisExecution = true;
+        return true;
+      }
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) return false;
+      // Sleep until the holder releases (notify) or a short slice passes; the
+      // slice bounds the wait in case a notify is missed.
+      Atomics.wait(int32, LOCK_STATE_SLOT, 1, Math.min(remainingMs, 50));
+    }
+  }
+  function waitLock(timeoutMs) {
+    if (!tryLock(timeoutMs)) {
+      throw new Error('Lock timeout: another process was holding the lock for too long.');
+    }
+  }
+  function releaseLock() {
+    if (!int32 || !heldByThisExecution) return;
+    heldByThisExecution = false;
+    Atomics.store(int32, LOCK_HOLDER_SLOT, 0);
+    Atomics.store(int32, LOCK_STATE_SLOT, 0);
+    Atomics.notify(int32, LOCK_STATE_SLOT, 1);
+  }
+  function hasLock() {
+    return int32 ? heldByThisExecution : true;
+  }
+
+  // Apps Script has three lock scopes; the server code only ever uses the
+  // script lock, and one mutex for all three is the conservative choice.
+  const lock = { tryLock, waitLock, releaseLock, hasLock };
   return {
     getScriptLock: () => lock,
     getUserLock: () => lock,
     getDocumentLock: () => lock,
+    _releaseIfHeld: releaseLock,
   };
+}
+
+// Called by the pool (main thread) when a worker died or was terminated: if
+// that worker was holding the lock, free it so the other workers do not wait
+// forever. Returns true when a lock was freed.
+function forceReleaseLockHeldBy(lockBuffer, holderId) {
+  const int32 = new Int32Array(lockBuffer);
+  if (!holderId || Atomics.load(int32, LOCK_HOLDER_SLOT) !== holderId) return false;
+  Atomics.store(int32, LOCK_HOLDER_SLOT, 0);
+  Atomics.store(int32, LOCK_STATE_SLOT, 0);
+  Atomics.notify(int32, LOCK_STATE_SLOT, 1);
+  return true;
 }
 
 function makeSession(ownerEmail, tz) {
@@ -159,6 +218,8 @@ module.exports = {
   makePropertiesService,
   makeCacheService,
   makeLockService,
+  forceReleaseLockHeldBy,
+  LOCK_BUFFER_BYTES,
   makeSession,
   makeLogger,
   makeHtmlService,
