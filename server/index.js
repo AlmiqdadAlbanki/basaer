@@ -40,6 +40,7 @@ const { GoogleTokenVerifier } = require('./auth/google-token.js');
 const { enforce, scopeResult, rpcKinds } = require('./policy.js');
 const { storeStudentWork, isOwnFolder, MAX_UPLOAD_BYTES } = require('./uploads.js');
 const { makeDriveShims } = require('./shims/drive.js');
+const { convertWithSoffice } = require('./docgen/convert.js');
 const { forceReleaseLockHeldBy, LOCK_BUFFER_BYTES } = require('./shims/platform.js');
 const { Scheduler } = require('./scheduler.js');
 const { WorkerPool } = require('./worker-pool.js');
@@ -777,6 +778,39 @@ app.get('/files/:id/:name?', (req, res) => serveStoredFile(req, res, req.params.
 // drive.google.com/thumbnail?id=<id>&sz=w500; page-rewrites.js turns that into
 // /thumb?id=<id>&sz=w500. The size hint is ignored: the stored image is served.
 app.get('/thumb', (req, res) => serveStoredFile(req, res, req.query.id));
+
+// docs.google.com/document/d/<id>/edit|preview, rewritten to /doc/<id>/<mode>
+// (admin template screen). edit: download the .docx to edit locally; preview:
+// the document converted to PDF (cached beside the file as <id>.preview.pdf).
+// Staff only — templates are not public files.
+app.get('/doc/:id/:mode', async (req, res) => {
+  if (!FILE_ID_RE.test(req.params.id)) return res.status(404).send('Not found');
+  const caller = await callerFrom(req);
+  if (!caller || !caller.isStaff) return res.status(caller ? 403 : 401).send('Staff only');
+  res.locals.callerCpr = caller.cpr;
+  const fileRecord = storage.db.prepare('SELECT * FROM files WHERE id = ? AND is_folder = 0 AND trashed = 0').get(req.params.id);
+  const contentPath = path.join(FILES_DIR, req.params.id);
+  if (!fileRecord || !fs.existsSync(contentPath)) return res.status(404).send('Not found');
+  if (req.params.mode === 'edit') {
+    req.query.download = '1';
+    return serveStoredFile(req, res, req.params.id);
+  }
+  if (req.params.mode !== 'preview') return res.status(404).send('Not found');
+  try {
+    const previewPath = contentPath + '.preview.pdf';
+    const stale = !fs.existsSync(previewPath) || fs.statSync(previewPath).mtimeMs < fs.statSync(contentPath).mtimeMs;
+    if (stale) {
+      const extension = /presentation/.test(fileRecord.mime) ? 'pptx' : 'docx';
+      fs.writeFileSync(previewPath, convertWithSoffice(fs.readFileSync(contentPath), extension, 'pdf'));
+    }
+    res.set('Content-Type', 'application/pdf').set('Cache-Control', 'private, max-age=60');
+    res.set('Content-Disposition', 'inline; filename*=UTF-8\'\'' + encodeURIComponent(fileRecord.name.replace(/\.[^.]+$/, '') + '.pdf'));
+    res.sendFile(previewPath, { dotfiles: 'deny' });
+  } catch (err) {
+    console.error('doc preview failed for', req.params.id, err.message);
+    res.status(500).send('Preview failed');
+  }
+});
 
 app.get('/healthz', (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ ok: true, mode: OUTBOUND_MODE, rpc: rpcPool.stats(), background: backgroundPool.stats() });

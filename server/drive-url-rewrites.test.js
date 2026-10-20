@@ -22,6 +22,7 @@ test('rewriteLegacyDriveUrls repoints thumbnail, file and folder URL prefixes an
     "window.open('https://drive.google.com/file/d/' + fileBtn.dataset.fileId + '/view', '_blank');",
     "mediaFrame.src = 'https://drive.google.com/file/d/' + id + '/preview';",
     "return 'https://drive.google.com/drive/folders/' + idMatch[0];",
+    "frame.src = 'https://docs.google.com/document/d/' + encodeURIComponent(id) + '/preview';",
   ].join('\n');
   const output = rewriteLegacyDriveUrls(input);
   assert.ok(output.includes('<img src="/thumb?id=1iOIJNIzjaUi55iSEtqGzubUp7ZhDkdbX&amp;sz=w1000.png">'));
@@ -29,7 +30,8 @@ test('rewriteLegacyDriveUrls repoints thumbnail, file and folder URL prefixes an
   assert.ok(output.includes("window.open('/files/' + fileBtn.dataset.fileId + '/view'"));
   assert.ok(output.includes("mediaFrame.src = '/files/' + id + '/preview'"));
   assert.ok(output.includes("return '/files/folder/' + idMatch[0]"));
-  assert.ok(!output.includes('drive.google.com'));
+  assert.ok(output.includes("frame.src = '/doc/' + encodeURIComponent(id) + '/preview'"));
+  assert.ok(!output.includes('drive.google.com') && !output.includes('docs.google.com'));
   assert.strictEqual(rewriteLegacyDriveUrls(output), output, 'idempotent');
 });
 

@@ -56,6 +56,10 @@ const LEGACY_DRIVE_URL_PREFIXES = [
   ['https://drive.google.com/thumbnail?id=', '/thumb?id='],
   ['https://drive.google.com/file/d/', '/files/'],
   ['https://drive.google.com/drive/folders/', '/files/folder/'],
+  // The admin's template screen links "edit in Google Docs" and embeds a Docs
+  // preview iframe; templates are .docx in the local store, so /doc/<id>/edit
+  // downloads the file and /doc/<id>/preview shows it converted to PDF.
+  ['https://docs.google.com/document/d/', '/doc/'],
 ];
 
 // Returns text with every legacy Drive URL prefix replaced. Safe to apply twice.
