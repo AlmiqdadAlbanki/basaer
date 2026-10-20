@@ -22,9 +22,10 @@ function importDir(storage, dir, log = console.log) {
       log('WARN  ' + logical + ': ' + file + ' not found, skipped');
       continue;
     }
-    // cellDates turns date cells into JS Dates; the converter reads raw typed
-    // values, never the formatted text.
-    const wb = XLSX.read(fs.readFileSync(file), { type: 'buffer', cellDates: true });
+    // Dates are read as raw serial numbers and converted by sheetToGrid (see
+    // serialToDate in xlsx-common.js for why the library's cellDates is not used).
+    // cellNF keeps each cell's number format in `z`, which is how a date cell is told from a number.
+    const wb = XLSX.read(fs.readFileSync(file), { type: 'buffer', cellDates: false, cellNF: true });
     storage.ensureSpreadsheet(ssId);
     for (const name of wb.SheetNames) {
       const grid = sheetToGrid(wb.Sheets[name]);

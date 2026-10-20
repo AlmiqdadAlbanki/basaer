@@ -8,6 +8,14 @@
 // the custom token it mints is later verified at /api/auth/exchange with the
 // matching public key.
 //
+// Accounts imported from the old Firebase project
+// (tools/import-firebase-users.js) arrive with their Firebase password hash
+// stored as 'fbscrypt$<salt>$<hash>'. verifyPassword checks it with Firebase's
+// modified scrypt (firebase-scrypt.js) using the project's hash parameters,
+// passed in as options.firebaseHashConfig. The first successful sign-in
+// replaces it with a local scrypt hash, so the Firebase parameters are only
+// needed until each user has signed in once.
+//
 // Brute-force protection: failed sign-ins are counted per (lowercased) email in
 // a SQLite `auth_attempts` table, so the count is shared by every worker thread
 // and survives restarts. Unknown emails are counted too, so the reply never
@@ -16,6 +24,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { verifyFirebasePassword, assertValidHashConfig } = require('./firebase-scrypt.js');
 
 const SA_CLIENT_EMAIL = 'local-admin@basaer-local.iam.gserviceaccount.com';
 
@@ -73,6 +82,25 @@ function verifyHash(password, stored) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+// Stored form of an imported Firebase password hash: 'fbscrypt$' + salt + '$' +
+// hash, both base64 exactly as Firebase exports them. Base64 never contains
+// '$', so the split is unambiguous; a local hash ('<hex salt>$<hex hash>')
+// can never start with this prefix.
+const FIREBASE_HASH_PREFIX = 'fbscrypt$';
+
+function isFirebaseHash_(storedHash) {
+  return typeof storedHash === 'string' && storedHash.startsWith(FIREBASE_HASH_PREFIX);
+}
+// A password the user set here: any stored hash that is not an imported Firebase one.
+function isLocalPasswordHash_(storedHash) {
+  return typeof storedHash === 'string' && storedHash !== '' && !isFirebaseHash_(storedHash);
+}
+// { salt, passwordHash } of a stored Firebase hash, or null when it is malformed.
+function splitFirebaseHash_(storedHash) {
+  const parts = storedHash.slice(FIREBASE_HASH_PREFIX.length).split('$');
+  return parts.length === 2 && parts[0] !== '' && parts[1] !== '' ? { salt: parts[0], passwordHash: parts[1] } : null;
+}
+
 // A throwaway hash checked when the email has no usable password, so a sign-in
 // for an unknown email costs the same scrypt time as a wrong password for a
 // real one (otherwise response time would reveal which emails exist).
@@ -88,9 +116,17 @@ function normaliseEmail(email) {
 
 class IdentityService {
   // options.now: clock returning epoch milliseconds (injectable for tests).
+  // options.firebaseHashConfig: the old Firebase project's hash parameters
+  //   ({ signerKey, saltSeparator, rounds, memCost }, as parseHashConfig in
+  //   firebase-scrypt.js returns them). Needed to check imported Firebase
+  //   password hashes; without it those accounts cannot sign in. An invalid
+  //   config throws here, so a broken setup fails at startup instead of at
+  //   some user's sign-in.
   constructor(storage, options) {
     this.storage = storage;
     this.now = (options && typeof options.now === 'function') ? options.now : Date.now;
+    this.firebaseHashConfig = (options && options.firebaseHashConfig) || null;
+    if (this.firebaseHashConfig) assertValidHashConfig(this.firebaseHashConfig);
     storage.db.exec(`
       CREATE TABLE IF NOT EXISTS auth_users (
         uid            TEXT PRIMARY KEY,
@@ -137,6 +173,31 @@ class IdentityService {
     return true;
   }
 
+  // Called by tools/import-firebase-users.js for each exported Firebase
+  // account. Stores the exported hash so the user's existing password keeps
+  // working (verifyPassword swaps it for a local hash at the first successful
+  // sign-in). An account that already has a local password is left completely
+  // untouched. Importing an account again refreshes its Firebase hash and
+  // details. Returns 'imported' or 'kept-local'.
+  importFirebaseUser({ uid, email, cpr, salt, passwordHash, emailVerified }) {
+    if (!uid || !salt || !passwordHash) throw new Error('importFirebaseUser: uid, salt and passwordHash are required');
+    if (String(salt).includes('$') || String(passwordHash).includes('$')) {
+      throw new Error('importFirebaseUser: salt and passwordHash must be base64 exactly as Firebase exports them');
+    }
+    const db = this.storage.db;
+    const uidText = String(uid);
+    // IMMEDIATE: the check and the write happen under the write lock, so a
+    // sign-in on another worker thread cannot slip a local hash in between.
+    return db.transaction(() => {
+      const existing = this.findByUid(uidText);
+      if (existing && isLocalPasswordHash_(existing.pw_hash)) return 'kept-local';
+      this.upsertUser({ uid: uidText, email, cpr, emailVerified });
+      db.prepare('UPDATE auth_users SET pw_hash = ? WHERE uid = ?')
+        .run(FIREBASE_HASH_PREFIX + salt + '$' + passwordHash, uidText);
+      return 'imported';
+    }).immediate();
+  }
+
   // Called by the signInWithPassword interceptor. `options.clientIp` is the
   // requesting client's address (from the call context). Returns one of:
   //   { uid }                                              correct password
@@ -145,6 +206,9 @@ class IdentityService {
   // While a pair is locked the password is not checked at all. The failure
   // that reaches MAX_FAILURES is itself answered INVALID_LOGIN_CREDENTIALS; the
   // lockout then applies to every later attempt from that IP.
+  // An imported Firebase hash is checked with options.firebaseHashConfig from
+  // the constructor (without it the sign-in fails like a wrong password); a
+  // correct password then replaces it with a local hash.
   verifyPassword(email, password, options) {
     const normalisedEmail = normaliseEmail(email);
     const key = attemptKey(normalisedEmail, options && options.clientIp);
@@ -159,13 +223,49 @@ class IdentityService {
     const user = this.findByEmail(normalisedEmail);
     const storedHash = user && user.pw_hash ? user.pw_hash : null;
     // Always run one scrypt check, against the decoy when there is no real hash.
-    const passwordMatches = verifyHash(password, storedHash || getDecoyHash());
+    const passwordMatches = this.passwordMatchesStoredHash_(password, storedHash);
     if (!storedHash || !passwordMatches) {
       this.recordFailure_(key);
       return { error: 'INVALID_LOGIN_CREDENTIALS' };
     }
+    if (isFirebaseHash_(storedHash)) this.replaceFirebaseHash_(user.uid, storedHash, password);
     this.clearAttempts(normalisedEmail);
     return { uid: user.uid };
+  }
+
+  // Whether the password matches the stored hash, local or imported from
+  // Firebase. Each case costs one scrypt run: the decoy stands in when there
+  // is no hash, or when a Firebase hash cannot be checked (no config, or a
+  // malformed hash), so response time does not reveal which case an email is
+  // in. Firebase's scrypt costs the same as the local one at its usual
+  // parameters (N = 16384, r = 8).
+  passwordMatchesStoredHash_(password, storedHash) {
+    if (!storedHash) return verifyHash(password, getDecoyHash());
+    if (!isFirebaseHash_(storedHash)) return verifyHash(password, storedHash);
+    const parts = splitFirebaseHash_(storedHash);
+    const config = this.firebaseHashConfig;
+    if (!parts || !config) {
+      verifyHash(password, getDecoyHash()); // result ignored: this account cannot match
+      return false;
+    }
+    return verifyFirebasePassword({
+      password: String(password),
+      salt: parts.salt,
+      passwordHash: parts.passwordHash,
+      signerKey: config.signerKey,
+      saltSeparator: config.saltSeparator,
+      rounds: config.rounds,
+      memCost: config.memCost,
+    });
+  }
+
+  // First successful sign-in of an imported account: swap its Firebase hash for
+  // a local scrypt hash of the password just verified. The update only applies
+  // while the stored hash is still the Firebase one we checked, so a password
+  // changed in the meantime (setPassword) is never overwritten.
+  replaceFirebaseHash_(uid, firebaseHash, password) {
+    this.storage.db.prepare('UPDATE auth_users SET pw_hash = ? WHERE uid = ? AND pw_hash = ?')
+      .run(hashPassword(password), uid, firebaseHash);
   }
 
   // Forget the failed-attempt counters and any lockout for an email, from every

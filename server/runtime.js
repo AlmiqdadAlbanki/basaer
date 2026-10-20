@@ -64,8 +64,11 @@ function notYetProxy(serviceName) {
 // is predictable. The sandbox gets a Math whose random() comes from the
 // CSPRNG; everything else is inherited from the real Math. (QR session ids
 // already use Utilities.getUuid, i.e. crypto.randomUUID.)
+// crypto.randomInt requires max - min < 2^48, hence the 2^48 - 1 bound; the
+// result is uniform in [0, 1) with 48 bits of entropy.
+const RANDOM_RANGE = 2 ** 48 - 1;
 const SafeMath = Object.create(Math);
-SafeMath.random = () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
+SafeMath.random = () => crypto.randomInt(0, RANDOM_RANGE) / RANDOM_RANGE;
 
 class Runtime {
   constructor(opts) {
@@ -237,4 +240,4 @@ class Runtime {
   }
 }
 
-module.exports = { Runtime, Storage };
+module.exports = { Runtime, Storage, SafeMath };

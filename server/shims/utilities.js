@@ -27,6 +27,12 @@ const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 
 function formatDate(date, tz, pattern) {
   if (!(date instanceof Date)) date = new Date(date);
+  // Apps Script hands the JS Date to Java, where an invalid Date (NaN time)
+  // becomes the epoch, so formatting it yields 1970-01-01 rather than an
+  // error. The server code relies on that: it formats `new Date(cell)` for
+  // cells that are sometimes free text, and date comparisons then simply
+  // ignore the row. Intl would throw a RangeError instead.
+  if (isNaN(date.getTime())) date = new Date(0);
   const p = partsInZone(date, tz || 'Asia/Qatar');
   const yyyy = p.year;
   const MM = p.month;

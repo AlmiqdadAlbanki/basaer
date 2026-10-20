@@ -161,7 +161,8 @@ class Storage {
         status     TEXT NOT NULL,
         error      TEXT
       );
-      -- Record of outbound HTTP calls (WhatsApp, FCM, ...). mode: 'dry-run' | 'live'
+      -- Record of outbound HTTP calls (WhatsApp, FCM, ...). mode: 'dry-run' | 'live' |
+      -- 'local-qr' (a QR image drawn locally instead of calling api.qrserver.com)
       CREATE TABLE IF NOT EXISTS outbound_log (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at INTEGER NOT NULL,

@@ -70,7 +70,13 @@ try {
   // The keypair already exists (index.js creates it before spawning workers);
   // this instance only verifies tokens and resolves roles through the runtime.
   identity = new Identity({ runtime, keyDir: config.keyDir });
-  runtime.setAuthServices(identity, new IdentityService(storage));
+  // Accounts imported from Firebase Auth keep their Firebase scrypt hashes
+  // until their first successful login (tools/import-firebase-users.js stores
+  // the hash parameters in this property). Absent property = no such accounts.
+  const storedHashConfig = storage.propGet('script', 'FIREBASE_HASH_CONFIG');
+  runtime.setAuthServices(identity, new IdentityService(storage, {
+    firebaseHashConfig: storedHashConfig ? JSON.parse(storedHashConfig) : undefined,
+  }));
   // Compile and evaluate the bundle now so the first request pays nothing.
   runtime.functionNames();
   parentPort.postMessage({ type: 'ready' });

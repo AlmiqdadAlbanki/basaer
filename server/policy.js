@@ -134,7 +134,8 @@ const POLICY = {
   getSubjectsList: { level: 'staff', kind: 'read' },
   getCurriculaList: { level: 'staff', kind: 'read' },
   getMatnCatalogList: { level: 'staff', kind: 'read' },
-  getLecAttend: { level: 'staff', kind: 'read' },
+  // The student page reads its own lecture attendance at startup (js.html:643).
+  getLecAttend: { level: 'user', selfCprArg: 0, kind: 'read' },
   getAttendanceRequests: { level: 'staff', kind: 'read' },
   getAllStWrks: { level: 'staff', kind: 'read' },
   getDualRoleCprList: { level: 'admin', kind: 'read' },
@@ -193,7 +194,7 @@ const POLICY = {
   saveStageTemplateField: { level: 'admin', kind: 'write' },
   saveStageCriterion: { level: 'admin', kind: 'write' },
   getStageCriteriaList: { level: 'staff', kind: 'read' },
-  getStageAttendanceStats: { level: 'staff', kind: 'read' },
+  getStageAttendanceStats: { level: 'user', selfCprArg: 0, kind: 'read' }, // student dashboard (js.html:1260)
   getStageCompletionStatus: { level: 'staff', kind: 'read' },
   getStageCertificateMessageTemplate: { level: 'admin', kind: 'read' },
   getGraduationCandidates: { level: 'admin', kind: 'read' },

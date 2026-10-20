@@ -126,6 +126,17 @@ test('submitStWRK is rescoped to "stWork-<callerCpr>" for students', () => {
   assert.strictEqual(staff.args[0], 'stWork-999999999');
 });
 
+// The student dashboard reads these for its own CPR at startup; they must be
+// allowed for students and pinned to the caller.
+test('student dashboard reads getLecAttend / getStageAttendanceStats are self-scoped, not staff-only', () => {
+  for (const fn of ['getLecAttend', 'getStageAttendanceStats']) {
+    const decision = enforce(fn, ['999999999'], STUDENT);
+    assert.strictEqual(decision.allow, true, fn);
+    assert.strictEqual(decision.args[0], STUDENT.cpr, fn);
+    assert.strictEqual(enforce(fn, ['999999999'], TEACHER).args[0], '999999999', fn + ' staff');
+  }
+});
+
 test('exam-state reads are scoped to the caller (getExams arg 2, studentFailedExam arg 0)', () => {
   assert.strictEqual(enforce('getExams', [null, null, '999999999'], STUDENT).args[2], STUDENT.cpr);
   assert.strictEqual(enforce('getExams', ['x', 1], STUDENT).args[2], STUDENT.cpr);

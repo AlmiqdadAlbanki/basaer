@@ -2,20 +2,25 @@
 
 // UrlFetchApp shim.
 //
-// Three kinds of destination:
+// Four kinds of destination:
 //   1. Google auth hosts (identitytoolkit / oauth2) — served locally by the
 //      IdentityService so auth.js runs unchanged (see the plan's auth decision).
-//   2. Everything else in dry-run mode (the default) — the request is recorded
+//   2. api.qrserver.com (QR-code images) — drawn locally by docgen/qr.js in BOTH
+//      modes, so the text of a QR code (a certificate link, a CPR) never goes to a
+//      third party and the gas code gets a real, scannable PNG even in dry-run.
+//      Recorded in `outbound_log` with mode 'local-qr'.
+//   3. Everything else in dry-run mode (the default) — the request is recorded
 //      in `outbound_log` and a plausible success reply is returned per provider,
-//      so WhatsApp/push/QR features exercise fully without contacting anyone.
-//   3. Everything else in live mode — a real synchronous HTTP call via curl
+//      so WhatsApp/push features exercise fully without contacting anyone.
+//   4. Everything else in live mode — a real synchronous HTTP call via curl
 //      (UrlFetchApp is synchronous; Node's fetch is not, and curl is the
 //      simplest dependable sync path for this traffic volume).
 
 const { spawnSync } = require('child_process');
 const { Blob } = require('./utilities.js');
+const { renderQrPng, parseQrServerUrl } = require('../docgen/qr.js');
 
-// 1x1 transparent PNG, used as the dry-run reply for image endpoints (QR codes).
+// 1x1 transparent PNG, used as the dry-run reply for the Slides PNG export (docs.google.com).
 const TINY_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
@@ -75,7 +80,6 @@ function dryRunReply(url, params) {
     return makeResponse(200, { success: true });
   }
   if (host === 'fcm.googleapis.com') return makeResponse(200, { name: 'projects/basaer-local/messages/dryrun-' + Date.now() });
-  if (host === 'api.qrserver.com') return makeResponse(200, TINY_PNG, { 'Content-Type': 'image/png' });
   if (host === 'docs.google.com') return makeResponse(200, TINY_PNG, { 'Content-Type': 'image/png' }); // Slides PNG export
   if (host === 'script.google.com') return makeResponse(200, { area: '', block: '' }); // external block->area lookup
   return makeResponse(200, { ok: true, dryRun: true });
@@ -119,12 +123,14 @@ function makeUrlFetchApp(opts) {
   const log = opts.log || (() => {});
   const getCallContext = opts.getCallContext || (() => ({}));
 
-  function record(url, params, code, responseText) {
+  // `recordedMode` replaces the shim's mode in the row, for calls that never left
+  // the machine ('local-qr') and so must not show up as 'live' traffic.
+  function record(url, params, code, responseText, recordedMode) {
     if (!opts.storage) return;
     try {
       opts.storage.db
         .prepare('INSERT INTO outbound_log (created_at, mode, host, url, method, payload, status, response) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(Date.now(), mode, hostOf(url), String(url).slice(0, 2000),
+        .run(Date.now(), recordedMode || mode, hostOf(url), String(url).slice(0, 2000),
           String((params && params.method) || 'GET').toUpperCase(),
           typeof (params && params.payload) === 'string' ? params.payload.slice(0, 4000) : JSON.stringify((params && params.payload) || null).slice(0, 4000),
           code, String(responseText || '').slice(0, 2000));
@@ -169,7 +175,23 @@ function makeUrlFetchApp(opts) {
       }
     }
 
-    // --- 2) Dry-run: record and fake a success ------------------------------
+    // --- 2) QR codes: drawn locally, in dry-run and live alike ---------------
+    // The legacy code fetches every QR image from api.qrserver.com, which would be
+    // handed the text of each code. docgen/qr.js draws the same image here instead.
+    if (hostOf(urlText).toLowerCase() === 'api.qrserver.com') {
+      let png;
+      try {
+        png = renderQrPng(parseQrServerUrl(urlText));
+      } catch (error) {
+        throw new Error(`UrlFetchApp: could not draw the QR code for ${hostOf(urlText)}: ${error.message}`, { cause: error });
+      }
+      record(urlText, params, 200, `(local-qr) image/png, ${png.length} bytes`, 'local-qr');
+      // Path only, no query string: the query carries the QR text (a certificate link, a CPR).
+      log(`LOCAL-QR ${String(params.method || 'GET').toUpperCase()} ${hostOf(urlText)}${urlText.replace(/^https?:\/\/[^/]+/, '').split(/[?#]/)[0]} (${png.length} bytes)`);
+      return makeResponse(200, png, { 'Content-Type': 'image/png' });
+    }
+
+    // --- 3) Dry-run: record and fake a success ------------------------------
     if (mode !== 'live') {
       const response = dryRunReply(urlText, params);
       record(urlText, params, response.getResponseCode(), '(dry-run) ' + response.getContentText().slice(0, 200));
@@ -177,7 +199,7 @@ function makeUrlFetchApp(opts) {
       return response;
     }
 
-    // --- 3) Live --------------------------------------------------------------
+    // --- 4) Live --------------------------------------------------------------
     const response = liveFetch(urlText, params);
     record(urlText, params, response.getResponseCode(), response.getContentText());
     const statusCode = response.getResponseCode();
