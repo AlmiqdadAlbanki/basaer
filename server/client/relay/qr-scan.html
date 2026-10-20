@@ -231,7 +231,8 @@
       log_('5) تم التحقق من البيانات، cpr=' + payload.cpr);
       scanReady_ = false;
       try {
-        var audio = new Audio('https://assets.mixkit.co/active_storage/sfx/900/900-preview.mp3');
+        // Self-hosted copy of Mixkit sfx 900 (free licence); the page must not depend on outside hosts.
+        var audio = new Audio('/site-assets/sounds/qr-scan-beep.mp3');
         audio.play();
       } catch (err) {}
       showToast_('جارٍ إرسال بيانات: ' + (payload.name || payload.cpr) + ' ...', 'info');

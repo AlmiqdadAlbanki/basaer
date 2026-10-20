@@ -347,11 +347,9 @@ describe('rewriteLegacyShell and rewriteLegacyPartial', () => {
 
 describe('page templates returned by HtmlService (the loadPage* functions)', () => {
   // server/shims/platform.js (makeHtmlService) hands every template through
-  // rewriteLegacyDriveUrls only, so registration.html reaches the browser, through
-  // loadPageRegistration, still naming Google Fonts and basaerbh.com/assets. That file is
-  // outside the change that added these rewrites; once makeHtmlService calls
-  // rewriteLegacyShell instead, this test passes and the `todo` marker should be removed.
-  it('are rewritten too', { todo: 'server/shims/platform.js still calls rewriteLegacyDriveUrls: switch it to rewriteLegacyShell' }, () => {
+  // rewriteLegacyShell, so a page reaching the browser through loadPage* names no Google
+  // Fonts or basaerbh.com/assets either.
+  it('are rewritten too', () => {
     const htmlService = makeHtmlService(GAS_DIR);
     for (const templateName of ['registration', 'login', 'student', 'emp', 'homePage', 'adminDashboard', 'Iqrar', 'questions']) {
       const templateHtml = htmlService.createTemplateFromFile(templateName).evaluate().getContent();
@@ -361,14 +359,13 @@ describe('page templates returned by HtmlService (the loadPage* functions)', () 
 });
 
 describe('the QR scanner relay page (server/client/relay/qr-scan.html)', () => {
-  // The page plays its scan beep from a sound hosting site, a third party. The sound should be
-  // copied into server/client/site-assets/ like the old-site files and the page pointed at the
-  // copy; the download was refused by the permission system of the session that made this
-  // change, so it is still to do. Once qr-scan.html names a /site-assets/ file instead, this
-  // test passes (the "every /site-assets/ file exists" test above then checks the copy) and the
-  // `todo` marker should be removed.
-  it('plays its beep from this server', { todo: 'the beep is still fetched from assets.mixkit.co: copy it to site-assets/sounds/ and point qr-scan.html at it' }, () => {
-    assertTextLacks(rewriteLegacyShell(readPageSource(RELAY_DIR, 'qr-scan.html')), /assets\.mixkit\.co/, 'qr-scan.html');
+  // The scan beep (Mixkit sfx 900) is a copy in server/client/site-assets/sounds/, not a
+  // download from the sound hosting site; the "every /site-assets/ file exists" test above
+  // checks that the copy is there.
+  it('plays its beep from this server', () => {
+    const pageSource = readPageSource(RELAY_DIR, 'qr-scan.html');
+    assertTextLacks(rewriteLegacyShell(pageSource), /assets\.mixkit\.co/, 'qr-scan.html');
+    assert.ok(pageSource.includes("new Audio('/site-assets/sounds/qr-scan-beep.mp3')"), 'qr-scan.html plays /site-assets/sounds/qr-scan-beep.mp3');
   });
 });
 
