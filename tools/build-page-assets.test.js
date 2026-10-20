@@ -21,8 +21,11 @@ test('builds one PNG per replaced Drive id with the expected shapes', () => {
     const mark = read(DRIVE_IDS.logoMark);
     assert.strictEqual(mark.width, mark.height, 'the logo mark is square');
     assert.strictEqual(mark.data[3], 0, 'transparent padding in the top-left corner');
-    const centre = (Math.floor(mark.height / 2) * mark.width + Math.floor(mark.width / 2)) * 4;
-    assert.ok(mark.data[centre] > mark.data[centre + 2], 'red mark in the middle');
+    let redPixels = 0;
+    for (let i = 0; i < mark.data.length; i += 4) {
+      if (mark.data[i + 3] > 200 && mark.data[i] > 150 && mark.data[i + 2] < 100) redPixels++;
+    }
+    assert.ok(redPixels > mark.width * mark.height * 0.1, 'the red mark covers a good part of the square');
 
     const avatar = read(DRIVE_IDS.defaultAvatar);
     assert.strictEqual(avatar.width, 512);
