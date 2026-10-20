@@ -263,23 +263,26 @@ Everything below is typed in that shell until step 11.
    ```
    A `WARN ... folders share this path` line means two folders of one name sit side by side. The
    files are fine, but the folder page may list them under the wrong one of the two.
-8. Save the page images. The pages themselves name a few images by Drive id: the logo, the default
-   avatar and the carousel pictures. They belong to the admin's account, where the API cannot reach
-   them. List them (this also writes `code-assets/ids.tsv`, which step 5 reads):
+8. Provide the page images. The pages themselves name a few images by Drive id: the logo, the
+   sidebar wordmark, the default avatar, the congratulations banner, the page background and the
+   carousel placeholders. The originals belong to a Google account nobody can read from any more
+   (they are broken on the live site as well), so they are rebuilt from the academy's own logo
+   files in `server/client/site-assets/`:
    ```
-   node tools/import-code-assets.js --list
-   ```
-   It prints one line per id with the browser link to open. Save each image from a browser that can
-   open it into `data/google-exports/code-assets/` with the id as the file name and no extension
-   (copy it over with `scp` if you saved it on your own machine). Then:
-   ```
+   node tools/build-page-assets.js
    node tools/import-code-assets.js
    ```
-   It works out each file's type from its bytes and registers it as a public file under its id.
-   Anything that is not an image or a PDF (a Google sign-in page saved by mistake, for example) is
-   skipped with a `skip` line, and `--dry-run` shows what would be registered. Nothing needs
-   editing in the pages: the server already serves them with `/thumb?id=<id>` in place of
-   `drive.google.com/thumbnail?id=`.
+   The first writes the logo mark, wordmark, avatar and banner as `<id>.png` into
+   `data/google-exports/code-assets/`; the second registers every image found there as a public
+   file under its id (type sniffed from the bytes; anything that is not an image or a PDF is
+   skipped with a `skip` line, `--dry-run` shows what would be registered). The background pattern
+   and the three carousel placeholders are left absent on purpose: the carousel is filled from the
+   announcements sheet, and the background falls back to the page colour, as on the live site.
+   `node tools/import-code-assets.js --list` prints every id the pages use (writing
+   `code-assets/ids.tsv`, which step 5 reads) and whether a file for it exists; if an original
+   ever becomes readable, save it from a browser as `<id>` or `<id>.<ext>` into the same folder
+   and re-run the import. Nothing needs editing in the pages: the server already serves them with
+   `/thumb?id=<id>` in place of `drive.google.com/thumbnail?id=`.
 9. Point the links in the sheets at this server. Run it with `--dry-run` first; the real run is the
    same command without it:
    ```
