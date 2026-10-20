@@ -161,10 +161,10 @@ function makeLogger(sink) {
 // loadPage* functions return embed Google Drive image URLs; those are repointed
 // at the local file store (page-rewrites.js), the same way the served partials are.
 function makeHtmlService(gasDir) {
-  const { rewriteLegacyDriveUrls } = require('../page-rewrites.js');
+  const { rewriteLegacyShell } = require('../page-rewrites.js');
   function readFile(name) {
     const candidates = [path.join(gasDir, name + '.html'), path.join(gasDir, name)];
-    for (const f of candidates) if (fs.existsSync(f)) return rewriteLegacyDriveUrls(fs.readFileSync(f, 'utf8'));
+    for (const f of candidates) if (fs.existsSync(f)) return rewriteLegacyShell(fs.readFileSync(f, 'utf8'));
     throw new Error('HtmlService: file not found: ' + name);
   }
   function htmlOutput(content) {
