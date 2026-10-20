@@ -11,9 +11,9 @@
 // (id <TAB> the gas files using it) and prints the thumbnail URL of each id to
 // save from a browser (those files belong to the admin's account, so the API
 // cannot fetch them for us). The directory then holds one file per id, named
-// exactly <id> (no extension). The content type is sniffed from the bytes,
-// never guessed from a name. Files are public, like the "anyone with the link"
-// originals.
+// <id> or <id>.<ext> (whatever the browser's "Save image as…" produced). The
+// content type is sniffed from the bytes, never guessed from a name. Files are
+// public, like the "anyone with the link" originals.
 
 const fs = require('fs');
 const path = require('path');
@@ -69,18 +69,20 @@ function importCodeAssets({ storage, filesDir, dir, dryRun, log }) {
     VALUES (@id, @name, @mime, @size, NULL, 0, 1, 0, @now, @now)
   `);
   for (const entry of fs.readdirSync(dir)) {
-    if (!ID_RE.test(entry)) continue;
+    // "Save image as…" in a browser appends an extension; the id is the stem.
+    const id = entry.replace(/\.(png|jpe?g|gif|webp|pdf)$/i, '');
+    if (!ID_RE.test(id)) continue;
     const sourcePath = path.join(dir, entry);
     if (!fs.statSync(sourcePath).isFile()) continue;
     const bytes = fs.readFileSync(sourcePath);
     const mime = sniffMime(bytes);
     if (!mime) { log(`skip  ${entry}: not an image or PDF (${bytes.length} bytes)`); counts.skipped++; continue; }
-    const name = `${entry}.${EXTENSION_BY_MIME[mime]}`;
-    log(`${dryRun ? 'would register' : 'register'} ${entry} as ${mime} (${bytes.length} bytes)`);
+    const name = `${id}.${EXTENSION_BY_MIME[mime]}`;
+    log(`${dryRun ? 'would register' : 'register'} ${id} as ${mime} (${bytes.length} bytes)`);
     if (!dryRun) {
-      fs.copyFileSync(sourcePath, path.join(filesDir, entry));
+      fs.copyFileSync(sourcePath, path.join(filesDir, id));
       const now = new Date().toISOString();
-      upsert.run({ id: entry, name, mime, size: bytes.length, now });
+      upsert.run({ id, name, mime, size: bytes.length, now });
     }
     counts.registered++;
   }
