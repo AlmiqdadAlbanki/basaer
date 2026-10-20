@@ -157,6 +157,12 @@ function buildBasairLoginIdEmail_(data) {
 }
 
 function sendBasairLoginIdEmail_(email, name, loginId, loginUrl) {
+  // كل مُستدعٍ لهذه الدالة يُغلِّفها بـtry/catch أصلًا (فشل إرسال هذا الإيميل تحديدًا لا يُفسد
+  // العملية الأصلية) — رمي استثناء هنا بدل تجاهل صامت يجعله يُعامَل بنفس منطق الفشل الموجود
+  // مسبقًا بلا أي تعديل إضافي بمواضع الاستدعاء. راجع isEmailBlocked_ بـemailBounces.js.
+  if (isEmailBlocked_(email)) {
+    throw new Error('البريد الإلكتروني محظور (رُصد فشل تسليم دائم سابق): ' + email);
+  }
   var html = buildBasairLoginIdEmail_({ name: name, loginId: loginId, loginUrl: loginUrl || 'https://basaerbh.com' });
   var plainText = 'أهلًا بك ' + name + '\n\nتم تسجيلك بنجاح في أكاديمية بصائر.\nمعرّف الدخول الخاص بك: ' + loginId + '\n\nيرجى حفظه في مكان آمن وعدم مشاركته مع أحد.';
 
@@ -168,7 +174,7 @@ function sendBasairLoginIdEmail_(email, name, loginId, loginUrl) {
 }
 
 // ===================================================================
-// 2) إيميل رمز التحقق (تسجيل الدخول / التسجيل الجديد / تغيير البريد) — راجع sendOtpEmail_ في
+// 2) إيميل رمز التحقق (تسجيل الدخول / التسجيل الجديد / تغيير البريد) — راجع sendOtpCode_ في
 // auth.js، وهو الأكثر إرسالًا في المشروع.
 // ===================================================================
 function buildBasairOtpEmail_(code, purpose) {
@@ -333,6 +339,11 @@ function buildBasairStageCertEmail_(name, stage, message, certUrl) {
 }
 
 function sendBasairStageCertEmail_(email, name, message, certUrl, stage) {
+  // نفس منطق sendBasairLoginIdEmail_ أعلاه: المُستدعي (dataPost.js) يُغلِّف النداء بـtry/catch
+  // ويضبط result.emailSent = false عند أي استثناء — لا حاجة لتعديل منطقه، فقط رمي هنا يكفي.
+  if (isEmailBlocked_(email)) {
+    throw new Error('البريد الإلكتروني محظور (رُصد فشل تسليم دائم سابق): ' + email);
+  }
   var html = buildBasairStageCertEmail_(name, stage, message, certUrl);
   var plainText = String(message || '');
 

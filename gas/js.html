@@ -834,27 +834,84 @@ async function setAttendData(){
     loadingEnd();
   }).getAttendance(stuCpr);
 }
+
 /////////////////////////////////////////////////////////////////////////////
 // تبويب "الحضور والانضباط": يعرض أيام الحضور مباشرة كقائمة (بلا مفتاح/مودال منفصل)،
 // بنفس أسلوب قائمة "التسميع والأوراد" (sp-task-list). uniqueData مُصفّاة سلفًا (يوم واحد
 // لكل تاريخ) من setAttendData أعلاه.
 /////////////////////////////////////////////////////////////////////////////
+var attendStagesCache_ = null; // نتيجة getStagesList() مخزَّنة لتفادي تكرار الجلب لكل رسم لهذه القائمة
+var attendRenderToken_ = 0; // يمنع رسمًا متأخرًا (بعد وصول المراحل) بقائمة قديمة فوق رسم أحدث منها
+
 function renderStudentAttendanceList(list){
   var container = document.getElementById('spAttendList');
   if(!container) return;
 
-  var countEl = document.getElementById('attendCountStat');
-  if(countEl) countEl.textContent = list.length;
-
-  var emptyEl = document.getElementById('attendEmpty');
   if(!list.length){
+    var countEl0 = document.getElementById('attendCountStat');
+    if(countEl0) countEl0.textContent = 0;
+    container.innerHTML = '';
+    var emptyEl0 = document.getElementById('attendEmpty');
+    if(emptyEl0) emptyEl0.classList.remove('d-none');
+    return;
+  }
+
+  var myToken = ++attendRenderToken_;
+  if(attendStagesCache_){
+    renderStudentAttendanceListWithStages_(list, attendStagesCache_);
+  }else{
+    // رسم أولي فوري (يُصفَّى بمرحلته الحالية فقط، بلا فصل الدفعة السابقة بعد لحين وصول
+    // courseStartDate)، ثم إعادة رسم فورية بمجرد توفّر بيانات المراحل — لا تأخير محسوس بالظهور.
+    renderStudentAttendanceListWithStages_(list, []);
+    pfGasCall('getStagesList').then(function(stages){
+      attendStagesCache_ = Array.isArray(stages) ? stages : [];
+      if(myToken === attendRenderToken_) renderStudentAttendanceListWithStages_(list, attendStagesCache_);
+    }).catch(function(){ /* فشل جلب المراحل: تبقى القائمة مُصفّاة بالمرحلة الحالية فقط بلا استبعاد دفعة سابقة */ });
+  }
+}
+
+// يعرض فقط أيام حضور مرحلة الطالب النشطة حاليًا (currentLevel، مضبوطة عالميًا قبل استدعاء
+// setAttendData — راجع funcs-js.html)، وضمنها فقط الدفعة الحالية تحديدًا لو أُعيد الطالب لنفس
+// المرحلة أكثر من مرة: أي حضور قبل courseStartDate المسجَّل بـ"إدارة المراحل" لهذه المرحلة يخص
+// دفعة سابقة انتهت فيُستبعد، لا عمود جديد أو تعديل بيانات، القيم كلها موجودة أصلًا (level بشيت
+// الحضور، courseStartDate بشيت stages). بطلب المستخدم صراحةً بعد معاينة نسخة سابقة كانت تعرض
+// المراحل السابقة المنتهية أيضًا (بعنوان منفصل) — تبيّن أن هذا غير مرغوب هنا إطلاقًا، فقط
+// "الدورة الحالية". لا مرحلة نشطة له حاليًا (currentLevel فارغة) → تُعرَض كل السجلات كما هي، تفاديًا
+// لإخفاء تاريخه الحقيقي بالكامل بلا أي بديل معروض.
+function renderStudentAttendanceListWithStages_(list, stages){
+  var container = document.getElementById('spAttendList');
+  if(!container) return;
+  var countEl = document.getElementById('attendCountStat');
+  var emptyEl = document.getElementById('attendEmpty');
+
+  var stageByLevel = {};
+  (stages || []).forEach(function(s){ stageByLevel[+s.stageIndex] = s; });
+
+  var curLvl = (typeof currentLevel !== 'undefined' && currentLevel !== null) ? +currentLevel : null;
+  var filtered = curLvl === null ? list.slice() : list.filter(function(item){
+    return item.level !== null && item.level !== undefined && item.level !== '' && +item.level === curLvl;
+  });
+
+  if(curLvl !== null){
+    var stage = stageByLevel[curLvl];
+    if(stage && stage.courseStartDate){
+      var start = new Date(stage.courseStartDate);
+      if(!isNaN(start.getTime())){
+        filtered = filtered.filter(function(item){ return new Date(item.date).getTime() >= start.getTime(); });
+      }
+    }
+  }
+
+  if(countEl) countEl.textContent = filtered.length;
+
+  if(!filtered.length){
     container.innerHTML = '';
     if(emptyEl) emptyEl.classList.remove('d-none');
     return;
   }
   if(emptyEl) emptyEl.classList.add('d-none');
 
-  var sorted = list.slice().sort(function(a,b){ return new Date(b.date).getTime() - new Date(a.date).getTime(); });
+  var sorted = filtered.slice().sort(function(a,b){ return new Date(b.date).getTime() - new Date(a.date).getTime(); });
 
   container.innerHTML = sorted.map(function(e){
     var d = new Date(e.date);
@@ -2694,8 +2751,12 @@ async function clickEvent(e){
       try{
         loadingStart();
         google.script.run.withSuccessHandler(function(s){
-          swal.fire('تم التسجيل','تم تسجيل رغبتك بدراسة '+ choosen,'success');
           loadingEnd();
+          if(s && s.error){
+            swal.fire('تعذّر التسجيل', s.message || 'تسجيل المذهب الفقهي مغلق حاليًا', 'info');
+            return;
+          }
+          swal.fire('تم التسجيل','تم تسجيل رغبتك بدراسة '+ choosen,'success');
           studentData[0].mazhab = choosen;
           renderMazhabSelection();
         }).withFailureHandler(function(f){

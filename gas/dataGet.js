@@ -1762,6 +1762,18 @@ function getActiveWhatsAppProvider_() {
   return PropertiesService.getScriptProperties().getProperty(WHATSAPP_PROVIDER_PROP_) === 'meta' ? 'meta' : 'fonnte';
 }
 
+// مزوّد رمز التحقق (OTP) عبر واتساب — مفتاح منفصل عمدًا عن WHATSAPP_PROVIDER_PROP_ (مزوّد
+// الحملات الجماعية أعلاه) لأن مسار تسجيل الدخول حسّاس ولا يجوز أن يتأثر بتبديل يخص الحملات
+// فقط. Fonnte يبقى الافتراضي (نص حر بلا قالب معتمد)؛ راجع sendOtpCode_ في auth.js وقالب
+// AUTHENTICATION الثابت META_WA_OTP_TEMPLATE_NAME_ أدناه.
+var OTP_WHATSAPP_PROVIDER_PROP_ = 'OTP_WHATSAPP_PROVIDER';
+var META_WA_OTP_TEMPLATE_NAME_ = 'otp_ar';
+var META_WA_OTP_TEMPLATE_LANGUAGE_ = 'ar';
+
+function getActiveOtpWhatsAppProvider_() {
+  return PropertiesService.getScriptProperties().getProperty(OTP_WHATSAPP_PROVIDER_PROP_) === 'meta' ? 'meta' : 'fonnte';
+}
+
 // الإرسال الجماعي إلى الأفراد (طلاب/موظفين) معطَّل ما دام Fonnte هو المزوّد المختار، ويُتاح مع Meta
 // فقط؛ أما الإرسال إلى مجموعات واتساب فيبقى متاحًا مع Fonnte (بطلب صريح من المستخدم). يُفرَض هنا على
 // الخادم لأن تعطيل الواجهة وحده لا يمنع استدعاء الدالة مباشرة عبر google.script.run. لا يمسّ الحملات
@@ -1780,6 +1792,9 @@ function getWhatsAppProviderSettings(userCpr) {
   return {
     ok: true,
     provider: getActiveWhatsAppProvider_(),
+    otpProvider: getActiveOtpWhatsAppProvider_(),
+    otpTemplateName: META_WA_OTP_TEMPLATE_NAME_,
+    otpTemplateLanguage: META_WA_OTP_TEMPLATE_LANGUAGE_,
     canChange: perm.isSuperAdmin === true,
     metaConfigured: !!(meta.accessToken && meta.phoneNumberId && meta.businessAccountId),
     meta: {
@@ -1908,6 +1923,10 @@ var MESSAGE_TEMPLATE_DEFS_ = {
   examReadinessAlert: {
     label: 'تنبيه جاهزية اختبار (للإداريين)', requiredVars: ['{exam}', '{level}'],
     defaultBody: 'تنبيه: اختبار «{exam}» للمرحلة {level} لا يحتوي أي نموذج معتمد حتى الآن.'
+  },
+  examAvailable: {
+    label: 'اختبار متاح (للطلاب المعنيين الذين لم يؤدّوه)', requiredVars: ['{exam}'],
+    defaultBody: 'السلام عليكم {name}،\nاختبار «{exam}» متاح الآن ولم تؤدِّه بعد. ندعوك إلى الدخول إلى المنصة وأدائه.\n{deadline}'
   },
   wpQueueDone: {
     label: 'اكتمال حملة رسائل واتساب (لمن بدأ الحملة)', requiredVars: ['{total}', '{sent}', '{failed}'],
@@ -2807,6 +2826,10 @@ function getCurriculaList() { return getCurriculumList_('curricula', ['subjectId
 // "الكتاب / المتن" بشيت matns تبقى نصًّا حرًّا كما هي دائمًا (لا معرّفًا)، لأن أنظمة أخرى كثيرة
 // (التسميع وغيره) تُطابِقها بالاسم النصي فقط لا بمعرّف — راجع التنبيه أعلى saveMatnsItem بdataPost.js.
 function getMatnCatalogList() { return getCurriculumList_('matnCatalog', ['subjectId', 'level']); }
+
+// "المهارات" (skills) — قائمة بسيطة مستقلة بنفس بنية المقررات تمامًا (id/name/description/
+// subjectId/level)، شيتها الخاص skills بـrefID. بلا أي ربط بمكان آخر بالمشروع بعد.
+function getSkillsList() { return getCurriculumList_('skills', ['subjectId', 'level']); }
 
 // المذاهب: تُزرَع المذاهب الثلاثة الافتراضية تلقائيًا أول قراءة لو كانت القائمة فارغة تمامًا
 // (الشيت أُنشئ فارغًا بجلسة سابقة) — بنفس الأسماء/الأوصاف الثابتة أصلًا بتبويب "المذهب الفقهي"

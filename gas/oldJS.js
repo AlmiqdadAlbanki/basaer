@@ -318,6 +318,101 @@ function acceptedStu_(data, refID, refSH) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+// "إعادة إصدار بطاقة" — نفس منطق توليد البطاقة بالضبط من acceptedStu_ (القالب حسب المرحلة، رمز
+// QR، حفظ/استبدال PDF بمجلد الطالب، كتابة رابطها بعمود card) مُستخرَج في دالة مستقلة قابلة
+// للاستدعاء لطالب نشِط بالفعل — بخلاف acceptedStu_ نفسها، التي تمنع صراحةً إعادة تشغيلها لطالب
+// نشِط بنفس المرحلة (acquireAcceptLock_)، فلا توجد حاليًا أي وسيلة لإصدار بطاقة لطالب فقدها أو
+// لم تُصدَر له لسبب ما (خطأ أثناء القبول، بيانات قديمة...). هذه الدالة لا تؤرشف، ولا تُفعِّل
+// مرحلة، ولا ترسل بريد قبول — فقط البطاقة نفسها. راجع نقاش "بطاقة الحضور لا تظهر" مع المستخدم.
+function reissueStudentCard(cpr) {
+  try {
+    var data = getPersons();
+    var thisPer = data === 0 ? null : data.find(function (e) { return cprEquals_(e.cpr, cpr); });
+    if (!thisPer) return { ok: false, message: 'تعذّر العثور على الطالب.' };
+
+    var grade = null;
+    if (thisPer.class0 === 'active') grade = 0;
+    else if (thisPer.class1 === 'active') grade = 1;
+    else if (thisPer.class2 === 'active') grade = 2;
+    else if (thisPer.class3 === 'active') grade = 3;
+    if (grade === null) return { ok: false, message: 'الطالب ليس نشِطًا في أي مرحلة حاليًا، لا يمكن تحديد قالب البطاقة المناسب.' };
+
+    // نفس منطق اختيار القالب ولون QR حسب grade في acceptedStu_ أعلاه (سقوط احتياطي للثوابت
+    // الأربعة القديمة لو المرحلة بلا قالب مضبوط بعد بالواجهة).
+    var stageCardConfig = (getStagesList() || []).find(function (s) { return +s.stageIndex === grade; });
+    var fallbackCardIds = [cardID00, cardID01, cardID02, cardID03];
+    var qrColorsByGrade = [qr00Color, qr01Color, qr02Color, qr03Color];
+    var fileId = (stageCardConfig && stageCardConfig.cardTemplateId) || fallbackCardIds[grade];
+    var qrColor = qrColorsByGrade[grade];
+
+    var perArchive = DriveApp.getFolderById("1PexT7pwgJdaBUncuykBh6kYDAzzhyNYs");
+    var tempFolder = DriveApp.getFolderById("1BqEH-ihrkLbPFL5mxBbGUhA2G-MYolae");
+
+    var perCode = thisPer.code && thisPer.code !== '' ? thisPer.code : getRandomInt_(999999);
+    // يبحث عن مجلد الطالب الموجود أصلًا بالكود (أُنشئ وقت القبول الأول) بدل إنشاء مجلد جديد مكرَّر.
+    var perFolderIterator = perArchive.getFoldersByName(perCode);
+    var userFolder = perFolderIterator.hasNext() ? perFolderIterator.next() : perArchive.createFolder(perCode);
+
+    var tempFile = DriveApp.getFileById(fileId);
+    var newName = 'idCard-' + cpr + '-pdf';
+    var docCopy = tempFile.makeCopy(tempFolder);
+    var doc = DocumentApp.openById(docCopy.getId());
+    var body = doc.getBody();
+    body.replaceText("{name}", thisPer.name);
+
+    var qrData = encodeURIComponent(JSON.stringify({ cpr: Number(cpr) }));
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + qrData + '&color=' + qrColor + '&bgcolor=ffffff00&margin=0';
+    replaceImage_(doc.getId(), qrUrl);
+
+    doc.setName(newName);
+    doc.saveAndClose();
+
+    var pdfBlob = doc.getBlob();
+    var currentFileID, pdfUrl;
+    var existingFileId = checkExistFiles_(userFolder.getId(), newName);
+    if (existingFileId) {
+      var existingFileId2 = extractFileId_(existingFileId);
+      overwriteFile(pdfBlob, existingFileId2);
+      var file = DriveApp.getFileById(existingFileId2);
+      shareFileAnyoneWithLink_(existingFileId2);
+      pdfUrl = file.getUrl();
+      currentFileID = existingFileId2;
+    } else {
+      var newPdf = userFolder.createFile(pdfBlob).setName(newName);
+      shareFileAnyoneWithLink_(newPdf.getId());
+      pdfUrl = newPdf.getUrl();
+      currentFileID = newPdf.getId();
+    }
+
+    docCopy.setTrashed(true);
+
+    // كتابة رابط البطاقة بعمود card، + المجلد/الكود فقط لو كانا فارغين أصلًا لسبب ما (بيانات
+    // ناقصة من تسجيل قديم) — لا نُعيد كتابة قيم موجودة بالفعل بلا داعٍ.
+    var ss = SpreadsheetApp.openById(mainData);
+    var sheet = ss.getSheetByName('students');
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var cprCol = headers.indexOf('cpr');
+    var pdfCol = headers.indexOf('card');
+    var folderCol = headers.indexOf('folder');
+    var codeCol = headers.indexOf('code');
+    var lastRow = sheet.getLastRow();
+    var cprValues = sheet.getRange(2, cprCol + 1, lastRow - 1, 1).getValues();
+    var rowIndex = cprValues.findIndex(function (r) { return cprEquals_(r[0], cpr); });
+    if (rowIndex === -1) return { ok: false, message: 'تعذّر العثور على صف الطالب بالشيت.' };
+    var sheetRow = rowIndex + 2;
+
+    if (pdfCol > -1) sheet.getRange(sheetRow, pdfCol + 1).setValue(pdfUrl);
+    if (folderCol > -1 && !thisPer.folderUrl) sheet.getRange(sheetRow, folderCol + 1).setValue(userFolder.getUrl());
+    if (codeCol > -1 && (!thisPer.code || thisPer.code === '')) sheet.getRange(sheetRow, codeCol + 1).setValue(perCode);
+
+    return { ok: true, cardUrl: pdfUrl };
+  } catch (err) {
+    Logger.log('reissueStudentCard فشل لـ' + cpr + ': ' + err);
+    return { ok: false, message: 'تعذّر إصدار البطاقة: ' + (err && err.message ? err.message : err) };
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 // أرشفة بيانات مرحلة سابقة عند إعادة قبول طالب في نفس المرحلة — راجع مناقشات.md "تعديل آلية
 // قبول طالب" للمواصفة الكاملة. تُستدعى من acceptedStu_ كأول خطوة بعد التحقق من صحة grade.
 // النطاق دومًا مقيَّد بنفس level المقبول فيها الطالب فقط — لا تُلمس أي مرحلة سابقة مكتملة له.

@@ -39,6 +39,9 @@ const CLIENT_CALLED = [
   'setStudentsQrCard', 'setStudentStudyMode', 'setWhatsAppProvider', 'skipEmailVerificationLogin', 'startAcceptBatch',
   'startQrSession', 'startWPQueueSend', 'stopFCMQueueSend', 'stopWPQueueSend', 'submitAnswerData',
   'submitDectationData', 'submitExamSurvey', 'submitMetaWhatsAppTemplateForReview', 'submitStWRK', 'unarchiveExam',
+  // added by the live code merged on 2026-10-20
+  'getPassedStudents', 'reissueStudentCard', 'setOtpWhatsAppProvider', 'submitMetaOtpTemplateForReview',
+  'getSkillsList', 'saveSkill', 'deleteSkill',
   'updateAcceptBatchProgress', 'updateStaff', 'uploadProfileAvatar', 'verifyLoginCode', 'verifyRegistrationOtp',
   // curriculum lookup-table names
   'saveSubject', 'saveCurriculum', 'saveMadhab', 'saveMatnsItem', 'deleteSubject', 'deleteCurriculum',
@@ -135,6 +138,22 @@ test('student dashboard reads getLecAttend / getStageAttendanceStats are self-sc
     assert.strictEqual(decision.args[0], STUDENT.cpr, fn);
     assert.strictEqual(enforce(fn, ['999999999'], TEACHER).args[0], '999999999', fn + ' staff');
   }
+});
+
+// Two functions whose subject is not a bare CPR in argument 0: setMazhab's CPR
+// is the second argument, and requestAttendance takes a payload object.
+test('setMazhab rescopes argument 1 and requestAttendance rescopes payload.cpr', () => {
+  const mazhab = enforce('setMazhab', ['المذهب الحنبلي', '999999999'], STUDENT);
+  assert.deepStrictEqual(mazhab.args, ['المذهب الحنبلي', STUDENT.cpr]);
+  assert.deepStrictEqual(enforce('setMazhab', ['المذهب الحنبلي', '999999999'], TEACHER).args, ['المذهب الحنبلي', '999999999']);
+
+  const original = { cpr: '999999999', reason: 'late bus', date: '2026-10-20' };
+  const attendance = enforce('requestAttendance', [original], STUDENT);
+  assert.deepStrictEqual(attendance.args[0], { cpr: STUDENT.cpr, reason: 'late bus', date: '2026-10-20' });
+  assert.strictEqual(original.cpr, '999999999', 'caller-supplied object untouched');
+  assert.deepStrictEqual(enforce('requestAttendance', [original], TEACHER).args[0], original);
+  // A non-object payload still becomes an object naming the caller.
+  assert.deepStrictEqual(enforce('requestAttendance', ['junk'], STUDENT).args[0], { cpr: STUDENT.cpr });
 });
 
 test('exam-state reads are scoped to the caller (getExams arg 2, studentFailedExam arg 0)', () => {

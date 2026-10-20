@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>قارئ رمز حضور الطلاب - بصائر</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#b5262c; --primary-dark:#8d1d22; --primary-soft:#fff1f2;
+    --ink:#20252d; --muted:#667180; --line:#e2e7eb; --green:#24875a; --green-soft:#eaf7f0;
+    --danger:#c6373e; --gold:#8a663f; --gold-soft:#f7f1ea;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh; padding:18px;
+    font-family:"IBM Plex Sans Arabic", Tahoma, Arial, sans-serif; color:var(--ink); background:#f5f7f9;
+  }
+  header{ text-align:center; margin-bottom:14px; }
+  header h1{ margin:0 0 4px; font-size:18px; color:var(--primary-dark); }
+  header p{ margin:0; font-size:13px; color:var(--muted); }
+  .card{
+    max-width:420px; margin:0 auto; padding:14px; border:1px solid var(--line); border-radius:14px;
+    background:#fff; box-shadow:0 10px 30px rgba(20,25,30,.06);
+  }
+  .not-opened{
+    max-width:420px; margin:60px auto; padding:22px; border-radius:14px; background:#fff;
+    border:1px solid var(--line); text-align:center; color:var(--muted); font-size:14px; line-height:1.9;
+  }
+  .paused{
+    max-width:420px; margin:0 auto; padding:40px 20px; border-radius:14px; background:#fff;
+    border:1px solid var(--line); text-align:center; color:var(--muted); font-size:14px; display:none;
+  }
+  .paused.show{ display:block; }
+  .counter{
+    display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;
+    padding:8px 14px; border-radius:20px; background:var(--primary-soft); color:var(--primary-dark);
+    font-weight:600; font-size:13px; width:fit-content; margin-inline:auto;
+  }
+  #reader{ text-align:center; }
+  .toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-20px);
+    max-width:92vw; padding:12px 20px; border-radius:10px; font-size:14px; font-weight:600;
+    color:#fff; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.success{ background:var(--green); }
+  .toast.info{ background:var(--gold); }
+  .toast.error{ background:var(--danger); }
+
+  #reader__dashboard_section, #reader__dashboard{ display:flex !important; flex-direction:column; align-items:center; gap:10px !important; padding:8px 0 !important; }
+  #reader__scan_region{ border-radius:12px !important; overflow:hidden; }
+  #reader__header_message{ margin:10px 0 !important; padding:8px 12px !important; border-radius:8px !important; color:var(--muted) !important; background:#f5f7f9 !important; border:0 !important; font-size:12px !important; font-family:inherit !important; }
+  #html5-qrcode-select-camera{ height:38px !important; padding:0 12px !important; border:1px solid #d5dce2 !important; border-radius:7px !important; color:var(--ink) !important; background:#fff !important; font-family:inherit !important; }
+  #html5-qrcode-button-camera-permission, #html5-qrcode-button-camera-start{ min-height:40px !important; padding:8px 22px !important; border:1px solid var(--primary) !important; border-radius:7px !important; color:#fff !important; background:var(--primary) !important; font-weight:600 !important; font-family:inherit !important; cursor:pointer !important; box-shadow:none !important; }
+  #html5-qrcode-button-camera-stop{ min-height:40px !important; padding:8px 22px !important; border:1px solid var(--danger) !important; border-radius:7px !important; color:#fff !important; background:var(--danger) !important; font-weight:600 !important; font-family:inherit !important; cursor:pointer !important; box-shadow:none !important; }
+  #html5-qrcode-button-torch, #html5-qrcode-button-file-selection{ min-height:38px !important; padding:7px 18px !important; border:1px solid #d5dce2 !important; border-radius:7px !important; color:#46525e !important; background:#fff !important; font-weight:600 !important; font-family:inherit !important; cursor:pointer !important; margin:4px !important; box-shadow:none !important; }
+  #html5-qrcode-anchor-scan-type-change{ display:inline-block !important; margin-top:6px !important; color:var(--primary) !important; font-weight:600 !important; font-family:inherit !important; text-decoration:none !important; font-size:12px !important; }
+
+  .guide{ max-width:360px; margin:16px auto 0; padding:14px; border-radius:10px; background:var(--gold-soft); color:var(--gold); font-size:13px; line-height:1.9; text-align:right; display:none; }
+  .guide.show{ display:block; }
+  .guide strong{ display:block; margin-bottom:4px; }
+
+  .log-panel{ max-width:420px; margin:14px auto 0; border-radius:10px; overflow:hidden; background:#12161b; box-shadow:0 6px 18px rgba(0,0,0,.15); }
+  .log-panel-header{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#1c232b; color:#c9d1d9; font-size:12px; font-weight:600; }
+  .log-panel-header button{ border:0; background:transparent; color:#8b96a3; font-size:11px; font-family:inherit; cursor:pointer; padding:2px 6px; }
+  .log-panel-body{ max-height:220px; overflow-y:auto; padding:8px 12px; direction:ltr; text-align:left; font-family:"Courier New",monospace; font-size:11px; line-height:1.7; color:#8fd694; white-space:pre-wrap; word-break:break-word; }
+  .log-panel-body .err{ color:#ff8a8a; }
+  .log-panel-body .warn{ color:#ffd479; }
+</style>
+</head>
+<body>
+  <div id="notOpened" class="not-opened" style="display:none;">
+    هذه الصفحة يجب فتحها من زر "فتح قارئ QR" داخل لوحة إدارة أكاديمية بصائر، وليس مباشرة.
+  </div>
+
+  <div id="mainArea">
+    <header>
+      <h1>قارئ رمز حضور الطلاب</h1>
+      <p>وجّه الكاميرا نحو رمز QR في بطاقة الطالب لتسجيل حضوره — تبقى هذه النافذة مفتوحة لمسح عدة طلاب متتاليًا</p>
+    </header>
+    <div class="counter"><span>عدد الطلاب المُسجَّلين هذه الجلسة:</span><strong id="scanCount">0</strong></div>
+    <div class="card" id="cameraCard">
+      <div id="reader"></div>
+    </div>
+    <div class="paused" id="pausedNote">
+      <p>الكاميرا متوقفة مؤقتًا لأن هذه النافذة غير نشطة الآن.</p>
+      <p>عُد إليها وستُستأنف تلقائيًا.</p>
+    </div>
+    <div class="guide" id="permGuide">
+      <strong>إذن الكاميرا مرفوض على هذا الجهاز</strong>
+      اضغط على أيقونة القفل 🔒 أو المعلومات (ⓘ) بجانب عنوان الموقع أعلى المتصفح ← الأذونات (Permissions) ← الكاميرا ← السماح (Allow)، ثم أعد تحميل هذه الصفحة.
+    </div>
+    <div class="log-panel">
+      <div class="log-panel-header"><span>سجل التشخيص</span><button type="button" id="logClearBtn">مسح</button></div>
+      <div class="log-panel-body" id="logBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    // سجل تشخيص دائم (لا يختفي كالتوست) — أعيد بناؤه بعد أن أثبت جدواه سابقًا في تتبّع نفس
+    // نوع الأعطال (تعمل أحيانًا ولا تعمل أحيانًا أخرى على الجوال) خطوة بخطوة، بدل التخمين.
+    // أول استدعاء يحدث فورًا عند تحميل السكربت، قبل أي شيء آخر قد يفشل.
+    function log_(msg, kind) {
+      try {
+        var body = document.getElementById('logBody');
+        if (!body) return;
+        var time = new Date().toLocaleTimeString('ar-BH', { hour12: false });
+        var line = document.createElement('div');
+        if (kind) line.className = kind;
+        line.textContent = '[' + time + '] ' + msg;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+      } catch (e) {}
+    }
+    log_('0) بدأ تحميل الصفحة');
+    window.addEventListener('error', function (e) {
+      log_('❌ خطأ JS غير متوقع: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')', 'err');
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+      var clearBtn = document.getElementById('logClearBtn');
+      if (clearBtn) clearBtn.addEventListener('click', function () { document.getElementById('logBody').innerHTML = ''; });
+    });
+
+    var scanCount_ = 0;
+    var scanReady_ = true;
+    var toastTimer_;
+    var scannerInstance_ = null;
+    // بطاقة الجلسة (session token) قصيرة الصلاحية التي وُلِّدت في code.js::startQrSession بينما
+    // تبويب لوحة الإدارة كان لا يزال نشطًا ومُصادَقًا فعليًا — راجع الشرح الكامل عند onScanSuccess_.
+    // [الخادم الجديد المستضاف ذاتيًا] هذه الصفحة تُخدَّم الآن من نطاق التطبيق نفسه، وتغيّر فيها عن
+    // النسخة الأصلية (على Firebase Hosting) أمران فقط: (1) الإرسال صار إلى /exec على نفس النطاق (JSON مع
+    // credentials: 'same-origin') بدل رابط Apps Script، و(2) تجاهل إعادة قراءة نفس الرمز (isRepeatedRead_
+    // أدناه). كل ما عدا ذلك كما كان.
+    var QR_EXEC_URL_ = '/exec';
+    var qrSessionToken_ = new URLSearchParams(window.location.search).get('session') || '';
+
+    function showToast_(message, kind) {
+      var el = document.getElementById('toast');
+      el.textContent = message;
+      el.className = 'toast show ' + (kind || 'success');
+      clearTimeout(toastTimer_);
+      toastTimer_ = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    }
+
+    // صفحة مستقلة خارج Apps Script تمامًا (بلا مشكلة iframe/getUserMedia)، بنفس فكرة
+    // google-signin-relay.html الموجودة أصلًا بالمشروع — لكنها تتصل بالخادم مباشرة (fetch) بدل
+    // الاعتماد على تبويب لوحة الإدارة، راجع الشرح الكامل عند تعريف QR_EXEC_URL_/onScanSuccess_.
+    // تهيئة القارئ أحيانًا تفشل عند أول محاولة على بعض أجهزة أندرويد بخطأ من داخل مكتبة
+    // html5-qrcode نفسها ("Cannot convert undefined or null to object" — على الأرجح من قراءتها
+    // قدرات كاميرا لم تكن جاهزة بعد)، ونجحت لاحقًا في محاولة تالية فورية على نفس الجهاز حسب سجل
+    // تشخيص حقيقي — لذا نعيد المحاولة تلقائيًا مرتين قبل عرض زر إعادة محاولة يدوي.
+    var scannerInitAttempts_ = 0;
+    function initScannerWithRetry_() {
+      scannerInitAttempts_++;
+      log_('2) بدء تهيئة قارئ الكاميرا... (محاولة ' + scannerInitAttempts_ + ')');
+      try {
+        initScanner_();
+        log_('3) تم استدعاء render() على مكتبة html5-qrcode بنجاح');
+      } catch (err) {
+        log_('❌ فشل تهيئة القارئ: ' + (err && err.message || err), 'err');
+        if (scannerInitAttempts_ < 3) {
+          log_('⏳ إعادة محاولة تهيئة القارئ خلال ثانية...', 'warn');
+          setTimeout(initScannerWithRetry_, 1000);
+        } else {
+          log_('❌ فشلت 3 محاولات متتالية لتهيئة القارئ', 'err');
+          showScannerInitFailedUi_();
+        }
+      }
+    }
+    function showScannerInitFailedUi_() {
+      var reader = document.getElementById('reader');
+      if (!reader) return;
+      reader.innerHTML = '<div style="padding:24px 10px;color:var(--danger);font-size:13px;line-height:1.9;">تعذّر تشغيل قارئ الكاميرا على هذا الجهاز.<br><button type="button" id="manualRetryBtn" style="margin-top:10px;min-height:40px;padding:8px 22px;border:1px solid var(--primary);border-radius:7px;color:#fff;background:var(--primary);font-weight:600;cursor:pointer;">إعادة المحاولة</button></div>';
+      var btn = document.getElementById('manualRetryBtn');
+      if (btn) btn.addEventListener('click', function () {
+        scannerInitAttempts_ = 0;
+        reader.innerHTML = '';
+        initScannerWithRetry_();
+      });
+    }
+
+    // بطاقة الجلسة (وليس وجود window.opener) هي الشرط الفعلي الآن لصلاحية هذه الصفحة — راجع
+    // الشرح الكامل عند onScanSuccess_ لسبب هذا التغيير المعماري.
+    log_('1) فحص بطاقة الجلسة: ' + (qrSessionToken_ ? 'موجودة' : 'غير موجودة — الصفحة فُتحت مباشرة بلا رمز جلسة'));
+    if (!qrSessionToken_) {
+      document.getElementById('notOpened').style.display = 'block';
+      document.getElementById('mainArea').style.display = 'none';
+    } else {
+      initScannerWithRetry_();
+    }
+
+    // [الخادم الجديد المستضاف ذاتيًا] الإضافة الثانية على سلوك الصفحة الأصلية: تجاهل إعادة قراءة نفس
+    // الرمز خلال 3 ثوانٍ من آخر مرة رُئي فيها. المكتبة تستدعي onScanSuccess_ مع كل إطار يظهر فيه الرمز،
+    // وبطاقة ثابتة أمام الكاميرا كانت تُنتج طلبًا جديدًا فور وصول رد السابق. ردّ Apps Script البطيء كان يخفّف
+    // ذلك من تلقاء نفسه؛ أما الخادم الجديد فسريع ويحدّ /exec بـ60 طلبًا في الدقيقة لكل عنوان (في التجربة:
+    // 150 طلبًا خلال 12 ثانية لبطاقة واحدة، فاستُنفد الحد وصار كل مسح لأي طالب يُرفَض، وكذلك تسجيل الدخول
+    // عبر جوجل من نفس العنوان). المهلة تتجدد مع كل رؤية، فلا يُعاد الإرسال ما دامت البطاقة أمام الكاميرا.
+    var SAME_CODE_QUIET_MS_ = 3000;
+    var lastSeenAtByCode_ = Object.create(null);
+    function isRepeatedRead_(decodedText) {
+      var now = Date.now();
+      var lastSeenAt = lastSeenAtByCode_[decodedText];
+      lastSeenAtByCode_[decodedText] = now;
+      var knownCodes = Object.keys(lastSeenAtByCode_);
+      if (knownCodes.length > 200) {
+        knownCodes.forEach(function (code) { if (now - lastSeenAtByCode_[code] > 60000) delete lastSeenAtByCode_[code]; });
+      }
+      return !!lastSeenAt && now - lastSeenAt < SAME_CODE_QUIET_MS_;
+    }
+
+    function onScanSuccess_(decodedText) {
+      if (isRepeatedRead_(decodedText)) return;
+      if (!scanReady_) { log_('(تم تجاهل مسح جديد — لا يزال بانتظار رد المسح السابق)', 'warn'); return; }
+      log_('4) تم فك رمز QR: ' + decodedText.substring(0, 120));
+      var payload;
+      try { payload = JSON.parse(decodedText); } catch (err) {
+        log_('❌ الرمز ليس JSON صالحًا: ' + err.message, 'err');
+        showToast_('تم قراءة الرمز لكن محتواه ليس بالتنسيق المتوقَّع (JSON صالح يحتوي cpr)', 'error');
+        return;
+      }
+      if (!payload || !payload.cpr) {
+        log_('❌ الرمز لا يحتوي حقل cpr', 'err');
+        showToast_('تم قراءة الرمز لكن لا يحتوي رقمًا شخصيًا (cpr) — تأكّد أن هذا رمز بطاقة طالب صحيح', 'error');
+        return;
+      }
+      log_('5) تم التحقق من البيانات، cpr=' + payload.cpr);
+      scanReady_ = false;
+      try {
+        var audio = new Audio('https://assets.mixkit.co/active_storage/sfx/900/900-preview.mp3');
+        audio.play();
+      } catch (err) {}
+      showToast_('جارٍ إرسال بيانات: ' + (payload.name || payload.cpr) + ' ...', 'info');
+
+      if (!qrSessionToken_) {
+        log_('❌ لا توجد بطاقة جلسة (session) في رابط هذه الصفحة', 'err');
+        showToast_('لم تُفتح هذه الصفحة بشكل صحيح — أعد فتح قارئ QR من لوحة الإدارة', 'error');
+        scanReady_ = true;
+        return;
+      }
+
+      log_('6) إرسال الطلب مباشرة للخادم...');
+      var abortCtrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var abortTimer = setTimeout(function () { if (abortCtrl) abortCtrl.abort(); }, 20000);
+      fetch(QR_EXEC_URL_, {
+        method: 'POST',
+        // كان text/plain عمدًا لتجنّب طلب CORS preflight (OPTIONS) الذي لا تدعمه نقاط اتصال Apps
+        // Script Web App. الآن الطلب على نفس النطاق (لا CORS إطلاقًا) فنرسل JSON صريحًا.
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'qrAttend', token: qrSessionToken_, cpr: payload.cpr, perId: payload.perId, name: payload.name }),
+        signal: abortCtrl ? abortCtrl.signal : undefined
+      }).then(function (res) { return res.json(); }).then(function (result) {
+        clearTimeout(abortTimer);
+        scanReady_ = true;
+        log_('7) استُلم رد الخادم: status=' + result.status + (result.message ? (' — ' + result.message) : ''));
+        if (result.status === 'duplicate') {
+          showToast_(result.message || 'تم تسجيل حضور هذا الطالب مسبقًا اليوم', 'info');
+        } else if (result.status === 'ok') {
+          scanCount_++;
+          document.getElementById('scanCount').textContent = scanCount_;
+          showToast_('تم تسجيل حضور: ' + (result.studentName || payload.name || ''), 'success');
+        } else {
+          showToast_(result.message || 'تعذّر تسجيل الحضور', 'error');
+        }
+      }).catch(function (err) {
+        clearTimeout(abortTimer);
+        scanReady_ = true;
+        var isAbort = err && err.name === 'AbortError';
+        log_('❌ فشل الاتصال المباشر بالخادم: ' + (isAbort ? 'انتهت المهلة (20 ثانية) دون رد' : (err && err.message || err)), 'err');
+        showToast_('تعذّر الاتصال بالخادم — تحقّق من الإنترنت وحاول مجددًا', 'error');
+      });
+    }
+
+    // نصوص واجهة المكتبة بالإنجليزية — بعضها بمعرّفات ثابتة معروفة (الأزرار)، وبعضها نص عادي
+    // بلا معرّف (تسمية "اختيار الكاميرا"، رابط "مسح من صورة") فنستبدله بمسح كل عُقد النص داخل
+    // الحاوية بحثًا عن عبارات إنجليزية معروفة — أكثر مرونة من الاعتماد على معرّف دقيق لكل عنصر.
+    var qrLabels_ = {
+      'html5-qrcode-button-camera-permission': 'تفعيل الكاميرا',
+      'html5-qrcode-button-camera-start': 'ابدأ المسح',
+      'html5-qrcode-button-camera-stop': 'إيقاف المسح',
+      'html5-qrcode-button-torch': 'الفلاش',
+      'html5-qrcode-button-file-selection': 'مسح من صورة'
+    };
+    var textReplacements_ = [
+      [/Select\s*Camera/gi, 'اختر الكاميرا'],
+      [/Scan an Image File/gi, 'مسح من صورة'],
+      [/Switch to scanning using camera directly/gi, 'التبديل للمسح المباشر بالكاميرا'],
+      [/Requesting camera permissions/gi, 'يُطلب إذن الكاميرا...'],
+      [/No camera found/gi, 'لم يُعثر على كاميرا'],
+      [/Loading\.*/gi, 'جارٍ التحميل...']
+    ];
+    function translateWidget_() {
+      Object.keys(qrLabels_).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && el.textContent !== qrLabels_[id]) el.textContent = qrLabels_[id];
+      });
+      var root = document.getElementById('reader');
+      if (root && document.createTreeWalker) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+        var node;
+        while (node = walker.nextNode()) {
+          var text = node.nodeValue, changed = false;
+          textReplacements_.forEach(function (pair) {
+            if (pair[0].test(text)) { text = text.replace(pair[0], pair[1]); changed = true; }
+          });
+          if (changed) node.nodeValue = text;
+        }
+      }
+      checkPermissionError_();
+    }
+    var permErrorShown_ = false;
+    function checkPermissionError_() {
+      if (permErrorShown_) return;
+      var el = document.getElementById('reader');
+      var text = el ? el.textContent : '';
+      if (text && /NotAllowedError/i.test(text)) {
+        permErrorShown_ = true;
+        log_('⚠ اكتُشف رفض إذن الكاميرا (NotAllowedError) في محتوى الواجهة', 'warn');
+        document.getElementById('permGuide').classList.add('show');
+      }
+    }
+
+    // تتبّع أي ضغطة داخل واجهة القارئ (أزرار المكتبة نفسها، بما فيها "مسح من صورة"/تبديل
+    // الوضع) — لمعرفة هل الضغطة تصل للعنصر أصلًا حتى لو لم يظهر أي تغيير مرئي بعدها.
+    document.getElementById('reader').addEventListener('click', function (e) {
+      var t = e.target.closest('button, a, span, label');
+      if (!t) return;
+      log_('🖱 ضغطة داخل القارئ على: ' + (t.id || t.tagName) + (t.textContent ? (' — "' + t.textContent.trim().substring(0, 30) + '"') : ''));
+    });
+
+    function initScanner_() {
+      // useBarCodeDetectorIfSupported: يستخدم واجهة BarcodeDetector المدمجة بالمتصفح نفسه بدل
+      // فاكّ الشيفرة الجافاسكربتي البديل بالمكتبة — أدق بكثير في الحالات الصعبة (مسح من شاشة
+      // هاتف آخر)، ويرجع تلقائيًا للطريقة القديمة إن لم يدعمها المتصفح، فلا مخاطرة من تفعيله.
+      // بلا قيد qrbox عمدًا — يفحص الإطار كاملًا بلا تضييق لمساحة معيّنة (أعلى حساسية ممكنة).
+      log_('BarcodeDetector مدعوم في هذا المتصفح: ' + (typeof BarcodeDetector !== 'undefined' ? 'نعم' : 'لا (سيُستخدم فاكّ الشيفرة البديل بالمكتبة)'));
+      scannerInstance_ = new Html5QrcodeScanner('reader', {
+        fps: 15,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      });
+      scannerInstance_.render(onScanSuccess_);
+      var container = document.getElementById('reader');
+      if (container && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(translateWidget_).observe(container, { childList: true, subtree: true });
+      }
+      translateWidget_();
+    }
+
+    function stopScanner_() {
+      if (!scannerInstance_) return;
+      var inst = scannerInstance_;
+      scannerInstance_ = null;
+      try { inst.clear(); } catch (err) {}
+    }
+
+    // إيقاف الكاميرا فعليًا (لا مجرد تعليقها) عند مغادرة المستخدم لهذه النافذة (تبديل تطبيق على
+    // الجوال، تصغيرها، فتح تبويب آخر) — خصوصية وتوفير بطارية، بدل بقاء الكاميرا شغّالة في
+    // الخلفية بلا داعٍ. تُستأنف تلقائيًا بمجرد العودة للنافذة.
+    document.addEventListener('visibilitychange', function () {
+      if (!qrSessionToken_) return; // الصفحة لم تُفتح أصلًا كنافذة قارئ فعلية (بلا رمز جلسة)
+      if (document.hidden) {
+        log_('⏸ النافذة أصبحت غير نشطة — إيقاف الكاميرا مؤقتًا');
+        stopScanner_();
+        document.getElementById('cameraCard').style.display = 'none';
+        document.getElementById('pausedNote').classList.add('show');
+      } else if (!scannerInstance_) {
+        log_('▶ عادت النافذة نشطة — إعادة تشغيل الكاميرا');
+        document.getElementById('cameraCard').style.display = '';
+        document.getElementById('pausedNote').classList.remove('show');
+        permErrorShown_ = false;
+        document.getElementById('permGuide').classList.remove('show');
+        scannerInitAttempts_ = 0;
+        initScannerWithRetry_();
+      }
+    });
+  </script>
+</body>
+</html>

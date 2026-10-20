@@ -922,6 +922,10 @@ function deleteCurriculum(userCpr, id) { return deleteCurriculumItem_('curricula
 function saveMatnCatalog(userCpr, item) { return saveCurriculumItem_('matnCatalog', ['subjectId', 'level'], userCpr, item); }
 function deleteMatnCatalog(userCpr, id) { return deleteCurriculumItem_('matnCatalog', userCpr, id); }
 
+// "المهارات" — قائمة بسيطة بنفس بنية المقررات (راجع getSkillsList بdataGet.js).
+function saveSkill(userCpr, item) { return saveCurriculumItem_('skills', ['subjectId', 'level'], userCpr, item); }
+function deleteSkill(userCpr, id) { return deleteCurriculumItem_('skills', userCpr, id); }
+
 // استيراد أسماء المتون الفريدة من شيت الأوراد الحقيقي (matns، عمود "الكتاب / المتن") إلى
 // كتالوج "المتون" (matnCatalog) دون تكرار — بطلب المستخدم. آمنة للتشغيل أكثر من مرة: أي اسم
 // موجود بالفعل بالكتالوج (بعد الحذف) يُتجاهل ولا يُعاد إنشاؤه. لكل اسم متن مستورَد: المرحلة =
@@ -1355,9 +1359,9 @@ function deleteDectation(code){
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 // القفل (allowMazhabChange بشيت main، مفتاح "تغيير المذهب" بتبويب المذاهب — إدارة المواد) يُنفَّذ
-// خادميًا هنا أيضًا لا بالواجهة فقط (كانت هذه الدالة بلا أي تحقق إطلاقًا سابقًا) — يمنع فقط
-// تغيير مذهب مختار مسبقًا لطالب لا يمتلك مذهبًا بعد يبقى قادرًا على اختياره أول مرة بصرف النظر
-// عن حالة هذا المفتاح (راجع تعليق ensureAllowMazhabChangeColumn_ أعلاه لتفصيل هذا القرار).
+// خادميًا هنا أيضًا لا بالواجهة فقط (كانت هذه الدالة بلا أي تحقق إطلاقًا سابقًا) — يمنع كل
+// تسجيل أو تغيير للمذهب عند الإغلاق، بما فيه الاختيار الأول لطالب لا يمتلك مذهبًا بعد
+// (قرار المستخدم 2026-10-03: السماح بالاختيار الأول عند الإغلاق كان سلوكًا خاطئًا).
 function setMazhab(mazhab , cpr){
 
   var ss = SpreadsheetApp.openById(mainData);
@@ -1370,7 +1374,7 @@ function setMazhab(mazhab , cpr){
   if (row === -1) return { error: true, message: 'الطالب غير موجود' };
 
   var currentMazhab = sheet.getRange(row+1, mazhabCol+1).getValue();
-  if (currentMazhab && currentMazhab !== mazhab) {
+  if (currentMazhab !== mazhab) {
     var mainSh = SpreadsheetApp.openById(refID).getSheetByName('main');
     var col = ensureAllowMazhabChangeColumn_(mainSh);
     var allowChange = !!mainSh.getRange(2, col).getValue();
@@ -1685,10 +1689,20 @@ function getGraduationCandidates(userCpr) {
   var statusList = getStageCompletionStatusBatch_(persons);
 
   var candidates = [];
+  // مرحلة صدرت شهادة اجتيازها بالفعل (stageCertificates) لكن عمودها بشيت الطلاب ('class'+
+  // stageIndex) ما زال 'active' — يحدث عادة بالمرحلة التحصيلية الأخيرة (class3) التي لا "مرحلة
+  // تالية" يُقبَل بها الطالب فتُحوِّلها acceptedStu_ (oldJS.js) تلقائيًا لـ'done' كباقي المراحل.
+  // تُجمَع هنا وتُصحَّح دفعة واحدة أدناه إلى 'done' بطلب المستخدم صراحةً "كل من صدر له شهادة
+  // اجتياز... يُكتب أمامه done بالشيت الأساسي" — تُطبَّق عند كل ضغطة "تحديث" بهذه الصفحة.
+  var pendingDoneUpdates_ = [];
   statusList.forEach(function (status) {
     var s = personsByCpr[normalizeCpr_(status.cpr)];
     if (!s) return;
     var certIssued = !!issuedKeys[normalizeCpr_(s.cpr) + '|' + status.stageIndex];
+    if (certIssued && status.sourceStatus === 'active') {
+      pendingDoneUpdates_.push({ cpr: s.cpr, stageIndex: status.stageIndex });
+      status.sourceStatus = 'done';
+    }
     // مرحلة "done" (انتقل منها الطالب لمرحلة أخرى) لا تُعرَض هنا إن صدرت شهادتها بالفعل — سجل
     // تاريخي مُنجَز لا داعي لتكديسه ضمن قائمة مرشَّحين فعليين. مرحلته "active" الحالية تبقى
     // تُعرَض دومًا كالسابق بصرف النظر عن حالة الشهادة.
@@ -1699,13 +1713,113 @@ function getGraduationCandidates(userCpr) {
       gender: s.gender,
       phone: s.phone,
       hasEmail: !!String(s.mail || '').trim(),
+      avatarUrl: s.avatarUrl || '',
       stageIndex: status.stageIndex,
       criteria: status.criteria,
       meetsAllMandatory: status.meetsAllMandatory,
       certificateIssued: certIssued
     });
   });
+  markDoneForIssuedStageCertificates_(pendingDoneUpdates_);
   return candidates;
+}
+
+// السجل الرسمي للطلاب المجتازين: المصدر هو stageCertificates لا قيمة class وحدها، لأن "done"
+// قد تُكتب عند انتقال الطالب إلى مرحلة تالية قبل اعتماد اجتيازه رسميًا. كل شهادة تمثل اجتياز
+// مرحلة مستقلًا، لذلك قد يظهر الطالب أكثر من مرة إذا اجتاز عدة مراحل. نرفق نسب المرحلة الحالية
+// المحسوبة دفعة واحدة كي يعرض تبويب "مجتازون" تفاصيل المرحلة دون طلب منفصل لكل صف.
+function getPassedStudents(userCpr) {
+  var perm = hasExamPermission(userCpr);
+  if (!perm.isAdmin) return { error: true, message: 'يلزم صلاحية الإدارة' };
+
+  var sh = ensureStageCertificatesSheet_();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+
+  var persons = getPersons() || [];
+  var personsByCpr = {};
+  persons.forEach(function (s) { personsByCpr[normalizeCpr_(s.cpr)] = s; });
+
+  var certificateRows = sh.getRange(2, 1, lastRow - 1, 5).getValues();
+  var certifiedCprs = {};
+  certificateRows.forEach(function (r) { certifiedCprs[normalizeCpr_(r[0])] = true; });
+  var certifiedPersons = persons.filter(function (s) { return !!certifiedCprs[normalizeCpr_(s.cpr)]; });
+  if (!certifiedPersons.length) return [];
+
+  var statusByKey = {};
+  getStageCompletionStatusBatch_(certifiedPersons).forEach(function (status) {
+    statusByKey[normalizeCpr_(status.cpr) + '|' + (+status.stageIndex)] = status;
+  });
+
+  // لو وُجد تكرار قديم لنفس الطالب/المرحلة نحتفظ بأحدث إصدار فقط.
+  var latestByKey = {};
+  certificateRows.forEach(function (r) {
+    var cpr = normalizeCpr_(r[0]);
+    var stageIndex = +r[1];
+    if (!cpr || stageIndex < 0 || stageIndex > 3 || !personsByCpr[cpr]) return;
+    var key = cpr + '|' + stageIndex;
+    var timestamp = r[4] instanceof Date ? r[4].getTime() : new Date(r[4]).getTime();
+    if (!isFinite(timestamp)) timestamp = 0;
+    if (!latestByKey[key] || timestamp >= latestByKey[key].timestamp) {
+      latestByKey[key] = { row: r, timestamp: timestamp };
+    }
+  });
+
+  return Object.keys(latestByKey).map(function (key) {
+    var entry = latestByKey[key];
+    var r = entry.row;
+    var cpr = normalizeCpr_(r[0]);
+    var stageIndex = +r[1];
+    var s = personsByCpr[cpr];
+    var status = statusByKey[key];
+    var mandatoryPercents = status ? status.criteria.filter(function (c) {
+      return c.isMandatory && typeof c.percent === 'number';
+    }).map(function (c) { return c.percent; }) : [];
+    return {
+      cpr: cpr,
+      name: s.name,
+      gender: s.gender,
+      phone: s.phone,
+      nationality: s.nationality,
+      mazhab: s.mazhab,
+      avatarUrl: s.avatarUrl || '',
+      stageIndex: stageIndex,
+      criteria: status ? status.criteria : [],
+      mandatoryAverage: mandatoryPercents.length ? Math.round((mandatoryPercents.reduce(function (sum, n) { return sum + n; }, 0) / mandatoryPercents.length) * 10) / 10 : null,
+      certificateUrl: String(r[2] || ''),
+      issuedBy: normalizeCpr_(r[3]),
+      issuedAt: r[4] instanceof Date ? r[4].toISOString() : String(r[4] || '')
+    };
+  }).sort(function (a, b) {
+    return new Date(b.issuedAt || 0).getTime() - new Date(a.issuedAt || 0).getTime();
+  });
+}
+
+// تصحيح عمود 'class'+stageIndex بشيت الطلاب الأساسي (mainData) إلى 'done' لكل (cpr, stageIndex)
+// صدرت شهادة اجتيازها بالفعل لكن العمود ما زال 'active' — راجع تعليق الاستدعاء أعلاه
+// (getGraduationCandidates) للسياق الكامل. لا تلمس أي مرحلة أخرى ولا تُصدر أي شهادة، تكتفي
+// بتصحيح الحالة النصية فقط. pending: [{cpr, stageIndex}].
+function markDoneForIssuedStageCertificates_(pending) {
+  if (!pending || !pending.length) return;
+
+  var sh = SpreadsheetApp.openById(mainData).getSheetByName('students');
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var cprCol = headers.indexOf('cpr');
+  var classCols = [headers.indexOf('class0'), headers.indexOf('class1'), headers.indexOf('class2'), headers.indexOf('class3')];
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return;
+  var rowByCpr = {};
+  sh.getRange(2, cprCol + 1, lastRow - 1, 1).getValues().forEach(function (r, i) {
+    rowByCpr[normalizeCpr_(r[0])] = i + 2;
+  });
+
+  pending.forEach(function (p) {
+    var rowNumber = rowByCpr[normalizeCpr_(p.cpr)];
+    var col = classCols[+p.stageIndex];
+    if (!rowNumber || col === -1) return;
+    sh.getRange(rowNumber, col + 1).setValue('done');
+  });
 }
 
 // حارس "تضارب المصالح" — يمنع تنفيذ إجراء إداري حسّاس على حساب الشخص نفسه حتى لو كانت لديه
@@ -1945,9 +2059,8 @@ function setSelfIssueCertStatus(userCpr, isOpen) {
 // مفتاح "السماح بتغيير المذهب الفقهي" — نفس شيت main ونمط مفاتيح التسجيل/طلبات الحضور
 // أعلاه، **مفتوح افتراضيًا** (خلافًا لـselfIssueCertEnabled) لأن السماح بالتغيير هو السلوك
 // الحالي فعليًا قبل وجود هذا المفتاح إطلاقًا — إغلاقه سلوك تقييدي جديد يحتاج قرارًا إداريًا
-// صريحًا، لا العكس. عند الإغلاق: طالب اختار مذهبه فعلًا لا يمكنه تغييره (renderMazhabSelection/
-// معالج .mazhabBtn بـjs.html). طالب لم يختر بعد يبقى قادرًا على اختياره أول مرة بصرف النظر عن
-// حالة هذا المفتاح — إغلاقه لا يجوز أن يحرم طالبًا جديدًا من أي مذهب نهائيًا.
+// صريحًا، لا العكس. عند الإغلاق: لا يستطيع أي طالب تسجيل مذهب أو تغييره، سواء اختار مذهبه
+// سابقًا أم لا (renderMazhabSelection/معالج .mazhabBtn بـjs.html وsetMazhab).
 function ensureAllowMazhabChangeColumn_(sh) {
   var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   var col = headers.indexOf('allowMazhabChange');
@@ -2260,7 +2373,9 @@ async function exportNewCard(name, mail, phone, cpr) {
   var plainText = template.body;
   var htmlBody = buildBasairGreetingEmail_(template.name, plainText);
 
-  if (mail) {
+  // نتخطّى البريد فقط إن كان محظورًا (فشل تسليم دائم سابق، راجع emailBounces.js) دون أن يمنع
+  // ذلك رسالة الواتساب أعلاه (أُرسلت بالفعل) أو نجاح توليد البطاقة نفسه.
+  if (mail && !isEmailBlocked_(mail)) {
     GmailApp.sendEmail(mail, subject, plainText, {
       name: 'بصائر للعلوم الشرعية',
       htmlBody: htmlBody,
@@ -2522,6 +2637,56 @@ function submitMetaWhatsAppTemplateForReview(userCpr, template, firebaseIdToken)
   var result = metaWhatsAppRequest_('/' + meta.businessAccountId + '/message_templates', payload, meta);
   if (!result.status) return { error: true, message: result.reason, httpCode: result.httpCode };
   return { ok: true, id: result.id || '', status: result.templateStatus || 'PENDING', category: result.category || category };
+}
+
+// يرسل قالب Meta الثابت الخاص برمز تحقق واتساب (OTP) للمراجعة — فئة AUTHENTICATION الرسمية
+// التي تفرضها سياسة Meta لرسائل رموز التحقق (راجع WHATSAPP_CLOUD_API_HANDOFF_AR.md)، منفصل
+// عمدًا عن submitMetaWhatsAppTemplateForReview أعلاه (قوالب حملات MARKETING/UTILITY بنص حر).
+// لا نص حر هنا بتاتًا: Meta تولّد جملة التحذير بنفسها عبر add_security_recommendation، ولا يوجد
+// مكان لتوقيع أو أي نص إضافي. code_expiration_minutes يطابق AUTH_OTP_TTL_SECONDS الفعلي
+// (auth.js) حتى لا تتناقض رسالة القالب مع سلوك الخادم الحقيقي إن تغيّرت المدة مستقبلًا.
+function submitMetaOtpTemplateForReview(userCpr, firebaseIdToken) {
+  if (!requireVerifiedSuperAdmin_(userCpr, firebaseIdToken)) return { error: true, message: 'تعذّر التحقق من جلسة Super Admin؛ أعد تسجيل الدخول ثم حاول مرة أخرى' };
+  var meta = getMetaWhatsAppConfig_();
+  if (!meta.accessToken) return { error: true, code: 'META_NOT_CONFIGURED', message: 'رمز وصول Meta غير محفوظ' };
+  var payload = {
+    name: META_WA_OTP_TEMPLATE_NAME_,
+    language: META_WA_OTP_TEMPLATE_LANGUAGE_,
+    category: 'AUTHENTICATION',
+    components: [
+      { type: 'BODY', add_security_recommendation: true },
+      { type: 'FOOTER', code_expiration_minutes: Math.max(1, Math.round(AUTH_OTP_TTL_SECONDS / 60)) },
+      { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: 'نسخ الرمز' }] }
+    ]
+  };
+  var result = metaWhatsAppRequest_('/' + meta.businessAccountId + '/message_templates', payload, meta);
+  if (!result.status) return { error: true, message: result.reason, httpCode: result.httpCode };
+  return { ok: true, id: result.id || '', status: result.templateStatus || 'PENDING', category: result.category || 'AUTHENTICATION' };
+}
+
+// مزوّد رمز التحقق (OTP) عبر واتساب — منفصل عمدًا عن setWhatsAppProvider (مزوّد الحملات) لأن
+// مسار الدخول لا يجوز أن يتأثر بتبديل يخص الحملات فقط. يرفض التفعيل إن لم يكن قالب
+// AUTHENTICATION المعتمد (META_WA_OTP_TEMPLATE_NAME_) بحالة APPROVED فعليًا لدى Meta، حتى لا
+// ينقطع دخول الطلاب فجأة بقالب لم توافق عليه Meta بعد.
+function setOtpWhatsAppProvider(userCpr, provider, firebaseIdToken) {
+  if (!requireVerifiedSuperAdmin_(userCpr, firebaseIdToken)) return { error: true, message: 'تعذّر التحقق من جلسة Super Admin؛ أعد تسجيل الدخول ثم حاول مرة أخرى' };
+  provider = String(provider || '').toLowerCase();
+  if (provider !== 'fonnte' && provider !== 'meta') return { error: true, message: 'مزوّد واتساب غير معروف' };
+
+  if (provider === 'meta') {
+    var meta = getMetaWhatsAppConfig_();
+    if (!meta.accessToken || !meta.phoneNumberId || !meta.businessAccountId) {
+      return { error: true, code: 'META_NOT_CONFIGURED', message: 'أكمل إعداد Meta واحفظ رمز الوصول أولًا' };
+    }
+    var status = getMetaWhatsAppTemplateStatus(userCpr, META_WA_OTP_TEMPLATE_NAME_, META_WA_OTP_TEMPLATE_LANGUAGE_, firebaseIdToken);
+    if (status.error) return status;
+    if (!status.exists || status.status !== 'APPROVED') {
+      return { error: true, message: 'قالب رمز التحقق (' + META_WA_OTP_TEMPLATE_NAME_ + ') غير معتمد بعد لدى Meta؛ لا يمكن التفعيل قبل اعتماده.' };
+    }
+  }
+
+  PropertiesService.getScriptProperties().setProperty(OTP_WHATSAPP_PROVIDER_PROP_, provider);
+  return { ok: true, provider: provider };
 }
 
 // فحص صريح لحالة قالب Meta من الواجهة. يفيد أيضًا بعد انقطاع/تأخر رد إنشاء القالب، حتى لا
@@ -3007,6 +3172,36 @@ function sendMetaWhatsAppTemplate_(target, templateName, languageCode, bodyParam
   return metaWhatsAppRequest_('/' + config.phoneNumberId + '/messages', payload, config);
 }
 
+// يرسل رمز تحقق فعليًا عبر قالب Meta الثابت AUTHENTICATION (META_WA_OTP_TEMPLATE_NAME_) —
+// مستدعاة من sendOtpCode_ (auth.js) عند اختيار Super Admin مزوّد Meta لرمز التحقق. منفصلة عمدًا
+// عن sendMetaWhatsAppTemplate_ أعلاه (المستخدمة في الحملات ولا تدعم مكوّن زر copy_code)، لتفادي
+// أي تعديل قد يمسّ مسار الحملات الجاري تشغيله فعليًا. زر OTP من نوع COPY_CODE يحتاج مكوّن
+// button/copy_code إضافيًا بنفس قيمة الرمز، طبقًا لصيغة Meta الرسمية لقوالب Authentication.
+function sendMetaOtpTemplate_(target, code) {
+  var config = getMetaWhatsAppConfig_();
+  if (!config.accessToken || !config.phoneNumberId) {
+    return { status: false, provider: 'meta', reason: 'إعداد Meta غير مكتمل أو رمز الوصول غير محفوظ' };
+  }
+  var finalTarget = String(target || '').replace(/\D/g, '');
+  if (!finalTarget) return { status: false, provider: 'meta', reason: 'رقم المستلم غير صالح لـMeta' };
+  var codeStr = String(code || '');
+  var payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: finalTarget,
+    type: 'template',
+    template: {
+      name: META_WA_OTP_TEMPLATE_NAME_,
+      language: { code: META_WA_OTP_TEMPLATE_LANGUAGE_ },
+      components: [
+        { type: 'body', parameters: [{ type: 'text', text: codeStr }] },
+        { type: 'button', sub_type: 'copy_code', index: '0', parameters: [{ type: 'coupon_code', coupon_code: codeStr }] }
+      ]
+    }
+  };
+  return metaWhatsAppRequest_('/' + config.phoneNumberId + '/messages', payload, config);
+}
+
 // فحص قبل جدولة الحملة يمنع أخطر التباس في واجهة Meta: أن يكتب الإداري نصًا جديدًا لكن يضع
 // اسم قالب قديم، فتُرسل Meta محتوى القالب القديم بينما يعرض التأكيد/السجل النص الجديد. نتحقق
 // مرة واحدة من وجود القالب، واعتماده، ولغته، وتطابق جسمه حرفيًا بعد تحويل {name} إلى {{1}}.
@@ -3361,7 +3556,9 @@ function sendBatchWP(queue){
 function extractFileId_(fileUrl) {
   if (!fileUrl) return null;
   
-  const regex = /\/d\/([a-zA-Z0-9_-]+)/;
+  // Google Drive links (/d/<id>) and, after the migration to the self-hosted
+  // file store, our own links (/files/<id>/<name>) — see tools/rewrite-drive-links.js.
+  const regex = /\/(?:d|files)\/([a-zA-Z0-9_-]+)/;
   const match = fileUrl.match(regex);
   if (match && match[1]) {
     return match[1];

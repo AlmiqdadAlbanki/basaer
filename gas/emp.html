@@ -98,8 +98,11 @@
          القابلة للفرز/الترقيم المستخدَم في بقية لوحة الإدارة (renderPagination/updateSortIndicator). -->
     <section class="page-view" data-page="emp-attendreg">
       <header class="page-heading">
-        <div><span class="eyebrow">تسجيل الحضور</span><h1>تسجيل الحضور</h1><p>ابحث عن الطالب لفتح بطاقته أو تواصل معه واتساب، أو افتح قارئ QR مباشرة.</p></div>
+        <div><span class="eyebrow">تسجيل الحضور</span><h1>تسجيل الحضور</h1><p>ابحث عن الطالب لفتح بطاقته أو تواصل معه واتساب، أو افتح قارئ QR مباشرة، وراجع طلبات الحضور المرسَلة من الطلاب.</p></div>
         <div class="heading-actions">
+          <!-- صلاحية "تحضير" تشمل أيضًا قبول/رفض طلبات الحضور اليدوية من الطلاب — نفس مودال
+               openAttendanceRequestsModal() المستخدَم بصفحة الحضور في لوحة الإدارة حرفيًا -->
+          <button type="button" class="secondary-button" onclick="openAttendanceRequestsModal()"><i data-icon="inbox"></i>طلبات الحضور <b id="empAttendReqCount" class="d-none" style="min-width:20px;padding:0 6px;border-radius:10px;color:#fff;background:var(--primary);font-size:calc(10px + var(--font-adjust));"></b></button>
           <button type="button" class="primary-button" onclick="openQrScannerPage()"><i data-icon="scan-qr-code"></i>فتح قارئ QR</button>
         </div>
       </header>
@@ -500,3 +503,7 @@
     </div>
   </div>
 </div>
+
+<!-- المودال العام openActionModal() — نفس عنصر adminDashboard.html حرفيًا، يُستخدَم هنا لمودال
+     "طلبات الحضور" (صلاحية التحضير). يُربط زر الإغلاق من prepareDashboardPage() كالمعتاد. -->
+<div class="modal-backdrop" id="actionModal" hidden><section class="action-modal" role="dialog" aria-modal="true"><header><div><span class="eyebrow" id="modalEyebrow">إجراء</span><h2 id="modalTitle">العنوان</h2></div><button class="icon-button" id="modalClose" type="button"><i data-icon="x"></i></button></header><div class="modal-body" id="modalBody"></div><footer id="modalFooter"></footer></section></div>

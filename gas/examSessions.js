@@ -96,24 +96,29 @@ function examRuleById_(examId) {
   var rows = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i][idx.exam_id]) !== String(examId)) continue;
-    var r = rows[i];
-    return {
-      rowNumber: i + 2,
-      id: String(r[idx.exam_id] || ''),
-      exam: String(r[idx.exam] || '').trim(),
-      level: r[idx.level],
-      duration: Number(r[idx.duration]) || 0,
-      check: r[idx.check] === true,
-      archived: r[idx.archived] === true,
-      retakeOpen: r[idx.retakeOpen] === true,
-      showAnswerReview: r[idx.showAnswerReview] !== false,
-      startDate: normalizeExamDateCell_(r[idx.start]),
-      startTime: normalizeExamTimeCell_(r[idx.startTime]),
-      endDate: normalizeExamDateCell_(r[idx.end]),
-      endTime: normalizeExamTimeCell_(r[idx.endTime])
-    };
+    return examRuleFromRow_(rows[i], idx, i + 2);
   }
   return null;
+}
+
+// idx: خريطة اسم العمود → موضعه (من ensureExamManagementColumns_). مفصولة عن examRuleById_
+// ليستخدمها أيضًا مسار الإشعار الآلي (examAvailabilityNotify.js) دون إعادة قراءة الشيت لكل اختبار.
+function examRuleFromRow_(r, idx, rowNumber) {
+  return {
+    rowNumber: rowNumber,
+    id: String(r[idx.exam_id] || ''),
+    exam: String(r[idx.exam] || '').trim(),
+    level: r[idx.level],
+    duration: Number(r[idx.duration]) || 0,
+    check: r[idx.check] === true,
+    archived: r[idx.archived] === true,
+    retakeOpen: r[idx.retakeOpen] === true,
+    showAnswerReview: r[idx.showAnswerReview] !== false,
+    startDate: normalizeExamDateCell_(r[idx.start]),
+    startTime: normalizeExamTimeCell_(r[idx.startTime]),
+    endDate: normalizeExamDateCell_(r[idx.end]),
+    endTime: normalizeExamTimeCell_(r[idx.endTime])
+  };
 }
 
 // كانت الإزاحة "+03:00" مكتوبة صراحة بافتراض "Asia/Bahrain" — لكن منطقة شيت rules الزمنية
@@ -682,6 +687,7 @@ function ensureExamAutomationTriggers_() {
     triggers.forEach(function (t) { names[t.getHandlerFunction()] = true; });
     if (!names.monitorExamSessions) ScriptApp.newTrigger('monitorExamSessions').timeBased().everyMinutes(1).create();
     if (!names.monitorExamReadinessAlerts) ScriptApp.newTrigger('monitorExamReadinessAlerts').timeBased().everyHours(1).create();
+    if (!names.monitorExamAvailabilityNotifications) ScriptApp.newTrigger('monitorExamAvailabilityNotifications').timeBased().everyMinutes(15).create();
   } catch (err) {
     Logger.log('تعذّر ضمان مشغلات متابعة الاختبارات: ' + err);
   }
@@ -699,7 +705,7 @@ function sendExamDisconnectNotification_(s, templateBody) {
   // راجع نفس التعليق بـsendWPCertificate_ (dataPost.js).
   var msg = renderMessageTemplate_(templateBody || MESSAGE_TEMPLATE_DEFS_.examDisconnect.defaultBody, { exam: s.exam, minutes: minutes });
   var preferEmail = String(stu.contactPreference || '').toLowerCase().indexOf('mail') !== -1 || String(stu.contactPreference || '').indexOf('بريد') !== -1;
-  if (preferEmail && stu.email && stu.emailVerified) {
+  if (preferEmail && stu.email && stu.emailVerified && !isEmailBlocked_(stu.email)) {
     try {
       GmailApp.sendEmail(stu.email, 'يمكنك استكمال جلسة الاختبار', msg, {
         name: 'بصائر للعلوم الشرعية',
@@ -725,7 +731,7 @@ function sendExamDisconnectNotification_(s, templateBody) {
     });
     if (wpOk) return true;
   }
-  if (stu.email) {
+  if (stu.email && !isEmailBlocked_(stu.email)) {
     try {
       GmailApp.sendEmail(stu.email, 'يمكنك استكمال جلسة الاختبار', msg, {
         name: 'بصائر للعلوم الشرعية',
@@ -803,7 +809,7 @@ function sendExamAdminReadinessAlert_(warning, urgent, templateBody) {
   var msg = renderMessageTemplate_(templateBody || MESSAGE_TEMPLATE_DEFS_.examReadinessAlert.defaultBody, { exam: warning.exam + scope, level: levelLabel });
   var recipients = examAlertRecipients_(), seenEmails = {}, phones = [];
   recipients.forEach(function (r) {
-    if (r.email && !seenEmails[r.email]) {
+    if (r.email && !seenEmails[r.email] && !isEmailBlocked_(r.email)) {
       seenEmails[r.email] = true;
       var subject = urgent ? 'تنبيه عاجل: اختبار بلا نموذج معتمد' : 'تنبيه جاهزية اختبار';
       try {

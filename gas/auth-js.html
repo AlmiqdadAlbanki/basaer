@@ -10,6 +10,14 @@
   let AUTH_FRESH_LOGIN = false; // true only right after an interactive login (not a restored session)
   let AUTH_RESET_MODE = false; // true while the OTP flow is being used to reset an existing password
   let AUTH_CPR_MASKED_EMAIL = ''; // من checkCprStatus، يُستخدم في رسالة "نسيت كلمة المرور؟"
+  let AUTH_CPR_MASKED_PHONE = ''; // من checkCprStatus، يتحكم بظهور زر "إرسال عبر واتساب"
+  let AUTH_LAST_OTP_CHANNEL = 'email'; // آخر قناة أُرسل بها الرمز فعليًا، تُستخدم لزر "إعادة الإرسال"
+  // آخر رقم شخصي اكتمل التحقق الفعلي من حالته (وليس فقط قيد الكتابة) + نتيجته — يمنع ضغطة
+  // Enter المبكرة في حقل الرقم الشخصي (خصوصًا التعبئة التلقائية للمتصفح، التي قد تملأ الرقم
+  // وتُطلق Enter شبه فوريًا) من الافتراض خطأً أن الحساب بلا كلمة مرور لمجرد أن حقل كلمة المرور
+  // لم يظهر بعد (قد يكون الفحص اللحظي لم يكتمل بعد، لا أن الحساب فعلًا بلا كلمة مرور).
+  let AUTH_RESOLVED_CPR = '';
+  let AUTH_RESOLVED_HAS_PASSWORD = false;
 
   // نظير isValidPersonId في code.js (الخادم) — 9 أرقام بالضبط، سواء رقم شخصي بحريني حقيقي أو
   // هوية مولَّدة لطالب خارج البحرين (نفس الصيغة، راجع generateRemoteStudentId في code.js).
@@ -284,9 +292,11 @@
       const btn = document.getElementById('skipEmailVerifyBtn');
       const spinId = 'skipEmailVerifySpin';
       const sendCodeBtn = document.querySelector('#sendCodeBtn');
+      const sendCodeWhatsAppBtn = document.getElementById('sendCodeWhatsAppBtn');
       if (btn) btn.disabled = true;
       document.getElementById(spinId)?.classList.remove('d-none');
       sendCodeBtn?.classList.add('d-none');
+      sendCodeWhatsAppBtn?.classList.add('d-none');
       loadingStart();
 
       google.script.run.withSuccessHandler(function (res) {
@@ -295,18 +305,21 @@
           if (btn) btn.disabled = false;
           document.getElementById(spinId)?.classList.add('d-none');
           sendCodeBtn?.classList.remove('d-none');
+          if (AUTH_CPR_MASKED_PHONE) sendCodeWhatsAppBtn?.classList.remove('d-none');
           alertMSG(res.message || 'تعذّر تسجيل الدخول', 'error');
           return;
         }
         completeLoginWithToken(res, '#' + spinId, function () {
           if (btn) btn.disabled = false;
           sendCodeBtn?.classList.remove('d-none');
+          if (AUTH_CPR_MASKED_PHONE) sendCodeWhatsAppBtn?.classList.remove('d-none');
         });
       }).withFailureHandler(function (err) {
         loadingEnd();
         if (btn) btn.disabled = false;
         document.getElementById(spinId)?.classList.add('d-none');
         sendCodeBtn?.classList.remove('d-none');
+        if (AUTH_CPR_MASKED_PHONE) sendCodeWhatsAppBtn?.classList.remove('d-none');
         alertMSG('تعذّر تسجيل الدخول: ' + err, 'error');
       }).skipEmailVerificationLogin(AUTH_CPR);
     });
@@ -344,6 +357,8 @@
     clearTimeout(AUTH_CPR_CHECK_TIMER);
     const myToken = ++AUTH_CPR_CHECK_TOKEN; // ignore stale responses if the user keeps typing
 
+    AUTH_RESOLVED_CPR = ''; // أي تغيير بالحقل يُبطل الحالة المحسومة السابقة فورًا، قبل أي شيء آخر
+
     if (!isValidPersonId(cpr)) {
       status?.classList.add('d-none');
       buttons?.classList.add('d-none');
@@ -352,6 +367,7 @@
       forgotBtn?.classList.add('d-none');
       rememberWrap?.classList.add('d-none');
       sendCodeBtn?.classList.add('d-none');
+      document.getElementById('sendCodeWhatsAppBtn')?.classList.add('d-none');
       skipVerifyBtn?.classList.add('d-none');
       noAccountNote?.classList.remove('d-none');
       AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) { document.getElementById(id)?.classList.add('d-none'); });
@@ -386,7 +402,10 @@
         noAccountNote?.classList.remove('d-none');
         providerNote?.classList.add('d-none');
         const hasPassword = !!res.hasPassword;
+        AUTH_RESOLVED_CPR = cpr;
+        AUTH_RESOLVED_HAS_PASSWORD = hasPassword;
         AUTH_CPR_MASKED_EMAIL = res.maskedEmail || '';
+        AUTH_CPR_MASKED_PHONE = res.maskedPhone || '';
         passwordDiv?.classList.toggle('d-none', !hasPassword);
         passwordBtn?.classList.toggle('d-none', !hasPassword);
         forgotBtn?.classList.toggle('d-none', !hasPassword);
@@ -397,6 +416,7 @@
 
         if (hasPassword) {
           sendCodeBtn?.classList.add('d-none');
+          document.getElementById('sendCodeWhatsAppBtn')?.classList.add('d-none');
           AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) { document.getElementById(id)?.classList.add('d-none'); });
         } else {
           const domain = (AUTH_CPR_MASKED_EMAIL.split('@')[1] || '').toLowerCase();
@@ -404,10 +424,13 @@
           AUTH_LOGIN_PROVIDER_BTN_IDS_.forEach(function (id) {
             document.getElementById(id)?.classList.toggle('d-none', id !== matchedBtnId);
           });
-          // "إرسال رمز التحقق" يبقى ظاهرًا دائمًا كبديل، حتى عند وجود زر مزوّد مطابق — بعض
+          // "إرسال عبر البريد" يبقى ظاهرًا دائمًا كبديل، حتى عند وجود زر مزوّد مطابق — بعض
           // الطلاب اشتكوا من التعليق في منتصف مسار OAuth (النافذة الوسيطة لا تعود للصفحة
           // الأصلية) دون أي مخرج بديل ظاهر أمامهم سوى إغلاق الصفحة والمحاولة من جديد.
           sendCodeBtn?.classList.remove('d-none');
+          // "إرسال عبر واتساب" — قناة بديلة كاملة (وليست مجرد احتياط)، الطالب يختار صراحةً؛
+          // تظهر فقط إن وُجد رقم هاتف مسجَّل لحسابه.
+          document.getElementById('sendCodeWhatsAppBtn')?.classList.toggle('d-none', !AUTH_CPR_MASKED_PHONE);
           // زر "تسجيل الدخول عبر..." كان يوهم كثيرًا من المستخدمين لأول مرة بأنه دخول بحساب
           // جوجل/ياهو/مايكروسوفت منفصل، بينما هو تحقق من نفس بريدهم المسجَّل مسبقًا فقط —
           // لذا يوضَّح النص + يظهر جزء من البريد نفسه، ويختفي "ليس لديك حساب؟" لأن CPR موجود فعلًا.
@@ -425,6 +448,7 @@
         forgotBtn?.classList.add('d-none');
         rememberWrap?.classList.add('d-none');
         sendCodeBtn?.classList.remove('d-none');
+        document.getElementById('sendCodeWhatsAppBtn')?.classList.add('d-none');
         skipVerifyBtn?.classList.remove('d-none');
         noAccountNote?.classList.remove('d-none');
         providerNote?.classList.add('d-none');
@@ -549,39 +573,50 @@
     }, 1000);
   }
 
-  async function sendLoginCode() {
-    const btn = document.querySelector('#sendCodeBtn');
+  // channel: 'email' (افتراضي) أو 'whatsapp' — الطالب يختار صراحةً بين زرَّين منفصلين بدل
+  // اعتماد تلقائي كامل على قناة واحدة (كانت البريد فقط، عرضة لحصة الإرسال اليومية/تصنيف سبام/تأخر
+  // الوصول — راجع النقاش الذي أدى لهذا التغيير).
+  async function sendLoginCode(channel) {
+    channel = channel === 'whatsapp' ? 'whatsapp' : 'email';
+    const btnId = channel === 'whatsapp' ? 'sendCodeWhatsAppBtn' : 'sendCodeBtn';
+    const spinId = channel === 'whatsapp' ? 'sendCodeWhatsAppSpin' : 'sendCodeSpin';
+    const btn = document.getElementById(btnId);
     if (btn?.disabled) return; // already in flight, ignore repeat clicks
 
     const cpr = document.querySelector('#userId').value.trim();
     if (!cpr) { alertMSG('يرجى إدخال الرقم الشخصي', 'error'); return; }
     AUTH_CPR = cpr;
 
-    const emailDiv = document.querySelector('#emailCaptureDiv');
-    let emailVal = emailDiv && !emailDiv.classList.contains('d-none')
-      ? document.querySelector('#emailCapture').value.trim()
-      : '';
+    let emailVal = '';
+    if (channel === 'email') {
+      const emailDiv = document.querySelector('#emailCaptureDiv');
+      emailVal = emailDiv && !emailDiv.classList.contains('d-none')
+        ? document.querySelector('#emailCapture').value.trim()
+        : '';
 
-    // بريد التفعيل الأول (طالب جديد يدخل لأول مرة ولم يفعّل بريده بعد): نفس حارس التحقق من
-    // مزوّد البريد المستخدم في صفحة التسجيل — لا إرسال قبل التأكد من عدم وجود خطأ إملائي شائع.
-    if (emailVal) {
-      const emailGate_ = await confirmEmailProviderOk(emailVal);
-      if (!emailGate_.proceed) return;
-      if (emailGate_.correctedEmail) {
-        emailVal = emailGate_.correctedEmail;
-        document.querySelector('#emailCapture').value = emailVal;
+      // بريد التفعيل الأول (طالب جديد يدخل لأول مرة ولم يفعّل بريده بعد): نفس حارس التحقق من
+      // مزوّد البريد المستخدم في صفحة التسجيل — لا إرسال قبل التأكد من عدم وجود خطأ إملائي شائع.
+      if (emailVal) {
+        const emailGate_ = await confirmEmailProviderOk(emailVal);
+        if (!emailGate_.proceed) return;
+        if (emailGate_.correctedEmail) {
+          emailVal = emailGate_.correctedEmail;
+          document.querySelector('#emailCapture').value = emailVal;
+        }
       }
     }
 
-    const googleBtn = document.querySelector('#googleLoginBtn');
+    // تعطيل كل أزرار الإرسال الأخرى (وليس فقط زر هذه القناة) أثناء الانتظار — تفاديًا لضغط
+    // مزدوج عبر قناة أخرى بينما طلب سابق لا يزال قيد التنفيذ.
+    const otherBtnIds = ['sendCodeBtn', 'sendCodeWhatsAppBtn', 'googleLoginBtn', 'yahooLoginBtn'].filter(function (id) { return id !== btnId; });
     if (btn) btn.disabled = true;
-    if (googleBtn) googleBtn.disabled = true; // تفادي أي ضغط على مسار آخر أثناء الانتظار
-    document.querySelector('#sendCodeSpin')?.classList.remove('d-none');
+    otherBtnIds.forEach(function (id) { var el = document.getElementById(id); if (el) el.disabled = true; });
+    document.getElementById(spinId)?.classList.remove('d-none');
     loadingStart();
     google.script.run.withSuccessHandler(function (res) {
       if (btn) btn.disabled = false;
-      if (googleBtn) googleBtn.disabled = false;
-      document.querySelector('#sendCodeSpin')?.classList.add('d-none');
+      otherBtnIds.forEach(function (id) { var el = document.getElementById(id); if (el) el.disabled = false; });
+      document.getElementById(spinId)?.classList.add('d-none');
 
       if (!res.ok) {
         loadingEnd();
@@ -623,6 +658,9 @@
           startResendCooldown(document.querySelector('#resendCodeBtn'), res.retryAfterSeconds, 'إعادة إرسال الرمز');
           return;
         }
+        // فشل إرسال فعلي عبر هذه القناة (حصة بريد ممتلئة، تعذّر اتصال بواتساب، ...) — القناة
+        // الأخرى (إن كانت متاحة) تبقى ظاهرة بجانب هذا الخطأ، فيمكن للطالب تجربتها فورًا بلا
+        // أي خطوة إضافية.
         alertMSG(res.message || 'حدث خطأ، يرجى المحاولة مرة أخرى', 'error');
         return;
       }
@@ -630,18 +668,20 @@
       loadingEnd();
       document.querySelector('#cprStepForm').classList.add('d-none');
       document.querySelector('#codeStepForm').classList.remove('d-none');
+      AUTH_LAST_OTP_CHANNEL = channel;
+      const destinationLabel = channel === 'whatsapp' ? ('واتساب ' + res.maskedPhone) : res.maskedEmail;
       document.querySelector('#codeSentNote').textContent =
-        (AUTH_RESET_MODE ? 'لإعادة تعيين كلمة المرور، تم إرسال رمز التحقق إلى ' : 'تم إرسال رمز التحقق إلى ') + res.maskedEmail;
+        (AUTH_RESET_MODE ? 'لإعادة تعيين كلمة المرور، تم إرسال رمز التحقق إلى ' : 'تم إرسال رمز التحقق إلى ') + destinationLabel;
       document.querySelector('#otpCode').value = '';
       document.querySelector('#otpCode').focus();
       startResendCooldown(document.querySelector('#resendCodeBtn'), res.cooldownSeconds, 'إعادة إرسال الرمز');
     }).withFailureHandler(function (err) {
       loadingEnd();
       if (btn) btn.disabled = false;
-      if (googleBtn) googleBtn.disabled = false;
-      document.querySelector('#sendCodeSpin')?.classList.add('d-none');
+      otherBtnIds.forEach(function (id) { var el = document.getElementById(id); if (el) el.disabled = false; });
+      document.getElementById(spinId)?.classList.add('d-none');
       alertMSG('تعذّر إرسال الرمز: ' + err, 'error');
-    }).requestLoginCode(cpr, emailVal);
+    }).requestLoginCode(cpr, emailVal, channel);
   }
 
   // يُنهي تسجيل الدخول بعد الحصول على Firebase custom token من أي مسار (رمز بريد، تجاوز
@@ -836,21 +876,22 @@
     }).loginWithPassword(cpr, password);
   }
 
-  // Reuses the existing OTP send/verify flow to re-authenticate the user,
-  // then forces the password-reset variant of the set-password dialog.
+  // Reuses the existing OTP send/verify flow to re-authenticate the user, then forces the
+  // password-reset variant of the set-password dialog. لا يُرسل تلقائيًا: يكشف نفس زرَّي اختيار
+  // القناة (بريد/واتساب) المستخدمين لمن لا كلمة مرور له بعد، فالطالب يختار صراحةً بدل إرسال
+  // تلقائي عبر البريد وحده (نفس قرار اختيار القناة أينما وُجد رمز تحقق بهذا المشروع).
   function forgotPasswordClick() {
     const btn = document.querySelector('#forgotPasswordBtn');
     if (btn?.disabled) return;
-    // رسالة ثابتة تظهر دائمًا فور الضغط، بغضّ النظر عمّا يحدث لاحقًا (رمز جديد أو صدّ الخادم
-    // لطلب مبكر) — الزر الفعلي المسؤول عن الإرسال (#sendCodeBtn) مخفي في هذا السياق، فبدون
-    // تنبيه فوري هنا لا يظهر للمستخدم أي مؤشر أن شيئًا يحدث، فيضغط عدة مرات.
-    alertMSG('سيتم إرسال كود التحقق إلى بريدك ' + (AUTH_CPR_MASKED_EMAIL || 'المسجَّل'), 'info');
-    if (btn) {
-      btn.disabled = true;
-      setTimeout(function () { btn.disabled = false; }, 4000);
-    }
+
     AUTH_RESET_MODE = true;
-    sendLoginCode();
+    document.querySelector('#passwordLoginDiv')?.classList.add('d-none');
+    document.querySelector('#passwordLoginBtn')?.classList.add('d-none');
+    document.querySelector('#rememberMeWrap')?.classList.add('d-none');
+    btn.classList.add('d-none');
+    document.querySelector('#sendCodeBtn')?.classList.remove('d-none');
+    document.getElementById('sendCodeWhatsAppBtn')?.classList.toggle('d-none', !AUTH_CPR_MASKED_PHONE);
+    alertMSG('اختر طريقة استلام رمز إعادة تعيين كلمة المرور', 'info');
   }
 
   function forLogin() {
@@ -861,9 +902,10 @@
     if (cprStepForm && cprStepForm.dataset.bound) return;
     if (cprStepForm) cprStepForm.dataset.bound = '1';
 
-    document.querySelector('#sendCodeBtn')?.addEventListener('click', sendLoginCode);
+    document.querySelector('#sendCodeBtn')?.addEventListener('click', function () { sendLoginCode('email'); });
+    document.getElementById('sendCodeWhatsAppBtn')?.addEventListener('click', function () { sendLoginCode('whatsapp'); });
     document.querySelector('#verifyCodeBtn')?.addEventListener('click', verifyLoginCode);
-    document.querySelector('#resendCodeBtn')?.addEventListener('click', sendLoginCode);
+    document.querySelector('#resendCodeBtn')?.addEventListener('click', function () { sendLoginCode(AUTH_LAST_OTP_CHANNEL); });
     document.querySelector('#passwordLoginBtn')?.addEventListener('click', passwordLogin);
     document.querySelector('#forgotPasswordBtn')?.addEventListener('click', forgotPasswordClick);
     document.querySelector('#toggleLoginPassword')?.addEventListener('click', function () {
@@ -876,14 +918,16 @@
       e.preventDefault(); // تفاديًا لأي إرسال إضافي للنموذج بسلوك المتصفح الافتراضي لمفتاح Enter
       verifyLoginCode();
     });
+    // Enter بحقل الرقم الشخصي: ينقل التركيز لحقل كلمة المرور إن تأكّد أن الحساب له كلمة مرور
+    // بالفعل — ولا يفعل أي شيء غير ذلك إطلاقًا. بقرار صريح من المستخدم: إرسال رمز التحقق لا يبدأ
+    // أبدًا إلا بضغطة فعلية مباشرة من المستخدم على زر "إرسال عبر البريد/واتساب" نفسه، ولو حتى
+    // بعد اكتمال فحص الرقم — لا تخمين، ولا اختصار لوحة مفاتيح يُطلقه بالنيابة عنه.
     document.querySelector('#userId')?.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      const passwordDiv = document.querySelector('#passwordLoginDiv');
-      if (passwordDiv && !passwordDiv.classList.contains('d-none')) {
+      const cpr = document.querySelector('#userId').value.trim();
+      if (cpr === AUTH_RESOLVED_CPR && AUTH_RESOLVED_HAS_PASSWORD) {
         document.querySelector('#loginPassword')?.focus();
-      } else {
-        sendLoginCode();
       }
     });
     document.querySelector('#loginPassword')?.addEventListener('keydown', function (e) {

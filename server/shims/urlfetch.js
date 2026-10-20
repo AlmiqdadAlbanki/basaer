@@ -17,6 +17,8 @@
 //      simplest dependable sync path for this traffic volume).
 
 const { spawnSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const { Blob } = require('./utilities.js');
 const { renderQrPng, parseQrServerUrl } = require('../docgen/qr.js');
 
@@ -137,6 +139,33 @@ function makeUrlFetchApp(opts) {
     } catch (_) { /* logging must never break a call */ }
   }
 
+  // The file id a Drive URL or one of our own /files URLs names, or null.
+  function fileIdFromUrl(urlText) {
+    const host = hostOf(urlText).toLowerCase();
+    if (host === 'drive.google.com' || host === 'docs.google.com') {
+      const match = /\/(?:file\/d|document\/d|presentation\/d|spreadsheets\/d)\/([-\w]+)/.exec(urlText) || /[?&]id=([-\w]+)/.exec(urlText);
+      return match ? match[1] : null;
+    }
+    const own = /\/files\/([-\w]+)(?:\/|$|\?)/.exec(urlText.replace(/^https?:\/\/[^/]+/, ''));
+    return own && !/^files\/folder/.test(own[0].slice(1)) ? own[1] : null;
+  }
+
+  // { id, mime, bytes } for a file present in the local store, else null.
+  function lookupLocalFile(urlText) {
+    if (!opts.storage || !opts.filesDir) return null;
+    const id = fileIdFromUrl(urlText);
+    if (!id) return null;
+    try {
+      const record = opts.storage.db.prepare('SELECT id, mime FROM files WHERE id = ? AND is_folder = 0 AND trashed = 0').get(id);
+      if (!record) return null;
+      const contentPath = path.join(opts.filesDir, record.id);
+      if (!fs.existsSync(contentPath)) return null;
+      return { id: record.id, mime: record.mime || 'application/octet-stream', bytes: fs.readFileSync(contentPath) };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function fetch(url, params) {
     params = params || {};
     const urlText = String(url);
@@ -189,6 +218,19 @@ function makeUrlFetchApp(opts) {
       // Path only, no query string: the query carries the QR text (a certificate link, a CPR).
       log(`LOCAL-QR ${String(params.method || 'GET').toUpperCase()} ${hostOf(urlText)}${urlText.replace(/^https?:\/\/[^/]+/, '').split(/[?#]/)[0]} (${png.length} bytes)`);
       return makeResponse(200, png, { 'Content-Type': 'image/png' });
+    }
+
+    // --- 2b) Files that now live in the local store ---------------------------
+    // The legacy code fetches a few Drive files by URL (the academy logo for
+    // e-mails, exported cards). Those files were imported under their Drive
+    // ids, so a Drive URL — or one of our own /files/<id> URLs — is answered
+    // from disk and never leaves the machine. An id that is not in the store
+    // falls through to the dry-run/live handling below.
+    const localFile = lookupLocalFile(urlText);
+    if (localFile) {
+      record(urlText, params, 200, `(local-file) ${localFile.mime}, ${localFile.bytes.length} bytes`, 'local-file');
+      log(`LOCAL-FILE ${String(params.method || 'GET').toUpperCase()} ${hostOf(urlText)} -> files/${localFile.id}`);
+      return makeResponse(200, localFile.bytes, { 'Content-Type': localFile.mime });
     }
 
     // --- 3) Dry-run: record and fake a success ------------------------------

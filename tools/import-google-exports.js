@@ -149,4 +149,4 @@ if (require.main === module) {
   try { main(); } catch (e) { console.error('import failed: ' + (e && e.stack || e)); process.exit(1); }
 }
 
-module.exports = { importFolderListing, importFolders, importTemplates, readManifest };
+module.exports = { importFolderListing, importFolders, importTemplates, readManifest, upsertFileRow };

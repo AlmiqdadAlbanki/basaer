@@ -48,6 +48,7 @@ var fontAwesomeIcons_ = {
   "inbox": ["fa-solid", "fa-inbox"],
   "layout-dashboard": ["fa-solid", "fa-chart-pie"],
   "layers-3": ["fa-solid", "fa-layer-group"],
+  "lightbulb": ["fa-regular", "fa-lightbulb"],
   "list-checks": ["fa-solid", "fa-list-check"],
   "list-plus": ["fa-solid", "fa-list-ul"],
   "loader-circle": ["fa-solid", "fa-spinner"],
@@ -392,7 +393,7 @@ function updateDashboardGreeting() {
 var ADMIN_ROUTE_TITLES_ = {
   dashboard: 'لوحة المعلومات',
   registrations: 'طلبات التسجيل',
-  students: 'قوائم الطلاب',
+  students: 'الطلاب',
   attendance: 'الحضور',
   certificates: 'إدارة الشهادات',
   messages: 'إدارة الرسائل',
@@ -401,7 +402,8 @@ var ADMIN_ROUTE_TITLES_ = {
   lectures: 'إدارة المحاضرات',
   curriculum: 'إدارة المواد',
   stages: 'إدارة المراحل',
-  graduationCandidates: 'مرشّحو الاجتياز',
+  graduationCandidates: 'الطلاب',
+  passedStudents: 'الطلاب',
   templates: 'إدارة القوالب',
   reports: 'التقارير',
   pdfAnalysis: 'تحليل ملف بالذكالي',
@@ -426,6 +428,7 @@ var ADMIN_ROUTE_LOADERS_ = {
   curriculum: function () { loadCurriculumView(); },
   stages: function () { loadStagesView(); },
   graduationCandidates: function () { loadGraduationCandidatesView(); },
+  passedStudents: function () { loadPassedStudentsView(); },
   templates: function () { loadTemplatesView(); },
   pdfAnalysis: function () { setRouteLoading('pdfAnalysis', false); pdfaiInit(); },
   'emp-profile': function () { loadEmpProfileRoute(); }
@@ -437,7 +440,8 @@ var adminCurrentRoute_ = 'dashboard';
 function activateAdminRoute(route, opts) {
   if (!ADMIN_ROUTE_TITLES_[route]) route = 'dashboard';
   document.querySelectorAll('.page-view').forEach(function (p) { p.classList.toggle('active', p.dataset.page === route); });
-  document.querySelectorAll('.nav-link[data-route]').forEach(function (l) { l.classList.toggle('active', l.dataset.route === route); });
+  var sidebarRoute = (route === 'graduationCandidates' || route === 'passedStudents') ? 'students' : route;
+  document.querySelectorAll('.nav-link[data-route]').forEach(function (l) { l.classList.toggle('active', l.dataset.route === sidebarRoute); });
   var bt = document.getElementById('breadcrumbTitle'); if (bt) bt.textContent = ADMIN_ROUTE_TITLES_[route];
   document.body.classList.remove('sidebar-open');
   adminCurrentRoute_ = route;
@@ -1170,16 +1174,21 @@ function setupStudentsFilterControls() {
 
 function updateStudentFilterCounts() {
   var setText = function (id, n) { var el = document.getElementById(id); if (el) el.textContent = n; };
-  setText('count-all', allStudentsData.length);
-  setText('count-class0', allStudentsData.filter(function (s) { return s.class0 === 'active'; }).length);
-  setText('count-class1', allStudentsData.filter(function (s) { return s.class1 === 'active'; }).length);
-  setText('count-class2', allStudentsData.filter(function (s) { return s.class2 === 'active'; }).length);
-  setText('count-class3', allStudentsData.filter(function (s) { return s.class3 === 'active'; }).length);
+  var currentStudents = allStudentsData.filter(isCurrentStudent_);
+  setText('count-all', currentStudents.length);
+  setText('count-class0', currentStudents.filter(function (s) { return s.class0 === 'active'; }).length);
+  setText('count-class1', currentStudents.filter(function (s) { return s.class1 === 'active'; }).length);
+  setText('count-class2', currentStudents.filter(function (s) { return s.class2 === 'active'; }).length);
+  setText('count-class3', currentStudents.filter(function (s) { return s.class3 === 'active'; }).length);
 
-  var remoteCount = allStudentsData.filter(isRemoteStudent_).length;
-  setText('count-mode-all', allStudentsData.length);
-  setText('count-mode-onsite', allStudentsData.length - remoteCount);
+  var remoteCount = currentStudents.filter(isRemoteStudent_).length;
+  setText('count-mode-all', currentStudents.length);
+  setText('count-mode-onsite', currentStudents.length - remoteCount);
   setText('count-mode-remote', remoteCount);
+}
+
+function isCurrentStudent_(student) {
+  return getStudentCurrentLevel(student) !== null;
 }
 
 function syncStudentModeFilterButtons_() {
@@ -1191,7 +1200,7 @@ function syncStudentModeFilterButtons_() {
 }
 
 function getFilteredStudents() {
-  var data = allStudentsData.slice();
+  var data = allStudentsData.filter(isCurrentStudent_);
   if (currentStudentFilter === 'class0') data = data.filter(function (s) { return s.class0 === 'active'; });
   else if (currentStudentFilter === 'class1') data = data.filter(function (s) { return s.class1 === 'active'; });
   else if (currentStudentFilter === 'class2') data = data.filter(function (s) { return s.class2 === 'active'; });
@@ -1378,14 +1387,67 @@ function showStudentDetailsDrawer(cpr) {
       '<div><dt>أيام الحضور</dt><dd>' + attendCount + '</dd></div>' +
       '<div><dt>الأوراد</dt><dd>' + recitCount + '</dd></div>' +
       '<div><dt>اختبارات ناجحة</dt><dd>' + passedExamsCount + '</dd></div>' +
+      '<div><dt>بطاقة الحضور</dt><dd>' + (stu.cardUrl ? '<span style="color:#2e7d32">صادرة ✓</span>' : '<span style="color:#b5262c">غير صادرة</span>') + '</dd></div>' +
     '</dl></section>';
 
   var convertLabel = isRemoteStudent_(stu) ? 'تحويل إلى حضوري' : 'تحويل إلى عن بُعد';
+  // زر البطاقة يتبدّل نصّه حسب وجودها (إصدار أول مرة/إعادة إصدار)، ويُعاد بناؤه من
+  // reissueStudentCardClick نفسها بعد النجاح (closeDrawer + إعادة فتحها) ليعكس الحالة الجديدة.
+  var cardBtnLabel = stu.cardUrl ? 'إعادة إصدار البطاقة' : 'إصدار بطاقة';
+  var cardBtnHtml = (lvl === null)
+    ? ''
+    : '<button class="secondary-button" type="button" id="drawerReissueCardBtn" onclick="reissueStudentCardClick(\'' + escapeHtml(stu.cpr) + '\')"><i data-icon="scan-qr-code"></i>' + cardBtnLabel + '</button>';
   openDrawer(stu.name, 'ملف الطالب', bodyHtml,
+    cardBtnHtml +
     '<button class="secondary-button" type="button" onclick="changeStudentStudyMode(\'' + escapeHtml(stu.cpr) + '\', true)"><i data-icon="arrow-left-right"></i>' + convertLabel + '</button>' +
     '<button class="secondary-button" type="button" onclick="closeDrawer()">إغلاق</button>',
     function () { closeDrawer(); adminPreviewStudentPage(stu.cpr); }
   );
+}
+
+// يُستدعى من زر "إصدار بطاقة"/"إعادة إصدار البطاقة" بدرج تفاصيل الطالب — يتحقق أولًا (إعادة
+// إصدار تُنشئ ملفًا جديدًا فعليًا، فنُنبّه قبل الاستبدال)، ثم يستدعي reissueStudentCard (oldJS.js)
+// التي تُولِّد البطاقة من قالب مرحلته الحالية وتكتب رابطها بالشيت. عند النجاح: يُحدَّث stu.cardUrl
+// محليًا (بلا إعادة تحميل الجدول كاملًا من الخادم) وتُعاد فتح الدرج ليعكس الحالة الجديدة فورًا.
+var reissueCardBusy_ = false;
+function reissueStudentCardClick(cpr) {
+  if (reissueCardBusy_) return;
+  var stu = findStudentByCpr(cpr);
+  if (!stu) { alertMSG('تعذّر العثور على بيانات هذا الطالب', 'error'); return; }
+
+  var isReissue = !!stu.cardUrl;
+  Swal.fire({
+    title: isReissue ? 'إعادة إصدار البطاقة؟' : 'إصدار بطاقة حضور؟',
+    text: isReissue
+      ? 'سيُستبدَل ملف البطاقة الحالي ببطاقة جديدة بنفس رمز QR (الرقم الشخصي نفسه)، ولن تعمل أي نسخة قديمة محفوظة لدى الطالب بعد ذلك.'
+      : 'سيُصدَر للطالب ملف بطاقة جديد يحمل رمز QR لتسجيل حضوره، حسب قالب مرحلته الحالية.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#b5262c',
+    confirmButtonText: isReissue ? 'إعادة الإصدار' : 'إصدار البطاقة',
+    cancelButtonText: 'إلغاء'
+  }).then(function (result) {
+    if (!result.isConfirmed) return;
+    reissueCardBusy_ = true;
+    var btn = document.getElementById('drawerReissueCardBtn');
+    if (btn) btn.disabled = true;
+    loadingStart();
+    google.script.run.withSuccessHandler(function (res) {
+      reissueCardBusy_ = false;
+      loadingEnd();
+      if (!res || !res.ok) { alertMSG(escapeHtml((res && res.message) || 'تعذّر إصدار البطاقة'), 'error'); if (btn) btn.disabled = false; return; }
+      stu.cardUrl = res.cardUrl;
+      alertMSG('تم إصدار البطاقة بنجاح', 'success');
+      closeDrawer();
+      showStudentDetailsDrawer(cpr);
+      if (typeof renderStudentsTable === 'function') renderStudentsTable();
+    }).withFailureHandler(function (err) {
+      reissueCardBusy_ = false;
+      loadingEnd();
+      if (btn) btn.disabled = false;
+      alertMSG('تعذّر إصدار البطاقة: ' + err, 'error');
+    }).reissueStudentCard(cpr);
+  });
 }
 
 /* ==========================================================================
@@ -1516,11 +1578,12 @@ function findStudentByCpr(cpr) {
   return allStudentsData.find(function (s) { return String(s.cpr) === String(cpr); }) || null;
 }
 
-function openAttendDetails(cpr) {
+function openAttendDetails(cpr, stageIndex) {
   var stu = findStudentByCpr(cpr);
   if (!stu) return;
   detailsTargetCpr = cpr;
-  document.getElementById('attendDetailsLabel').innerHTML = '<i class="fas fa-calendar-check me-1"></i> أيام حضور: ' + escapeHtml(stu.name);
+  var stageSuffix = stageIndex !== undefined && stageIndex !== null && stageIndex !== '' ? (' — ' + getLevelName(+stageIndex)) : '';
+  document.getElementById('attendDetailsLabel').innerHTML = '<i class="fas fa-calendar-check me-1"></i> أيام حضور: ' + escapeHtml(stu.name) + escapeHtml(stageSuffix);
   renderAttendDetailsBody(cpr);
   var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('attendDetailsModal'));
   modal.show();
@@ -1551,14 +1614,15 @@ function renderAttendDetailsBody(cpr) {
   }).join('');
 }
 
-function openRecitDetails(cpr) {
+function openRecitDetails(cpr, stageIndex) {
   var stu = findStudentByCpr(cpr);
   if (!stu) return;
-  var lvl = getStudentCurrentLevel(stu);
-  if (lvl === null) return;
+  var hasExplicitStage = stageIndex !== undefined && stageIndex !== null && stageIndex !== '';
+  var lvl = hasExplicitStage ? +stageIndex : getStudentCurrentLevel(stu);
+  if (lvl === null || !isFinite(lvl) || lvl < 0 || lvl > 3) return;
 
   var all = studentsRecitByCpr[cpr] || [];
-  var list = all.filter(function (r) { return r.level === lvl; });
+  var list = all.filter(function (r) { return +r.level === lvl; });
   list.sort(function (a, b) {
     var m = String(a.matn || '').localeCompare(String(b.matn || ''));
     if (m !== 0) return m;
@@ -1634,15 +1698,16 @@ function renderRecitChecklist(container, breakdown) {
     '</div>' + groupsHtml;
 }
 
-function openExamDetails(cpr) {
+function openExamDetails(cpr, stageIndex) {
   var stu = findStudentByCpr(cpr);
   if (!stu) return;
-  var lvl = getStudentCurrentLevel(stu);
-  if (lvl === null) return;
+  var hasExplicitStage = stageIndex !== undefined && stageIndex !== null && stageIndex !== '';
+  var lvl = hasExplicitStage ? +stageIndex : getStudentCurrentLevel(stu);
+  if (lvl === null || !isFinite(lvl) || lvl < 0 || lvl > 3) return;
 
   var all = studentsAnswersByCpr[cpr] || [];
-  var passed = all.filter(function (a) { return a.level === lvl && a.rate !== 'راسب' && a.rate !== '' && a.rate !== undefined && a.rate !== null; });
-  var failed = all.filter(function (a) { return a.level === lvl && a.rate === 'راسب'; });
+  var passed = all.filter(function (a) { return +a.level === lvl && a.rate !== 'راسب' && a.rate !== '' && a.rate !== undefined && a.rate !== null; });
+  var failed = all.filter(function (a) { return +a.level === lvl && a.rate === 'راسب'; });
   passed.sort(function (a, b) { return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(); });
   failed.sort(function (a, b) { return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(); });
 
@@ -2091,6 +2156,32 @@ function refreshAttendDatePicker(dedupedRecords) {
   }
 }
 
+// مرحلة صف الحضور/الطلب: قيمة السجل نفسه إن وُجدت (0..3)، وإلا مرحلة الطالب الفعّالة حاليًا، وإلا null
+function attendResolveLevel_(recordLevel, person) {
+  if (recordLevel !== null && recordLevel !== undefined && recordLevel !== '' && !isNaN(+recordLevel) && +recordLevel >= 0 && +recordLevel <= 3) return +recordLevel;
+  return person ? getStudentCurrentLevel(person) : null;
+}
+
+// أيقونة "عن بُعد" بجوار خلية الاسم — للطلاب عن بُعد فقط (الحضوري هو الأصل فلا تُكرَّر على كل صف)
+function attendPersonWithModeHtml_(personHtml, person) {
+  if (!isRemoteStudent_(person)) return personHtml;
+  return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">' + personHtml +
+    '<span class="soft-badge blue tiny students-mode-badge" title="يدرس عن بُعد" aria-label="يدرس عن بُعد"><i data-icon="globe"></i></span></div>';
+}
+
+// طلبات الحضور تُفتح أيضًا من صفحة المتعاون (emp.html) حيث لم تُحمَّل بيانات الطلاب بعد
+function ensureAttendPersonsLoaded_(done) {
+  if (attendPersonsData_ !== null) { done(); return; }
+  google.script.run.withSuccessHandler(function (data) {
+    if (attendPersonsData_ === null) {
+      attendPersonsData_ = Array.isArray(data) ? data : [];
+      attendPersonsMap_ = {};
+      attendPersonsData_.forEach(function (p) { attendPersonsMap_[p.cpr] = p; });
+    }
+    done();
+  }).withFailureHandler(function () { done(); }).getPersons();
+}
+
 function renderAttendanceAdminTable() {
   if (attendPersonsData_ === null) return; // لم يصل getPersons() بعد
   var tbody = document.getElementById('attendRowsContainer');
@@ -2156,7 +2247,8 @@ function renderAttendanceAdminTable() {
   var rows = pageData.map(function (e, iOnPage) {
     var i = startIdx + iOnPage;
     var person = attendPersonsMap_[e.cpr] || null;
-    var lvl = person ? getStudentCurrentLevel(person) : null;
+    // مرحلة السجل نفسه (المحفوظة وقت التحضير) أولًا، ثم مرحلة الطالب الحالية للسجلات القديمة بلا مرحلة
+    var lvl = attendResolveLevel_(e.level, person);
     var cprStr = escapeHtml(e.cpr);
     var phoneStr = person && person.phone ? escapeHtml(person.phone) : '';
 
@@ -2176,7 +2268,7 @@ function renderAttendanceAdminTable() {
 
     return '<tr>' +
       '<td data-label="#">' + (i + 1) + '</td>' +
-      '<td>' + personCellHtml(e.name, cprStr) + '</td>' +
+      '<td>' + attendPersonWithModeHtml_(personCellHtml(e.name, cprStr), person) + '</td>' +
       '<td data-label="المرحلة">' + stageHtml + '</td>' +
       '<td data-label="وقت الحضور">' + escapeHtml(formatDateAr(e.date)) + ' — ' + escapeHtml(formatTimeOnly(e.date)) + '</td>' +
       '<td data-label="طريقة التسجيل">' + methodHtml + '</td>' +
@@ -2240,6 +2332,14 @@ var attendReqSelected_ = {}; // key: "cpr_date" -> {cpr, date}
 
 function attendReqKey(item) { return item.cpr + '_' + item.date; }
 
+// عدّاد الطلبات المعلَّقة على زر "طلبات الحضور" بصفحة المتعاون (emp.html) — لا أثر بلوحة الإدارة
+function setEmpAttendReqCount(n) {
+  var el = document.getElementById('empAttendReqCount');
+  if (!el) return;
+  el.textContent = n;
+  el.classList.toggle('d-none', !n);
+}
+
 function openAttendanceRequestsModal() {
   attendReqCache_ = null;
   attendReqSelected_ = {};
@@ -2274,9 +2374,14 @@ function fetchAttendanceRequests() {
   var wrap = document.getElementById('attendReqTableWrap');
   if (wrap) wrap.innerHTML = '<p class="empty-note">جاري التحميل...</p>';
   google.script.run.withSuccessHandler(function (data) {
-    attendReqCache_ = Array.isArray(data) ? data : [];
-    attendReqSelected_ = {};
-    renderAttendanceRequestsTable();
+    var list = Array.isArray(data) ? data : [];
+    setEmpAttendReqCount(list.length);
+    // نحتاج بيانات الطلاب لمعرفة المرحلة الاحتياطية ونمط الدراسة قبل أول عرض للجدول
+    ensureAttendPersonsLoaded_(function () {
+      attendReqCache_ = list;
+      attendReqSelected_ = {};
+      renderAttendanceRequestsTable();
+    });
   }).withFailureHandler(function (err) {
     if (wrap) wrap.innerHTML = '<p class="empty-note" style="color:var(--danger)">تعذّر تحميل طلبات الحضور: ' + err + '</p>';
   }).getAttendanceRequests();
@@ -2288,7 +2393,11 @@ function computeAttendanceRequestsRows() {
   list.sort(function (a, b) {
     var va, vb;
     if (field === 'name') { va = a.name || ''; vb = b.name || ''; return dir === 'desc' ? vb.localeCompare(va, 'ar') : va.localeCompare(vb, 'ar'); }
-    if (field === 'level') { va = +a.level || 0; vb = +b.level || 0; return dir === 'desc' ? vb - va : va - vb; }
+    if (field === 'level') {
+      va = attendResolveLevel_(a.level, attendPersonsMap_[a.cpr]); vb = attendResolveLevel_(b.level, attendPersonsMap_[b.cpr]);
+      va = va === null ? -1 : va; vb = vb === null ? -1 : vb;
+      return dir === 'desc' ? vb - va : va - vb;
+    }
     va = new Date(a.date).getTime() || 0; vb = new Date(b.date).getTime() || 0;
     return dir === 'desc' ? vb - va : va - vb;
   });
@@ -2320,10 +2429,13 @@ function renderAttendanceRequestsTable() {
     var checked = !!attendReqSelected_[key];
     var d = new Date(r.date);
     var dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString('ar-BH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : escapeHtml(r.date);
-    var stageHtml = (r.level !== null && r.level !== undefined) ? stageBadgeHtml(+r.level) : '<span style="color:#b7bec5">—</span>';
+    var person = attendPersonsMap_[r.cpr] || null;
+    var rLvl = attendResolveLevel_(r.level, person);
+    var stageHtml = rLvl !== null ? stageBadgeHtml(rLvl) : '<span style="color:#b7bec5">—</span>';
+    var modeIcon = isRemoteStudent_(person) ? ' <span class="soft-badge blue tiny students-mode-badge" title="يدرس عن بُعد" aria-label="يدرس عن بُعد"><i data-icon="globe"></i></span>' : '';
     return '<tr><td><input type="checkbox" class="attend-req-row-check" data-key="' + escapeHtml(key) + '"' + (checked ? ' checked' : '') + '></td>' +
       '<td>' + escapeHtml(dateStr) + '</td>' +
-      '<td>' + escapeHtml(r.name) + '</td>' +
+      '<td>' + escapeHtml(r.name) + modeIcon + '</td>' +
       '<td>' + stageHtml + '</td>' +
       '<td class="reason-cell">' + escapeHtml(r.reason || '—') + '</td></tr>';
   }).join('');
@@ -2394,7 +2506,9 @@ function submitAttendanceRequestsDecision(action) {
       alertMSG(isAccept ? 'تم قبول الطلبات المحدَّدة' : 'تم رفض الطلبات المحدَّدة', 'success');
       attendReqSelected_ = {};
       fetchAttendanceRequests();
-      loadAttendanceView(); // تحديث جدول الحضور الرئيسي وإحصائياته فورًا بعد القبول/الرفض
+      // تحديث جدول الحضور الرئيسي وإحصائياته فورًا بعد القبول/الرفض — بلوحة الإدارة فقط؛ صفحة
+      // المتعاون (emp.html، صلاحية "تحضير") لا تحوي جدول الحضور أصلًا.
+      if (document.getElementById('appAdminAttendancePanel')) loadAttendanceView();
     };
     var onFail = function (err) {
       [acceptBtn, rejectBtn].forEach(function (b) { if (b) b.disabled = false; });
@@ -3517,7 +3631,8 @@ function deleteLectureConfirm(id) {
    الأربعة بنفس مزايا باقي جداول لوحة الإدارة (بحث/فرز/ترقيم صفحات — renderPagination/
    updateSortIndicator العامّتان القائمتان، بنفس نمط جدول المحاضرات).
    ========================================================================== */
-var curriculumData_ = { subjects: [], curricula: [], matnCatalog: [], madhabs: [], awrad: [] };
+var curriculumData_ = { subjects: [], curricula: [], matnCatalog: [], madhabs: [], awrad: [], skills: [] };
+var CURRICULUM_ENTITIES_ = ['subjects', 'curricula', 'matnCatalog', 'madhabs', 'awrad', 'skills'];
 var curriculumActiveTab_ = 'subjects';
 var curriculumControlsBound_ = false;
 var curriculumModalEntity_ = '';
@@ -3530,35 +3645,36 @@ var matnsSubjectFilter_ = 'all';
 // تضم مقررات ومتونًا معًا بلا أي تبعية بينهما، بطلب صريح من المستخدم. راجع تعليق
 // getMatnCatalogList بdataGet.js للتفصيل الكامل، ولماذا اسم الشيت matnCatalog لا matns
 // (المحجوز فعليًا لشيت الأوراد الحقيقي).
-var CURRICULUM_PANEL_IDS_ = { subjects: 'curriculumSubjectsPanel', curricula: 'curriculumCurriculaPanel', matnCatalog: 'curriculumMatnsPanel', madhabs: 'curriculumMadhabsPanel', awrad: 'curriculumAwradPanel' };
-var CURRICULUM_LABELS_ = { subjects: 'مادة', curricula: 'مقرر', matnCatalog: 'متن', madhabs: 'مذهب', awrad: 'وِرد' };
+var CURRICULUM_PANEL_IDS_ = { subjects: 'curriculumSubjectsPanel', curricula: 'curriculumCurriculaPanel', matnCatalog: 'curriculumMatnsPanel', madhabs: 'curriculumMadhabsPanel', awrad: 'curriculumAwradPanel', skills: 'curriculumSkillsPanel' };
+var CURRICULUM_LABELS_ = { subjects: 'مادة', curricula: 'مقرر', matnCatalog: 'متن', madhabs: 'مذهب', awrad: 'وِرد', skills: 'مهارة' };
 // المقررات = شيت curricula البسيط (اسم/وصف/مادة). الأوراد مربوطة بشيت matns الحقيقي
 // مباشرة (الأوراد مبنية على المتون، وليست هي نفسها المتون أو المقررات)
-var CURRICULUM_GET_FN_ = { subjects: 'getSubjectsList', curricula: 'getCurriculaList', matnCatalog: 'getMatnCatalogList', madhabs: 'getMadhabsList', awrad: 'getMatns' };
-var CURRICULUM_SAVE_FN_ = { subjects: 'saveSubject', curricula: 'saveCurriculum', matnCatalog: 'saveMatnCatalog', madhabs: 'saveMadhab', awrad: 'saveMatnsItem' };
-var CURRICULUM_DELETE_FN_ = { subjects: 'deleteSubject', curricula: 'deleteCurriculum', matnCatalog: 'deleteMatnCatalog', madhabs: 'deleteMadhab', awrad: 'deleteMatnsItem' };
-var CURRICULUM_SEARCH_INPUT_ID_ = { subjects: 'subjects-search-input', curricula: 'curricula-search-input', matnCatalog: 'matns-search-input', madhabs: 'madhabs-search-input', awrad: 'awrad-search-input' };
-var CURRICULUM_TABLE_ID_ = { subjects: 'subjectsTable', curricula: 'curriculaTable', matnCatalog: 'matnsTable', madhabs: 'madhabsTable', awrad: 'awradTable' };
-var CURRICULUM_ROWS_ID_ = { subjects: 'subjectsRows', curricula: 'curriculaRows', matnCatalog: 'matnsRows', madhabs: 'madhabsRows', awrad: 'awradRows' };
-var CURRICULUM_PAGINATION_ID_ = { subjects: 'subjectsPagination', curricula: 'curriculaPagination', matnCatalog: 'matnsPagination', madhabs: 'madhabsPagination', awrad: 'awradPagination' };
-var CURRICULUM_VISIBLE_COUNT_ID_ = { subjects: 'subjects-visible-count', curricula: 'curricula-visible-count', matnCatalog: 'matns-visible-count', madhabs: 'madhabs-visible-count', awrad: 'awrad-visible-count' };
-var CURRICULUM_PAGE_SIZE_SELECT_ID_ = { subjects: 'subjects-page-size', curricula: 'curricula-page-size', matnCatalog: 'matns-page-size', madhabs: 'madhabs-page-size', awrad: 'awrad-page-size' };
-var CURRICULUM_REFRESH_BTN_ID_ = { subjects: 'refreshSubjectsBtn', curricula: 'refreshCurriculaBtn', matnCatalog: 'refreshMatnsBtn', madhabs: 'refreshMadhabsBtn', awrad: 'refreshAwradBtn' };
-var CURRICULUM_EMPTY_COLSPAN_ = { subjects: 4, curricula: 5, matnCatalog: 6, madhabs: 4, awrad: 10 };
+var CURRICULUM_GET_FN_ = { subjects: 'getSubjectsList', curricula: 'getCurriculaList', matnCatalog: 'getMatnCatalogList', madhabs: 'getMadhabsList', awrad: 'getMatns', skills: 'getSkillsList' };
+var CURRICULUM_SAVE_FN_ = { subjects: 'saveSubject', curricula: 'saveCurriculum', matnCatalog: 'saveMatnCatalog', madhabs: 'saveMadhab', awrad: 'saveMatnsItem', skills: 'saveSkill' };
+var CURRICULUM_DELETE_FN_ = { subjects: 'deleteSubject', curricula: 'deleteCurriculum', matnCatalog: 'deleteMatnCatalog', madhabs: 'deleteMadhab', awrad: 'deleteMatnsItem', skills: 'deleteSkill' };
+var CURRICULUM_SEARCH_INPUT_ID_ = { subjects: 'subjects-search-input', curricula: 'curricula-search-input', matnCatalog: 'matns-search-input', madhabs: 'madhabs-search-input', awrad: 'awrad-search-input', skills: 'skills-search-input' };
+var CURRICULUM_TABLE_ID_ = { subjects: 'subjectsTable', curricula: 'curriculaTable', matnCatalog: 'matnsTable', madhabs: 'madhabsTable', awrad: 'awradTable', skills: 'skillsTable' };
+var CURRICULUM_ROWS_ID_ = { subjects: 'subjectsRows', curricula: 'curriculaRows', matnCatalog: 'matnsRows', madhabs: 'madhabsRows', awrad: 'awradRows', skills: 'skillsRows' };
+var CURRICULUM_PAGINATION_ID_ = { subjects: 'subjectsPagination', curricula: 'curriculaPagination', matnCatalog: 'matnsPagination', madhabs: 'madhabsPagination', awrad: 'awradPagination', skills: 'skillsPagination' };
+var CURRICULUM_VISIBLE_COUNT_ID_ = { subjects: 'subjects-visible-count', curricula: 'curricula-visible-count', matnCatalog: 'matns-visible-count', madhabs: 'madhabs-visible-count', awrad: 'awrad-visible-count', skills: 'skills-visible-count' };
+var CURRICULUM_PAGE_SIZE_SELECT_ID_ = { subjects: 'subjects-page-size', curricula: 'curricula-page-size', matnCatalog: 'matns-page-size', madhabs: 'madhabs-page-size', awrad: 'awrad-page-size', skills: 'skills-page-size' };
+var CURRICULUM_REFRESH_BTN_ID_ = { subjects: 'refreshSubjectsBtn', curricula: 'refreshCurriculaBtn', matnCatalog: 'refreshMatnsBtn', madhabs: 'refreshMadhabsBtn', awrad: 'refreshAwradBtn', skills: 'refreshSkillsBtn' };
+var CURRICULUM_EMPTY_COLSPAN_ = { subjects: 4, curricula: 5, matnCatalog: 6, madhabs: 4, awrad: 10, skills: 5 };
 
 var curriculumTableState_ = {
   subjects: { sortField: 'name', sortDir: 'asc', page: 1, pageSize: 50 },
   curricula: { sortField: 'name', sortDir: 'asc', page: 1, pageSize: 50 },
   matnCatalog: { sortField: 'name', sortDir: 'asc', page: 1, pageSize: 50 },
   madhabs: { sortField: 'name', sortDir: 'asc', page: 1, pageSize: 50 },
-  awrad: { sortField: 'matn', sortDir: 'asc', page: 1, pageSize: 50 }
+  awrad: { sortField: 'matn', sortDir: 'asc', page: 1, pageSize: 50 },
+  skills: { sortField: 'name', sortDir: 'asc', page: 1, pageSize: 50 }
 };
 
 function loadCurriculumView() {
   setRouteLoading('curriculum', true);
   setupCurriculumControls();
 
-  var pending = 5;
+  var pending = CURRICULUM_ENTITIES_.length;
   function tryDone() {
     pending--;
     if (pending <= 0) {
@@ -3569,7 +3685,7 @@ function loadCurriculumView() {
     }
   }
 
-  ['subjects', 'curricula', 'matnCatalog', 'madhabs', 'awrad'].forEach(function (entity) {
+  CURRICULUM_ENTITIES_.forEach(function (entity) {
     google.script.run.withSuccessHandler(function (rows) {
       curriculumData_[entity] = Array.isArray(rows) ? rows : []; tryDone();
     }).withFailureHandler(function (err) {
@@ -3599,7 +3715,7 @@ function refreshCurriculumEntity(entity, silent) {
 }
 
 function updateCurriculumOverview_() {
-  ['subjects', 'curricula', 'matnCatalog', 'madhabs', 'awrad'].forEach(function (entity) {
+  CURRICULUM_ENTITIES_.forEach(function (entity) {
     var count = document.getElementById('curriculumCount-' + entity);
     if (count) count.textContent = (curriculumData_[entity] || []).length;
   });
@@ -3669,6 +3785,8 @@ function setupCurriculumControls() {
   if (addMadhabBtn) addMadhabBtn.addEventListener('click', function () { openCurriculumItemModal('madhabs', null); });
   var addAwradBtn = document.getElementById('addAwradBtn');
   if (addAwradBtn) addAwradBtn.addEventListener('click', function () { openCurriculumItemModal('awrad', null); });
+  var addSkillBtn = document.getElementById('addSkillBtn');
+  if (addSkillBtn) addSkillBtn.addEventListener('click', function () { openCurriculumItemModal('skills', null); });
 
   var awradStageGroup = document.getElementById('awradStageFilterGroup');
   if (awradStageGroup) awradStageGroup.addEventListener('click', function (e) {
@@ -3702,7 +3820,7 @@ function setupCurriculumControls() {
     renderCurriculumTab('matnCatalog');
   });
 
-  ['subjects', 'curricula', 'matnCatalog', 'madhabs', 'awrad'].forEach(function (entity) {
+  CURRICULUM_ENTITIES_.forEach(function (entity) {
     var refreshBtn = document.getElementById(CURRICULUM_REFRESH_BTN_ID_[entity]);
     if (refreshBtn) refreshBtn.addEventListener('click', function () { refreshCurriculumEntity(entity); });
 
@@ -3767,7 +3885,7 @@ function initMazhabChangeToggle() {
     var next = toggle.checked;
     google.script.run.withSuccessHandler(function () {
       updateMazhabChangeToggleLabel(next);
-      alertMSG(next ? 'أصبح بإمكان الطلاب اختيار/تغيير مذهبهم الفقهي' : 'أُغلق تغيير المذهب الفقهي للطلاب (الاختيار الأول لمن لم يختر بعد يبقى متاحًا)', 'success');
+      alertMSG(next ? 'أصبح بإمكان الطلاب اختيار/تغيير مذهبهم الفقهي' : 'أُغلق تسجيل المذهب الفقهي وتغييره للطلاب', 'success');
     }).withFailureHandler(function (err) {
       toggle.checked = !next;
       alertMSG('تعذّر تحديث حالة تغيير المذهب: ' + err, 'error');
@@ -3900,6 +4018,7 @@ function renderCurriculumTab(tab) {
     tbody.innerHTML = pageRows.map(function (matn) { return matnCatalogRowHtml(matn, awradCountsByMatn); }).join('');
   }
   else if (tab === 'awrad') tbody.innerHTML = pageRows.map(awradRowHtml).join('');
+  else if (tab === 'skills') tbody.innerHTML = pageRows.map(skillRowHtml).join('');
   else tbody.innerHTML = pageRows.map(madhabRowHtml).join('');
 
   refreshIcons();
@@ -3939,6 +4058,20 @@ function curriculumRowHtml(r) {
   return '<tr><td data-label="المقرر">' + curriculumEntityCellHtml_('scroll-text', 'blue', r.name, 'مقرر علمي') + '</td>' +
     '<td data-label="المادة"><span class="academic-relation"><i data-icon="book-open-check"></i>' + escapeHtml(subjectName) + '</span></td>' +
     '<td data-label="المرحلة">' + levelsHtml + '</td><td data-label="الوصف"><span class="academic-description">' + escapeHtml(r.description || '—') + '</span></td>' + curriculumRowActionsHtml('curricula', r.id) + '</tr>';
+}
+
+// صف "مهارة" — نفس بنية المقرر (اسم/مادة اختيارية/مراحل/وصف).
+function skillRowHtml(r) {
+  var subjectsById = {};
+  curriculumData_.subjects.forEach(function (s) { subjectsById[s.id] = s.name; });
+  var subjectName = r.subjectId && subjectsById[r.subjectId] ? subjectsById[r.subjectId] : '—';
+  var levels = String(r.level || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  var levelsHtml = levels.length
+    ? levels.map(function (lv) { var idx = LECTURE_STAGE_LABELS_.indexOf(lv); return idx > -1 ? stageBadgeHtml(idx) : escapeHtml(lv); }).join(' ')
+    : '<span style="color:#b7bec5">—</span>';
+  return '<tr><td data-label="المهارة">' + curriculumEntityCellHtml_('lightbulb', 'purple', r.name, 'مهارة علمية') + '</td>' +
+    '<td data-label="المادة"><span class="academic-relation"><i data-icon="book-open-check"></i>' + escapeHtml(subjectName) + '</span></td>' +
+    '<td data-label="المرحلة">' + levelsHtml + '</td><td data-label="الوصف"><span class="academic-description">' + escapeHtml(r.description || '—') + '</span></td>' + curriculumRowActionsHtml('skills', r.id) + '</tr>';
 }
 
 // صف "متن" — مفهوم منفصل تمامًا عن "مقرر" أعلاه (لا تبعية بينهما، كلاهما تابع لمادة مباشرة
@@ -4035,7 +4168,7 @@ function openCurriculumItemModal(entity, id) {
       '<div class="warning-note" id="curriculumItemError" hidden><i data-icon="triangle-alert"></i><span></span></div>';
   } else {
     var stagesFieldHtml = '';
-    if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs') {
+    if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs' || entity === 'skills') {
       // نفس أسلوب اختيار مرحلة المحاضرة بالضبط (.choice-grid من أزرار .staff-perm-btn قابلة
       // للتفعيل المتعدد) — بطلب صريح من المستخدم، مادة/مقرر/متن/مذهب واحد قد يخص أكثر من مرحلة معًا.
       // بالنسبة للمذاهب تحديدًا: هذه المرحلة/المراحل هي ما يُحدِّد (بوابة الطالب،
@@ -4049,7 +4182,7 @@ function openCurriculumItemModal(entity, id) {
     }
 
     var subjectFieldHtml = '';
-    if (entity === 'curricula' || entity === 'matnCatalog') {
+    if (entity === 'curricula' || entity === 'matnCatalog' || entity === 'skills') {
       var curriculumSubjectOptions;
       if (entity === 'matnCatalog') {
         // المواد المعروضة هنا تتبع المرحلة/المراحل المختارة أعلاه (راجع matnSubjectOptionsHtml_
@@ -4080,7 +4213,7 @@ function openCurriculumItemModal(entity, id) {
 
   openActionModal(rec ? ('تعديل ' + label) : ('إضافة ' + label), 'إدارة المواد', bodyHtml, footerHtml);
 
-  if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs') {
+  if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs' || entity === 'skills') {
     var stagesGroup = document.getElementById('curriculumStagesGroup');
     if (stagesGroup) stagesGroup.addEventListener('click', function (e) {
       var btn = e.target.closest('.staff-perm-btn');
@@ -4122,12 +4255,12 @@ function saveCurriculumItemModal() {
     if (!name) { errBox.hidden = false; errBox.querySelector('span').textContent = 'الاسم مطلوب'; return; }
     item.name = name;
     item.description = document.getElementById('curriculumItemDescription').value.trim();
-    if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs') {
+    if (entity === 'subjects' || entity === 'curricula' || entity === 'matnCatalog' || entity === 'madhabs' || entity === 'skills') {
       var activeStages = [];
       document.querySelectorAll('#curriculumStagesGroup .staff-perm-btn.active').forEach(function (btn) { activeStages.push(btn.getAttribute('data-stage')); });
       item.level = activeStages.join(',');
     }
-    if (entity === 'curricula' || entity === 'matnCatalog') {
+    if (entity === 'curricula' || entity === 'matnCatalog' || entity === 'skills') {
       var subjectSel = document.getElementById('curriculumItemSubject');
       item.subjectId = subjectSel ? subjectSel.value : '';
     }
@@ -5340,7 +5473,7 @@ function graduationCriterionCellHtml_(candidate, key) {
   var hasPercent = c && typeof c.percent === 'number';
   var color = hasPercent ? (c.met ? 'var(--green, #1a9e5c)' : 'var(--danger, #dc3545)') : '#b7bec5';
   var text = hasPercent ? (c.percent + '%') : '—';
-  return '<td><button class="text-button" type="button" style="color:' + color + ';font-weight:600;" onclick="' + fn + '(\'' + cprAttr + '\')">' + text + '</button>' + (c && c.isMandatory ? ' <small>(إلزامي)</small>' : '') + '</td>';
+  return '<td><button class="text-button" type="button" style="color:' + color + ';font-weight:600;" onclick="' + fn + '(\'' + cprAttr + '\',' + (+candidate.stageIndex) + ')">' + text + '</button>' + (c && c.isMandatory ? ' <small>(إلزامي)</small>' : '') + '</td>';
 }
 
 function renderGraduationCandidatesTable_() {
@@ -5675,6 +5808,237 @@ function openStageCertificateIssueModal_(checked, templateBody) {
   });
 }
 
+/* ========================================================================== 
+   تبويب "مجتازون" — سجل كل شهادة اجتياز مرحلة صادرة رسميًا. الطالب قد يظهر في أكثر من صف
+   إذا اجتاز أكثر من مرحلة؛ المفتاح دائمًا (الرقم الشخصي + المرحلة).
+   ========================================================================== */
+var passedStudentsControlsBound_ = false;
+var passedStudentsData_ = [];
+var passedStudentsStageFilter_ = 'all';
+var passedStudentsGenderFilter_ = 'all';
+var passedStudentsPage_ = 1;
+var passedStudentsPageSize_ = 50;
+var passedStudentsSortField_ = 'issuedAt';
+var passedStudentsSortDir_ = 'desc';
+
+function loadPassedStudentsView() {
+  if (!passedStudentsControlsBound_) {
+    passedStudentsControlsBound_ = true;
+    setupPassedStudentsControls_();
+  }
+  setRouteLoading('passedStudents', true);
+  google.script.run.withSuccessHandler(function (rows) {
+    if (rows && rows.error) {
+      alertMSG(rows.message || 'تعذّر تحميل المجتازين', 'error');
+      rows = [];
+    }
+    passedStudentsData_ = Array.isArray(rows) ? rows : [];
+    passedStudentsPage_ = 1;
+    renderPassedStudentsTable_();
+    setRouteLoading('passedStudents', false);
+  }).withFailureHandler(function (err) {
+    console.error('تعذّر تحميل المجتازين', err);
+    var tbody = document.getElementById('passedStudentsRows');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">تعذّر تحميل سجل المجتازين</td></tr>';
+    setRouteLoading('passedStudents', false);
+  }).getPassedStudents(getCurrentUserCpr());
+
+  // تجهيز خرائط التفاصيل بالتوازي حتى تعمل أرقام الحضور والاختبارات والتسميع عند الضغط عليها.
+  ensureStudentDetailMapsLoaded_(function () {});
+}
+
+function setupPassedStudentsControls_() {
+  var refreshBtn = document.getElementById('refreshPassedStudentsBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', loadPassedStudentsView);
+  var exportBtn = document.getElementById('exportPassedStudentsBtn');
+  if (exportBtn) exportBtn.addEventListener('click', exportPassedStudentsToExcel_);
+
+  var stageGroup = document.getElementById('passedStageFilterGroup');
+  if (stageGroup) stageGroup.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-filter]');
+    if (!btn) return;
+    stageGroup.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
+    passedStudentsStageFilter_ = btn.getAttribute('data-filter');
+    passedStudentsPage_ = 1;
+    renderPassedStudentsTable_();
+  });
+
+  var genderGroup = document.getElementById('passedGenderFilterGroup');
+  if (genderGroup) genderGroup.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-filter]');
+    if (!btn) return;
+    genderGroup.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
+    passedStudentsGenderFilter_ = btn.getAttribute('data-filter');
+    passedStudentsPage_ = 1;
+    renderPassedStudentsTable_();
+  });
+
+  var search = document.getElementById('passedStudentsSearchInput');
+  if (search) search.addEventListener('input', function () { passedStudentsPage_ = 1; renderPassedStudentsTable_(); });
+
+  var pageSize = document.getElementById('passedStudents-page-size');
+  if (pageSize) pageSize.addEventListener('change', function () {
+    passedStudentsPageSize_ = pageSize.value === 'all' ? 'all' : (parseInt(pageSize.value, 10) || 50);
+    passedStudentsPage_ = 1;
+    renderPassedStudentsTable_();
+  });
+
+  var table = document.getElementById('passedStudentsTable');
+  if (table) table.querySelectorAll('th[data-sort]').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var field = th.getAttribute('data-sort');
+      if (passedStudentsSortField_ === field) passedStudentsSortDir_ = passedStudentsSortDir_ === 'asc' ? 'desc' : 'asc';
+      else {
+        passedStudentsSortField_ = field;
+        passedStudentsSortDir_ = field === 'name' || field === 'stageIndex' ? 'asc' : 'desc';
+      }
+      passedStudentsPage_ = 1;
+      updateSortIndicator('passedStudentsTable', passedStudentsSortField_, passedStudentsSortDir_);
+      renderPassedStudentsTable_();
+    });
+  });
+}
+
+function updatePassedStudentsStageCounts_() {
+  var setText = function (id, count) { var el = document.getElementById(id); if (el) el.textContent = count; };
+  setText('passedStageCount-all', passedStudentsData_.length);
+  [0, 1, 2, 3].forEach(function (stageIndex) {
+    setText('passedStageCount-' + stageIndex, passedStudentsData_.filter(function (row) { return +row.stageIndex === stageIndex; }).length);
+  });
+}
+
+function getFilteredPassedStudents_() {
+  var rows = passedStudentsData_.slice();
+  if (passedStudentsStageFilter_ !== 'all') rows = rows.filter(function (row) { return String(row.stageIndex) === passedStudentsStageFilter_; });
+  if (passedStudentsGenderFilter_ !== 'all') rows = rows.filter(function (row) { return row.gender === passedStudentsGenderFilter_; });
+  var input = document.getElementById('passedStudentsSearchInput');
+  var q = input ? String(input.value || '').trim().toLowerCase() : '';
+  if (q) rows = rows.filter(function (row) {
+    return String(row.name || '').toLowerCase().indexOf(q) !== -1 || String(row.cpr || '').toLowerCase().indexOf(q) !== -1;
+  });
+
+  var field = passedStudentsSortField_;
+  var dir = passedStudentsSortDir_ === 'desc' ? -1 : 1;
+  rows.sort(function (a, b) {
+    var av, bv;
+    if (field === 'issuedAt') {
+      av = new Date(a.issuedAt || 0).getTime(); bv = new Date(b.issuedAt || 0).getTime();
+    } else if (field === 'stageIndex') {
+      av = +a.stageIndex; bv = +b.stageIndex;
+    } else if (GRAD_NUMERIC_SORT_FIELDS_.indexOf(field) !== -1) {
+      av = field === 'mandatoryAvg' ? getGraduationCandidateMandatoryAverage(a) : getGraduationCandidateCriterionPercent(a, field);
+      bv = field === 'mandatoryAvg' ? getGraduationCandidateMandatoryAverage(b) : getGraduationCandidateCriterionPercent(b, field);
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+    } else {
+      return String(a[field] || '').localeCompare(String(b[field] || ''), 'ar') * dir;
+    }
+    return (av - bv) * dir;
+  });
+  return rows;
+}
+
+function passedCriterionCellHtml_(row, key) {
+  var criterion = (row.criteria || []).find(function (item) { return item.criterionKey === key; });
+  var hasPercent = criterion && typeof criterion.percent === 'number';
+  var color = hasPercent ? 'var(--green,#1a9e5c)' : '#b7bec5';
+  var text = hasPercent ? criterion.percent + '%' : '—';
+  return '<td><button class="text-button" type="button" style="color:' + color + ';font-weight:600;" onclick="openPassedStudentMetric_(\'' + key + '\',\'' + escapeHtml(row.cpr) + '\',' + (+row.stageIndex) + ')">' + text + '</button></td>';
+}
+
+function openPassedStudentMetric_(key, cpr, stageIndex) {
+  var fn = GRAD_CRITERION_DETAIL_FN_[key];
+  if (!fn || typeof window[fn] !== 'function') return;
+  ensureStudentDetailMapsLoaded_(function () { window[fn](cpr, stageIndex); });
+}
+
+function renderPassedStudentsTable_() {
+  var tbody = document.getElementById('passedStudentsRows');
+  if (!tbody) return;
+  updatePassedStudentsStageCounts_();
+  updateSortIndicator('passedStudentsTable', passedStudentsSortField_, passedStudentsSortDir_);
+  var fullData = getFilteredPassedStudents_();
+  var count = document.getElementById('passedStudents-visible-count');
+  if (count) count.textContent = fullData.length;
+
+  var showAll = passedStudentsPageSize_ === 'all';
+  var effectivePageSize = showAll ? Math.max(fullData.length, 1) : passedStudentsPageSize_;
+  renderPagination('passedStudentsPagination', fullData.length, effectivePageSize, passedStudentsPage_, function (page) {
+    passedStudentsPage_ = page; renderPassedStudentsTable_();
+  });
+
+  if (!fullData.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">لا يوجد طلاب مجتازون مطابقون</td></tr>';
+    return;
+  }
+
+  var totalPages = showAll ? 1 : Math.max(1, Math.ceil(fullData.length / passedStudentsPageSize_));
+  if (passedStudentsPage_ > totalPages) passedStudentsPage_ = totalPages;
+  var pageRows = showAll ? fullData : fullData.slice((passedStudentsPage_ - 1) * passedStudentsPageSize_, passedStudentsPage_ * passedStudentsPageSize_);
+  tbody.innerHTML = pageRows.map(function (row) {
+    var average = getGraduationCandidateMandatoryAverage(row);
+    var certLink = row.certificateUrl
+      ? '<a class="secondary-button" href="' + escapeHtml(row.certificateUrl) + '" target="_blank" rel="noopener" data-issued-file><i data-icon="file-check-2"></i>الشهادة</a>'
+      : '';
+    return '<tr>' +
+      '<td>' + personCellHtml(row.name, row.cpr, null, row.avatarUrl) + '</td>' +
+      '<td>' + stageBadgeHtml(+row.stageIndex) + '</td>' +
+      passedCriterionCellHtml_(row, 'attendance') +
+      passedCriterionCellHtml_(row, 'examPassRate') +
+      passedCriterionCellHtml_(row, 'recitationRate') +
+      '<td><strong>' + (typeof average === 'number' ? average + '%' : '—') + '</strong></td>' +
+      '<td>' + escapeHtml(formatDateAr(row.issuedAt)) + '</td>' +
+      '<td><div class="passed-stage-actions">' + certLink + '<button class="secondary-button" type="button" onclick="showPassedStageDetails_(\'' + escapeHtml(row.cpr) + '\',' + (+row.stageIndex) + ')"><i data-icon="panel-left-open"></i>التفاصيل</button></div></td>' +
+      '</tr>';
+  }).join('');
+  refreshIcons();
+}
+
+function showPassedStageDetails_(cpr, stageIndex) {
+  var row = passedStudentsData_.find(function (item) { return String(item.cpr) === String(cpr) && +item.stageIndex === +stageIndex; });
+  if (!row) return;
+  var average = getGraduationCandidateMandatoryAverage(row);
+  var cards = (row.criteria || []).map(function (criterion) {
+    var value = typeof criterion.percent === 'number' ? criterion.percent + '%' : '—';
+    var stateClass = criterion.met ? ' met' : ' not-met';
+    return '<div class="passed-stage-detail-card' + stateClass + '"><small>' + escapeHtml(criterion.label) + (criterion.isMandatory ? ' — إلزامي' : '') + '</small><strong>' + value + '</strong><small>الحد المطلوب: ' + (+criterion.threshold || 0) + '%</small></div>';
+  }).join('');
+  if (!cards) cards = '<div class="passed-stage-detail-card"><small>تفاصيل النسب</small><strong>غير متاحة</strong></div>';
+  var body = '<div class="passed-stage-detail-summary"><span><i data-icon="circle-check-big"></i><span><small>المرحلة المجتازة</small><strong>' + escapeHtml(getLevelName(+row.stageIndex)) + '</strong></span></span><b>' + (typeof average === 'number' ? average + '%' : 'مجتاز') + '</b></div>' +
+    '<div class="passed-stage-detail-grid">' + cards +
+      '<div class="passed-stage-detail-card"><small>تاريخ اعتماد الاجتياز</small><strong>' + escapeHtml(formatDateAr(row.issuedAt)) + '</strong></div>' +
+      '<div class="passed-stage-detail-card"><small>الرقم الشخصي</small><strong dir="ltr">' + escapeHtml(row.cpr) + '</strong></div>' +
+    '</div>';
+  var footer = (row.certificateUrl ? '<a class="primary-button" href="' + escapeHtml(row.certificateUrl) + '" target="_blank" rel="noopener" data-issued-file><i data-icon="award"></i>فتح شهادة الاجتياز</a>' : '') +
+    '<button class="secondary-button" type="button" onclick="closeDrawer()">إغلاق</button>';
+  openDrawer(row.name, 'تفاصيل اجتياز المرحلة', body, footer);
+  refreshIcons();
+}
+
+function exportPassedStudentsToExcel_() {
+  var rows = getFilteredPassedStudents_();
+  if (!rows.length) { alertMSG('لا توجد بيانات لتصديرها', 'warning'); return; }
+  var excelRows = rows.map(function (row) {
+    var output = {
+      'الطالب': row.name,
+      'الرقم الشخصي': row.cpr,
+      'الجنس': row.gender || '—',
+      'المرحلة المجتازة': getLevelName(+row.stageIndex)
+    };
+    GRAD_CRITERIA_KEYS_.forEach(function (key) {
+      var criterion = (row.criteria || []).find(function (item) { return item.criterionKey === key; });
+      output[(criterion && criterion.label) || key] = criterion && typeof criterion.percent === 'number' ? criterion.percent + '%' : '—';
+    });
+    var average = getGraduationCandidateMandatoryAverage(row);
+    output['متوسط النسب الإلزامية'] = typeof average === 'number' ? average + '%' : '—';
+    output['تاريخ الاجتياز'] = formatDateAr(row.issuedAt);
+    output['شهادة الاجتياز'] = row.certificateUrl ? { text: 'فتح الشهادة', link: row.certificateUrl } : '—';
+    return output;
+  });
+  exportRowsToExcel({ title: 'المجتازون', rows: excelRows, filename: 'المجتازون' });
+}
+
 /* ==========================================================================
    "إدارة الرسائل" — قوالب موحَّدة لكل رسائل واتساب (تلقائية وجماعية)، مجموعات واتساب، إرسال
    جماعي بتحكم كامل بالدفعة/الفواصل/الجدولة، وسجل دائم لكل رسالة. حلّت محل صفحة "إرسال رسالة"
@@ -5744,6 +6108,7 @@ function loadMessagesManagementView() {
     messagesControlsBound_ = true;
     setupMessagesTabControls_();
     setupWhatsAppProviderControls_();
+    setupOtpWhatsAppProviderControls_();
     setupBroadcastControls_();
     setupFcmBroadcastControls_();
     setupMessagesStatusChannelControls_();
@@ -5810,6 +6175,7 @@ function loadWhatsAppProviderSettings_() {
     res.loaded = true;
     whatsappProviderState_ = res;
     renderWhatsAppProviderState_();
+    renderOtpWhatsAppProviderState_();
     enforceBroadcastTargetForProvider_();
   }).withFailureHandler(function () {
     if (hint) hint.textContent = 'تعذّر تحميل إعداد المزوّد؛ لم يتغير أي إعداد.';
@@ -5875,6 +6241,175 @@ function renderWhatsAppProviderState_() {
   updateBroadcastEstimate_();
   applyBroadcastTargetAvailability_();
   refreshIcons();
+}
+
+function setupOtpWhatsAppProviderControls_() {
+  var group = document.getElementById('otpWhatsappProviderSwitch');
+  if (!group) return;
+  group.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-otp-provider]');
+    if (!btn || btn.disabled) return;
+    var provider = btn.getAttribute('data-otp-provider');
+    if (!whatsappProviderState_.canChange || provider === whatsappProviderState_.otpProvider) return;
+    var label = provider === 'meta' ? 'Meta الرسمي' : 'Fonnte';
+    Swal.fire({
+      title: 'تغيير مزوّد رمز التحقق (OTP)',
+      text: provider === 'meta'
+        ? 'رمز تسجيل الدخول القادم عبر واتساب سيُرسل عبر Meta الرسمي بدل Fonnte. يشترط اعتماد قالب OTP لدى Meta أولًا، وإلا سيُرفض التبديل.'
+        : 'رمز تسجيل الدخول القادم عبر واتساب سيعود للإرسال عبر Fonnte كنص حر. هل تريد المتابعة؟',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'تغيير المزوّد',
+      cancelButtonText: 'إلغاء'
+    }).then(function (answer) {
+      if (!answer.isConfirmed) return;
+      group.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      getFirebaseIdTokenForSensitiveAction_(function (firebaseIdToken) {
+        google.script.run.withSuccessHandler(function (res) {
+          if (!res || res.error || !res.ok) {
+            alertMSG((res && res.message) || 'تعذّر تغيير مزوّد رمز التحقق', 'error');
+            renderOtpWhatsAppProviderState_();
+            if (res && res.code === 'META_NOT_CONFIGURED') openMetaWhatsAppSettings_();
+            return;
+          }
+          whatsappProviderState_.otpProvider = res.provider;
+          renderOtpWhatsAppProviderState_();
+          alertMSG('تم اعتماد ' + label + ' لإرسال رمز التحقق عبر واتساب', 'success');
+        }).withFailureHandler(function (err) {
+          alertMSG('تعذّر تغيير مزوّد رمز التحقق: ' + err, 'error');
+          renderOtpWhatsAppProviderState_();
+        }).setOtpWhatsAppProvider(getCurrentUserCpr(), provider, firebaseIdToken);
+      }, function (message) {
+        alertMSG(message, 'error');
+        renderOtpWhatsAppProviderState_();
+      });
+    });
+  });
+}
+
+function renderOtpWhatsAppProviderState_() {
+  var state = whatsappProviderState_ || {};
+  var provider = state.otpProvider === 'meta' ? 'meta' : 'fonnte';
+  var group = document.getElementById('otpWhatsappProviderSwitch');
+  if (group) group.querySelectorAll('button[data-otp-provider]').forEach(function (btn) {
+    var active = btn.getAttribute('data-otp-provider') === provider;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', String(active));
+    btn.disabled = !state.canChange;
+  });
+  var hint = document.getElementById('otpWhatsappProviderHint');
+  if (hint) {
+    hint.textContent = provider === 'meta'
+      ? 'رمز تسجيل الدخول عبر واتساب يُرسل الآن عبر WhatsApp Cloud API الرسمي (Meta).'
+      : 'رمز تسجيل الدخول عبر واتساب يُرسل حاليًا كنص حر عبر Fonnte، ولا يحتاج قالب معتمد.';
+  }
+  var templateBtn = document.getElementById('otpMetaTemplateBtn');
+  if (templateBtn) templateBtn.hidden = !state.canChange;
+}
+
+function openOtpMetaTemplatePanel_() {
+  if (!whatsappProviderState_.canChange) {
+    alertMSG('إعداد قالب OTP متاح لـSuper Admin فقط', 'error');
+    return;
+  }
+  var state = whatsappProviderState_ || {};
+  var name = state.otpTemplateName || 'otp_ar';
+  var languageCode = state.otpTemplateLanguage || 'ar';
+  var body = '<div class="form-grid">' +
+    '<label class="field"><span>اسم القالب</span><input type="text" dir="ltr" value="' + escapeHtml(name) + '" disabled></label>' +
+    '<label class="field"><span>اللغة</span><input type="text" dir="ltr" value="' + escapeHtml(languageCode) + '" disabled></label>' +
+    '<label class="field"><span>التصنيف</span><input type="text" dir="ltr" value="AUTHENTICATION" disabled></label>' +
+    '<label class="field"><span>مدة صلاحية الرمز</span><input type="text" dir="ltr" value="10 دقائق" disabled></label>' +
+    '</div>' +
+    '<p class="messages-inline-note"><i data-icon="info"></i><span>هذا قالب Authentication الرسمي؛ Meta تضيف جملة التحذير («لا تشارك هذا الرمز») وزر نسخ الرمز تلقائيًا، ولا مجال لتحرير نص حر هنا.</span></p>' +
+    '<p class="meta-template-status" id="otpMetaTemplateStatusText" role="status" aria-live="polite"></p>';
+  var footer = '<button class="secondary-button" type="button" onclick="closeActionModal()">إغلاق</button>' +
+    '<button class="secondary-button" id="checkOtpMetaTemplateStatusBtn" type="button" onclick="checkOtpMetaTemplateStatus_()"><i data-icon="search"></i>فحص حالة القالب</button>' +
+    '<button class="primary-button" id="submitOtpMetaTemplateBtn" type="button" onclick="submitOtpMetaTemplate_()"><i data-icon="send"></i>إرسال القالب للمراجعة</button>';
+  openActionModal('قالب رمز التحقق على Meta', 'Authentication', body, footer, false);
+  refreshIcons();
+}
+
+function setOtpMetaTemplateActionBusy_(busy) {
+  ['submitOtpMetaTemplateBtn', 'checkOtpMetaTemplateStatusBtn'].forEach(function (id) {
+    var button = document.getElementById(id);
+    if (button) button.disabled = !!busy;
+  });
+}
+
+function setOtpMetaTemplateStatus_(message, tone) {
+  var status = document.getElementById('otpMetaTemplateStatusText');
+  if (!status) return;
+  status.textContent = message || '';
+  status.className = 'meta-template-status' + (message && tone ? (' ' + tone) : '');
+}
+
+function submitOtpMetaTemplate_() {
+  if (!whatsappProviderState_.canChange) return;
+  Swal.fire({
+    title: 'إرسال قالب رمز التحقق إلى Meta؟',
+    text: 'سيُنشأ قالب Authentication الثابت ويُرسل للمراجعة. لن يصل أي رمز تحقق فعلي لأي مستخدم في هذه الخطوة.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'إرسال للمراجعة',
+    cancelButtonText: 'إلغاء'
+  }).then(function (answer) {
+    if (!answer.isConfirmed) return;
+    setOtpMetaTemplateActionBusy_(true);
+    setOtpMetaTemplateStatus_('جارٍ إرسال القالب إلى Meta؛ لا تغلق الصفحة…', 'info');
+    getFirebaseIdTokenForSensitiveAction_(function (firebaseIdToken) {
+      google.script.run.withSuccessHandler(function (res) {
+        setOtpMetaTemplateActionBusy_(false);
+        if (!res || res.error || !res.ok) {
+          var errorMessage = (res && res.message) || 'تعذّر إرسال القالب إلى Meta';
+          setOtpMetaTemplateStatus_(errorMessage, 'error');
+          alertMSG(errorMessage, 'error');
+          return;
+        }
+        var successMessage = 'تم إرسال قالب رمز التحقق إلى Meta للمراجعة — الحالة: ' + (res.status || 'PENDING');
+        setOtpMetaTemplateStatus_(successMessage, 'success');
+        alertMSG(successMessage, 'success');
+      }).withFailureHandler(function (err) {
+        setOtpMetaTemplateActionBusy_(false);
+        var failureMessage = 'تعذّر إرسال القالب إلى Meta: ' + err;
+        setOtpMetaTemplateStatus_(failureMessage, 'error');
+        alertMSG(failureMessage, 'error');
+      }).submitMetaOtpTemplateForReview(getCurrentUserCpr(), firebaseIdToken);
+    }, function (message) {
+      setOtpMetaTemplateActionBusy_(false);
+      setOtpMetaTemplateStatus_(message, 'error');
+    });
+  });
+}
+
+function checkOtpMetaTemplateStatus_() {
+  if (!whatsappProviderState_.canChange) return;
+  var state = whatsappProviderState_ || {};
+  var name = state.otpTemplateName || 'otp_ar';
+  var languageCode = state.otpTemplateLanguage || 'ar';
+  setOtpMetaTemplateActionBusy_(true);
+  setOtpMetaTemplateStatus_('جارٍ الاستعلام من Meta عن حالة القالب…', 'info');
+  getFirebaseIdTokenForSensitiveAction_(function (firebaseIdToken) {
+    google.script.run.withSuccessHandler(function (res) {
+      setOtpMetaTemplateActionBusy_(false);
+      if (!res || res.error || !res.ok) {
+        setOtpMetaTemplateStatus_((res && res.message) || 'تعذّر فحص حالة القالب في Meta.', 'error');
+        return;
+      }
+      if (!res.exists) {
+        setOtpMetaTemplateStatus_('القالب غير موجود في Meta حتى الآن.', 'warning');
+        return;
+      }
+      var tone = res.status === 'APPROVED' ? 'success' : (res.status === 'REJECTED' ? 'error' : 'warning');
+      setOtpMetaTemplateStatus_('حالة القالب في Meta: ' + res.status + (res.category ? (' — التصنيف: ' + res.category) : ''), tone);
+    }).withFailureHandler(function (err) {
+      setOtpMetaTemplateActionBusy_(false);
+      setOtpMetaTemplateStatus_('تعذّر فحص حالة القالب: ' + err, 'error');
+    }).getMetaWhatsAppTemplateStatus(getCurrentUserCpr(), name, languageCode, firebaseIdToken);
+  }, function (message) {
+    setOtpMetaTemplateActionBusy_(false);
+    setOtpMetaTemplateStatus_(message, 'error');
+  });
 }
 
 function openMetaWhatsAppSettings_() {
@@ -6268,7 +6803,8 @@ var MESSAGE_TEMPLATE_META_ = {
   examCertificate: { icon: 'award', tone: 'blue', description: 'تُرسل للطالب عند إصدار شهادة الاختبار.' },
   greetingCard: { icon: 'message-circle', tone: 'gold', description: 'رسالة التهنئة المرفقة ببطاقة الطالب.' },
   examDisconnect: { icon: 'triangle-alert', tone: '', description: 'تنبيه يُرسل عند انقطاع اتصال الطالب أثناء الاختبار.' },
-  examReadinessAlert: { icon: 'send-check', tone: 'green', description: 'إشعار جاهزية الاختبار الموجّه إلى المسؤولين.' }
+  examReadinessAlert: { icon: 'send-check', tone: 'green', description: 'إشعار جاهزية الاختبار الموجّه إلى المسؤولين.' },
+  examAvailable: { icon: 'bell-ring', tone: 'blue', description: 'يُرسل آليًا إلى الطلاب المعنيين الذين لم يؤدّوا اختبارًا أصبح متاحًا (إشعار المنصة، وبالبريد عند تعذّره). متغيّرات: {name} {exam} {deadline}.' }
 };
 
 function renderMessageTemplatesGrid_(list) {
@@ -7328,7 +7864,7 @@ var messageLogData_ = [];
 var messageLogDeliveryPollTimer_ = null;
 var MESSAGE_LOG_TYPE_LABELS_ = {
   stageCertificate: 'شهادة اجتياز مرحلة', stageCert: 'شهادة اجتياز مرحلة', examCertificate: 'شهادة اختبار', greetingCard: 'كارت تهنئة', examDisconnect: 'انقطاع اتصال',
-  examReadinessAlert: 'تنبيه جاهزية', broadcast: 'رسالة جماعية', connectionTest: 'اختبار اتصال',
+  examReadinessAlert: 'تنبيه جاهزية', examAvailable: 'اختبار متاح', broadcast: 'رسالة جماعية', connectionTest: 'اختبار اتصال',
   fcmBroadcast: 'إشعار جماعي'
 };
 

@@ -5,7 +5,7 @@
 //
 //   node tools/import-firebase-users.js --users data/firebase-users.json
 //                                       --hash-params data/firebase-hash-params.txt
-//                                       [--db <sqlite path>] [--dry-run]
+//                                       [--db <sqlite path>] [--dry-run] [--mark-verified]
 //
 // --users        the Firebase Auth export: { "users": [ { localId, email,
 //                emailVerified, passwordHash, salt, ... } ] }
@@ -102,6 +102,41 @@ function importFirebaseUsers({ storage, exportedUsers, hashConfig }) {
   return counts;
 }
 
+// Firebase was the authority for e-mail verification, and the sheets did not
+// always follow: the live export has dozens of students whose Firebase record
+// says emailVerified while the students sheet cell is empty. The page checks
+// that cell on every load and signs such accounts out again (js.html
+// loadStartData), so --mark-verified sets emailVerified = true in the students
+// and emp sheets for every exported account Firebase had verified. Returns
+// { marked, alreadyTrue, notInSheets }.
+function markVerifiedEmailsInSheets({ storage, exportedUsers, spreadsheetId }) {
+  const verifiedCprs = new Set(exportedUsers
+    .filter((user) => user.emailVerified === true && /^u\d+$/.test(String(user.localId || '')))
+    .map((user) => String(user.localId).slice(1)));
+  const counts = { marked: 0, alreadyTrue: 0, notInSheets: 0 };
+  const seen = new Set();
+  for (const sheetName of ['students', 'emp']) {
+    if (!storage.sheetExists(spreadsheetId, sheetName)) continue;
+    const grid = storage.loadGrid(spreadsheetId, sheetName);
+    const headers = grid[0] || [];
+    const cprColumn = headers.indexOf('cpr');
+    const verifiedColumn = headers.indexOf('emailVerified');
+    if (cprColumn < 0 || verifiedColumn < 0) continue;
+    for (let rowIndex = 1; rowIndex < grid.length; rowIndex++) {
+      const row = grid[rowIndex];
+      const cpr = String(row[cprColumn] == null ? '' : row[cprColumn]).padStart(9, '0');
+      if (!verifiedCprs.has(cpr)) continue;
+      seen.add(cpr);
+      if (row[verifiedColumn] === true) { counts.alreadyTrue++; continue; }
+      row[verifiedColumn] = true;
+      storage.putRows(spreadsheetId, sheetName, rowIndex + 1, [row]);
+      counts.marked++;
+    }
+  }
+  counts.notInSheets = [...verifiedCprs].filter((cpr) => !seen.has(cpr)).length;
+  return counts;
+}
+
 // ':memory:' is SQLite's in-memory database, not a file name.
 function resolveDatabasePath(requestedPath) {
   return requestedPath === ':memory:' ? requestedPath : path.resolve(requestedPath);
@@ -156,7 +191,8 @@ function main() {
   const argv = process.argv.slice(2);
   // parseArgs reads "--key value" pairs, so the valueless --dry-run comes out first.
   const dryRun = argv.includes('--dry-run');
-  const remainingArgv = argv.filter((argument) => argument !== '--dry-run');
+  const markVerified = argv.includes('--mark-verified');
+  const remainingArgv = argv.filter((argument) => argument !== '--dry-run' && argument !== '--mark-verified');
   const args = parseArgs(remainingArgv);
   const flagsWithoutValue = missingFlagValues(remainingArgv, args);
   if (flagsWithoutValue.length > 0) {
@@ -185,6 +221,11 @@ function main() {
   try {
     printCounts(importFirebaseUsers({ storage, exportedUsers, hashConfig }));
     if (!dryRun) console.log('Stored the hash parameters as script property ' + HASH_CONFIG_PROPERTY + '.');
+    if (markVerified) {
+      const { IDS } = require('./xlsx-common.js');
+      const marked = markVerifiedEmailsInSheets({ storage, exportedUsers, spreadsheetId: IDS.mainData });
+      console.log(`emailVerified in sheets: marked ${marked.marked}, already true ${marked.alreadyTrue}, not in sheets ${marked.notInSheets}`);
+    }
   } finally {
     storage.close();
   }
@@ -199,4 +240,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { importFirebaseUsers, mapFirebaseUser, openDryRunStorage, readFirebaseUsers };
+module.exports = { importFirebaseUsers, mapFirebaseUser, openDryRunStorage, readFirebaseUsers, markVerifiedEmailsInSheets };

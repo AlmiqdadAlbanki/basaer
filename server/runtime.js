@@ -199,6 +199,7 @@ class Runtime {
       identity: this.identity,
       localIssuer: this.localIssuer,
       storage: this.storage,
+      filesDir: this.filesDir,
       mode: this.outboundMode,
       log: this.outboundLog,
       getCallContext: () => this.callContext,

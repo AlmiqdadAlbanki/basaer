@@ -95,32 +95,253 @@ data in a system that will hold real data: stop the service and delete
 
 ## 4. Loading the real data
 
-1. On your own machine, export each Google Sheet as .xlsx (File, Download, Microsoft Excel).
-   Name each file after its logical name: `mainData.xlsx`, `attendanceData.xlsx`,
-   `answersData.xlsx`, `dectationData.xlsx`, `refID.xlsx`, `archiveData.xlsx`.
-2. Copy the folder to the server (`scp -r exports ubuntu@<ip>:/tmp/exports`).
-3. Import. `TZ=Asia/Qatar` is required so dates keep their local time; `--db` is required:
+The aim is that nothing is left on Google. Two things come over: the spreadsheets, and every Drive
+file they link to (student folders, certificates, ID cards, course material). The files keep their
+original Google ids, and the links stored in the sheets are then rewritten to this server's own
+addresses. The access to Google is read-only, so nothing is ever written to it.
+
+Run the whole section on the server, in `/opt/basaer/app`, as the `basaer` user, so that the
+database and the files end up owned by the service. The service stays stopped while you work.
+Check the free disk space first (`df -h`): for a while every file exists twice, once in the working
+copy and once in the file store. Copying can take hours, so start `tmux` (or `screen`) first and a
+dropped SSH connection will not stop it. The tools read `BASAER_DB` and `BASAER_FILES`, so set them
+once here instead of adding `--db` and `--files-dir` to every command (a flag still overrides them):
+```
+sudo systemctl stop basaer
+sudo -u basaer -H bash
+cd /opt/basaer/app
+export BASAER_DB=/var/lib/basaer/basaer.sqlite BASAER_FILES=/var/lib/basaer/files
+```
+Everything below is typed in that shell until step 11.
+
+1. Give the server read-only access to Drive. This is done once. rclone must be installed
+   (rclone.org/install); `deploy/install.sh` does not install it.
    ```
-   sudo systemctl stop basaer
-   cd /opt/basaer/app
-   sudo -u basaer TZ=Asia/Qatar node tools/import-xlsx.js --dir /tmp/exports --db /var/lib/basaer/basaer.sqlite
-   sudo systemctl start basaer
+   bash tools/google-exports.sh setup
+   rclone config reconnect gdrive:
+   rclone lsd gdrive:
    ```
-4. Register the real document templates (.docx for certificates and cards, .pptx for greetings).
-   The ids are the legacy Google Drive ids the code names. `tools/make-demo-templates.js`
-   registers the same ids with stand-in files, so these are the ones to replace:
-   - `certIdTemp` (certificate) and `cardID00`, `cardID01`, `cardID02`, `cardID03` (ID cards).
-     The actual id values are the strings assigned to those variables in `gas/code.js` and
-     `gas/oldJS.js`.
-   - The greeting template: its id is the `templateId` column of the `greetingTemplates`
-     sheet. The demo script uses `local_demo_greeting_template`.
+   `setup` creates the rclone remote `gdrive` with the read-only scope `drive.readonly`. Sign in
+   with the Google account the admin shared the files with. On a machine with a browser,
+   `rclone config reconnect gdrive:` is all it takes. The server has no browser, so use the other
+   way that `setup` prints: on a machine that has a browser and rclone, run
+   `rclone authorize "drive" "" "" --drive-scope drive.readonly`, sign in, and copy the token it
+   prints. Then run `rclone config reconnect gdrive:` on the server and paste the token when it
+   asks for the result of `rclone authorize`. `rclone lsd gdrive:` should now list the account's
+   top-level folders.
+2. Pull the sheets, the templates and the folders the code names, and import them. `pull` fetches
+   six workbooks (.xlsx), five templates (.docx) and the seven folders named in the code into
+   `data/google-exports/`. The import loads the sheets, registers the templates under their legacy
+   Drive ids, imports those seven folders (whole) with their original folder and file ids, and ends
+   with a header check:
    ```
-   sudo -u basaer node tools/register-template.js --id <legacyDriveId> --file /tmp/cert.docx --name "Certificate"
+   bash tools/google-exports.sh pull
+   TZ=Asia/Qatar node tools/import-google-exports.js
    ```
-   Add `--db /var/lib/basaer/basaer.sqlite` if you did not export `BASAER_DB`.
-   Templates must also be registered for any other template id used in the Certificates and
-   stages sheets.
-5. Delete `/tmp/exports` when done; it holds personal data.
+   `pull` prints one line per item. An item the admin has not shared with your account shows
+   `ACCESS DENIED (not shared with you)`; that is reported, not fatal. Ask the admin to share it and
+   run `pull` again, which is safe to repeat. Read every `WARN` line the import prints. The result
+   you want ends with `Header check: all expected headers present, in order`.
+
+   `TZ=Asia/Qatar` is still required, so dates keep their local time. The importer converts the
+   spreadsheets' date numbers itself, because the xlsx library's own conversion came out 8 seconds
+   early and so moved every date-only cell to the previous day.
+
+   **Warning:** the import replaces every sheet it loads. Do not run it again once people use the
+   new system. If you run it again before then, run step 9 again afterwards, because the workbooks
+   hold Google links.
+3. Find the greeting-card templates, and register any other templates. The greeting templates
+   (Slides) are not named in the code: their ids are in the `refID` workbook, which step 2 has put
+   in the database. So a second pass finds them, fetches them and imports again:
+   ```
+   bash tools/google-exports.sh discover
+   bash tools/google-exports.sh pull
+   TZ=Asia/Qatar node tools/import-google-exports.js
+   ```
+   `discover` adds them to `tools/google-files.json` and prints one line for each. Any other
+   template id used in the Certificates and stages sheets is registered by hand, from a copy of the
+   file:
+   ```
+   node tools/register-template.js --id <legacyDriveId> --file <path.docx|.pptx> --name "<name>"
+   ```
+4. List the two Drive trees the rest of the referenced files live in: the account's My Drive, and
+   the folders shared with it. Run them one after the other. The three throttling flags are there
+   because a plain run against a large tree died with `rateLimitExceeded`. **Never run two rclone
+   jobs at once** (this includes `pull` and the copy in step 6): they compete for the same limit.
+   ```
+   mkdir -p data/google-exports/trees
+   rclone lsjson -R --drive-export-formats pdf \
+     --tpslimit 4 --retries 20 --low-level-retries 40 \
+     gdrive: > data/google-exports/trees/mydrive.lsjson
+   rclone lsjson -R --drive-shared-with-me --drive-export-formats pdf \
+     --tpslimit 4 --retries 20 --low-level-retries 40 \
+     gdrive: > data/google-exports/trees/shared.lsjson
+   ```
+   A big Drive takes a long time. If rclone stops with an error, delete the half-written file and
+   run it again: the importer refuses a listing that is not complete JSON.
+5. Make the list of ids to bring over: a JSON array of Google ids in a file, for example
+   `data/google-exports/referenced-ids.json`:
+   ```
+   ["1AbCdEf...", "1GhIjKl..."]
+   ```
+   It must hold every Google id that appears in any cell of any sheet, whether inside a link or on
+   its own, and every id written into the pages (the logo, the default avatar and the carousel
+   pictures, and any other id in `gas/*.html` and `gas/*.js`). Only what is on the list comes over,
+   and the id of a folder brings everything inside it. Nothing else is copied, because every
+   imported file becomes readable by its link.
+
+   The tool that writes it reads every sheet cell for Google links and adds the ids listed in
+   `data/google-exports/code-assets/ids.tsv` (step 8):
+   ```
+   node tools/list-referenced-ids.js --out data/google-exports/referenced-ids.json
+   ```
+   A dry run of the link rewriter is a useful check of where the Google links are, per sheet and
+   column (it changes nothing; the report holds counts and a few sample ids per column):
+   ```
+   node tools/rewrite-drive-links.js --base-url https://<domain> --dry-run --report /tmp/links.json
+   ```
+6. Copy only what is referenced. With `--list-paths` the tool imports nothing: it writes the paths
+   of the referenced files to a text file and prints the counts, and `--unfound-ids` writes the
+   referenced ids that are not in that tree. rclone then copies exactly those paths. Copy to a
+   native Linux path such as `/var/tmp/drive-copy`, never under `/mnt/c` on WSL: thousands of small
+   files are about 10 times slower through the Windows bridge. Google Docs, Sheets and Slides files
+   come over as PDF. My Drive:
+   ```
+   node tools/import-drive-tree.js --listing data/google-exports/trees/mydrive.lsjson \
+     --only-ids data/google-exports/referenced-ids.json \
+     --list-paths data/google-exports/trees/mydrive-paths.txt \
+     --unfound-ids data/google-exports/trees/mydrive-unfound.txt
+   rclone copy gdrive: /var/tmp/drive-copy/mydrive \
+     --files-from data/google-exports/trees/mydrive-paths.txt --drive-export-formats pdf
+   ```
+   The tree shared with the account (note the extra flag on the copy):
+   ```
+   node tools/import-drive-tree.js --listing data/google-exports/trees/shared.lsjson \
+     --only-ids data/google-exports/referenced-ids.json \
+     --list-paths data/google-exports/trees/shared-paths.txt \
+     --unfound-ids data/google-exports/trees/shared-unfound.txt
+   rclone copy gdrive: /var/tmp/drive-copy/shared \
+     --files-from data/google-exports/trees/shared-paths.txt --drive-export-formats pdf \
+     --drive-shared-with-me
+   ```
+   If rclone stops with `rateLimitExceeded`, add the three throttling flags from step 4 and run it
+   again.
+
+   Each `-unfound.txt` file lists the referenced ids that are missing from that one tree. An id
+   that is in no tree at all appears in both files:
+   ```
+   comm -12 <(sort data/google-exports/trees/mydrive-unfound.txt) \
+            <(sort data/google-exports/trees/shared-unfound.txt)
+   ```
+   Ask the admin to share those files or folders with the account, then list the trees again
+   (step 4) and repeat. The page images of step 8 will be among them.
+7. Import the copies. Add `--dry-run` to the first command to see the counts without writing
+   anything.
+   ```
+   node tools/import-drive-tree.js --listing data/google-exports/trees/mydrive.lsjson \
+     --dir /var/tmp/drive-copy/mydrive --root-id mydrive-root --root-name "My Drive" \
+     --only-ids data/google-exports/referenced-ids.json --by-id-dir /var/tmp/drive-copy/by-id
+   node tools/import-drive-tree.js --listing data/google-exports/trees/shared.lsjson \
+     --dir /var/tmp/drive-copy/shared --root-id shared-root --root-name "Shared with me" \
+     --only-ids data/google-exports/referenced-ids.json --by-id-dir /var/tmp/drive-copy/by-id
+   ```
+   The root id is a made-up id for the top of each tree (`mydrive-root` for the account's My Drive,
+   `shared-root` for the shared one); the top-level entries become its children. Every file and
+   folder keeps its Google id. The summary shows how many files were imported, how many are
+   missing, and how many entries were skipped as not referenced. Running the import again is safe:
+   it only adds what was missing.
+
+   Drive lets two files in one folder share a name, but rclone writes by path, so such files cannot
+   be copied in step 6. The import does not guess which is which. It writes their ids to
+   `missing-ids.txt` in the copy folder and prints the command that fetches them one by one. For
+   My Drive it is the loop below (for the shared tree, read
+   `/var/tmp/drive-copy/shared/missing-ids.txt` instead). Run it, then run the same import again:
+   ```
+   while read id; do
+     rclone backend copyid gdrive: "$id" /var/tmp/drive-copy/by-id/"$id" --drive-export-formats pdf
+   done < /var/tmp/drive-copy/mydrive/missing-ids.txt
+   ```
+   A `WARN ... folders share this path` line means two folders of one name sit side by side. The
+   files are fine, but the folder page may list them under the wrong one of the two.
+8. Save the page images. The pages themselves name a few images by Drive id: the logo, the default
+   avatar and the carousel pictures. They belong to the admin's account, where the API cannot reach
+   them. List them (this also writes `code-assets/ids.tsv`, which step 5 reads):
+   ```
+   node tools/import-code-assets.js --list
+   ```
+   It prints one line per id with the browser link to open. Save each image from a browser that can
+   open it into `data/google-exports/code-assets/` with the id as the file name and no extension
+   (copy it over with `scp` if you saved it on your own machine). Then:
+   ```
+   node tools/import-code-assets.js
+   ```
+   It works out each file's type from its bytes and registers it as a public file under its id.
+   Anything that is not an image or a PDF (a Google sign-in page saved by mistake, for example) is
+   skipped with a `skip` line, and `--dry-run` shows what would be registered. Nothing needs
+   editing in the pages: the server already serves them with `/thumb?id=<id>` in place of
+   `drive.google.com/thumbnail?id=`.
+9. Point the links in the sheets at this server. Run it with `--dry-run` first; the real run is the
+   same command without it:
+   ```
+   node tools/rewrite-drive-links.js --base-url https://<domain> --dry-run --report /tmp/links.json
+   node tools/rewrite-drive-links.js --base-url https://<domain> --report /tmp/links.json
+   ```
+   **`--base-url` must be the final public URL**, the same address as `BASE_URL` in
+   `/etc/basaer.env`. The links are stored in the sheets as full addresses, because the same cells
+   are also sent in WhatsApp and e-mail messages. The tool cannot change an address it has already
+   written. If you used a wrong one, run step 2 again (it brings the Google links back) and then
+   this step with the right one.
+
+   A link to a file becomes `https://<domain>/files/<id>/<name>`, and a link to a folder becomes
+   `https://<domain>/files/folder/<id>`; the text around a link is kept. The report lists what
+   still points at Google, per sheet and column. `unresolved` is a link whose id is not in the file
+   store: add the id to the list (step 5) and repeat steps 6 and 7, or ask the admin to share it.
+   `unrecognized` is a `drive.google.com` or `docs.google.com` address of another shape, which the
+   tool leaves alone. Read both. Running it again is harmless. It reads rows and writes them back
+   whole, so run it only while nobody is editing, which the stopped service guarantees.
+10. Import the existing passwords. The admin runs `firebase auth:export` for the Firebase project
+    (to a file ending in `.json`) and copies the "Password hash parameters" block from the Firebase
+    console (Authentication, Users) into a text file. Put both in `data/` and run:
+    ```
+    node tools/import-firebase-users.js --users data/firebase-users.json \
+      --hash-params data/firebase-hash-params.txt --dry-run
+    node tools/import-firebase-users.js --users data/firebase-users.json \
+      --hash-params data/firebase-hash-params.txt
+    ```
+    It prints counts only, never hashes. Imported accounts keep their Firebase hash until their
+    first login, and are then re-hashed locally. Accounts with no password hash (Google-only
+    accounts, for example) or no email are skipped, and an account that already has a local
+    password is left as it is, so running it again is safe. Without the export, users sign in once
+    with an emailed code and set a new password.
+11. Check the result, then start the service:
+    ```
+    node tools/export-xlsx.js --dir /tmp/verify --db /var/lib/basaer/basaer.sqlite
+    node tools/check-headers.js
+    exit
+    sudo systemctl start basaer
+    ```
+    `export-xlsx.js` writes the sheets back out and prints the row count of each: compare them with
+    the workbooks that `pull` fetched into `data/google-exports/` (or with the Google Sheets
+    themselves). `check-headers.js` repeats the header check. After `exit` you are back in your own
+    shell and can start the service. Then open the app, sign in with a real account, open one
+    student's folder link and one ID-card link from a sheet row, and render one certificate (the
+    first PDF is slow, section 9).
+12. When you are satisfied, delete what you no longer need. It holds personal data and password
+    hashes, and the rclone token can read the whole Drive of that account:
+    ```
+    cd /opt/basaer/app
+    sudo rm -rf data/google-exports data/firebase-users.json data/firebase-hash-params.txt \
+      /var/tmp/drive-copy /tmp/links.json /tmp/verify
+    sudo -u basaer -H rclone config delete gdrive
+    ```
+    Then remove the access in the Google account itself (myaccount.google.com, Security,
+    Third-party access).
+
+No rclone? The sheets alone can be loaded from workbooks you export by hand from Google Sheets
+(File, Download, Microsoft Excel), named `mainData.xlsx`, `attendanceData.xlsx`, `answersData.xlsx`,
+`dectationData.xlsx`, `refID.xlsx` and `archiveData.xlsx`. This tool needs `--db`:
+`TZ=Asia/Qatar node tools/import-xlsx.js --dir <folder> --db /var/lib/basaer/basaer.sqlite`. No
+Drive file comes over that way and the links stay pointed at Google, so treat it as a stop-gap.
 
 ## 5. Going live
 
@@ -132,21 +353,27 @@ Until this step the server records emails, WhatsApp messages and push notificati
    Properties, using the admin screens of the app. Do not copy old secrets from the spreadsheet;
    issue new ones (see the cut-over checklist). Browser push also needs step 5 below.
 3. Turn on Google sign-in. Check that `/etc/basaer.env` has `FIREBASE_PROJECT_ID=coming-soon-basaer`
-   (the Firebase project the relay page signs in with), then restart the service. The journal
-   should say `google sign-in: enabled`. The server now checks the Google ID token itself and
-   ignores any email or `ok` flag the relay page sends. With no project id set, "sign in with
-   Google" is refused. If the page uses Google Identity Services directly instead of Firebase,
-   set `GOOGLE_OAUTH_CLIENT_ID` to its client id.
-4. Change the `google-signin-relay` page. It lives on Firebase Hosting, outside this repository,
-   and must be edited and redeployed there. It has to POST to `https://<domain>/exec`:
-   ```
-   { "action": "oauthVerify", "verifyToken": "<the verifyToken it already uses>", "idToken": "<ID token>" }
-   ```
-   where `idToken` is `await firebase.auth().currentUser.getIdToken()`, a Firebase ID token for
-   project `coming-soon-basaer`. The body is JSON; the server reads it whatever the Content-Type,
-   so the page's `no-cors` text/plain post still works. A post without a valid `idToken` is
-   refused (401), error reports from the page included. Until the relay is changed, "sign in with
-   Google" fails and users sign in with the emailed code or their password.
+   (the Firebase project the sign-in page signs in with), then restart the service. The journal
+   should say `google sign-in: enabled`. The server checks the Google ID token itself and ignores
+   any email or `ok` flag the sign-in page sends. With no project id set, "sign in with Google" is
+   refused. The page uses Firebase, so `GOOGLE_OAUTH_CLIENT_ID` is not needed.
+4. Let Firebase accept the app's domain. The Google sign-in window and the QR scanner window are
+   pages of this server, ported from the originals: `https://<domain>/relay/google-signin` and
+   `https://<domain>/relay/qr-scan`. Nothing is redeployed on Firebase Hosting any more. The
+   sign-in page already posts the Firebase ID token to `/exec` on the same origin, and the server
+   refuses (401) a post without a valid one. The QR scanner needs nothing from Firebase. For the
+   sign-in page, the admin of the Firebase project `coming-soon-basaer` has to do three things:
+   - Add `<domain>` in the Firebase console, under Authentication, Settings, Authorized domains.
+     Without it Google sign-in fails with `auth/unauthorized-domain`.
+   - If the project's web API key is restricted to certain HTTP referrers (Google Cloud console,
+     APIs & Services, Credentials), add `https://<domain>/*` to that list too.
+   - Keep `https://basaerbh.com/__/auth/handler` working. The sign-in page still uses `basaerbh.com`
+     as its Firebase sign-in domain, so Google sends the user back through that address. Firebase
+     Hosting serves it for that domain, so for as long as Google sign-in is wanted, do not point
+     `basaerbh.com` at another host.
+
+   Until this is done, "sign in with Google" fails and users sign in with the emailed code or
+   their password.
 5. Browser push (FCM) registration. `/exec` with `saveFcmToken` now needs a logged-in session, and
    the session cookie is only sent to the app's own domain. So the `platform.html` push page must
    be served from `https://<domain>`, not from Firebase Hosting. The server has no route for that
@@ -207,19 +434,21 @@ in-memory rate-limit counters (section 9).
 1. Lower the DNS TTL a day ahead, then point the A record at the Elastic IP. Confirm
    `https://<domain>/healthz`.
 2. Freeze the Apps Script: make it read-only, so nobody writes to the old system.
-3. Export the final sheets and import them (section 4). Re-register templates if needed.
+3. Load the final data (section 4). The long part, the Drive file copy (steps 4 to 7), can be done
+   ahead of the freeze and repeated: it only adds what is missing. After the freeze, run steps 2,
+   4 to 7 and 9 again, so that the final sheets, the newest files and the rewritten links all match.
+   Step 9 is not optional: freshly imported sheets hold Google links again.
 4. Verify counts: export from the new system and compare row counts per sheet with the Google Sheets.
    ```
    sudo -u basaer node tools/export-xlsx.js --dir /tmp/verify --db /var/lib/basaer/basaer.sqlite
    ```
 5. Set `FIREBASE_PROJECT_ID=coming-soon-basaer` in `/etc/basaer.env`, restart, and check that the
    journal says `google sign-in: enabled`.
-6. Repoint the two Firebase-hosted relay pages, `google-signin-relay` and `qr-scan-relay`,
-   to `POST https://<domain>/exec`, and redeploy them on Firebase Hosting. `qr-scan-relay` only
-   needs the new address. `google-signin-relay` must also change what it posts: `{ action:
-   'oauthVerify', verifyToken, idToken }`, with `idToken` from
-   `await firebase.auth().currentUser.getIdToken()` (section 5, step 4). Test both: sign in with
-   Google using an account whose email is on file, and scan one QR code.
+6. Test the two relay pages. This server now serves them (`/relay/google-signin` and
+   `/relay/qr-scan`), so nothing is redeployed on Firebase Hosting. The admin must have done
+   section 5, step 4 first: the domain under Authorized domains, and `basaerbh.com/__/auth/handler`
+   still answering. Sign in with Google using an account whose email is on file, and scan one QR
+   code.
 7. Serve `platform.html` (the push registration page) from the app's own domain, not from
    Firebase Hosting. Its `saveFcmToken` post to `/exec` needs the login cookie, so it must be
    same-origin and send the header `X-Requested-With: basaer`. This needs a code change (the
@@ -285,9 +514,12 @@ in-memory rate-limit counters (section 9).
     "DELETE FROM auth_attempts WHERE email LIKE 'student@example.com|%';"
   ```
 - "Sign in with Google" fails: check the start-up line `google sign-in:` in the journal.
-  `disabled` means neither `FIREBASE_PROJECT_ID` nor `GOOGLE_OAUTH_CLIENT_ID` is set (the relay's
-  post gets 503). If it says `enabled`, the relay is probably still posting the old payload
-  without an `idToken` (401), or its ID token comes from another Firebase project than
+  `disabled` means neither `FIREBASE_PROJECT_ID` nor `GOOGLE_OAUTH_CLIENT_ID` is set (the sign-in
+  page's post gets 503). If it says `enabled`, read the diagnostic log at the bottom of the
+  sign-in window (it is in Arabic and shows the Firebase error code). `auth/unauthorized-domain`
+  means the app's domain is missing from Authorized domains in Firebase. If the window goes to
+  Google and never comes back, check that `https://basaerbh.com/__/auth/handler` still answers. A
+  refusal from the server (401) means the ID token comes from another Firebase project than
   `FIREBASE_PROJECT_ID`. See section 5, step 4. Users can use the emailed code or their password
   meanwhile.
 - Users are logged out unexpectedly: the files in `BASAER_KEYS` were lost or replaced. Over plain
@@ -366,3 +598,30 @@ The honest limits:
 - Moving to PostgreSQL or another networked database is not a configuration change. The legacy
   code is synchronous (it reads or writes a sheet and carries on with the next line), and a
   networked database driver is asynchronous, so the legacy code would have to be rewritten.
+
+## 11. What still touches Google after migration
+
+Once section 4 is done and the cut-over is over, the app does not depend on a Google account for
+its data. What still reaches Google, honestly:
+
+- **Nothing for data, files, sending e-mail or QR codes.** The sheets are in the database, the
+  Drive files are in `/var/lib/basaer/files` under their old ids, mail leaves through the SMTP
+  server you set in `/etc/basaer.env` (pointing `SMTP_HOST` at a Google mail server would be your
+  own choice of provider, not something the app needs), and QR codes are drawn on this server.
+  Fonts and the old site's assets are served from this server.
+- **The "sign in with Google" button, which is optional.** Firebase Authentication is used as the
+  identity provider only. The sign-in window loads the Firebase script from Google, the user signs
+  in at Google and comes back through `https://basaerbh.com/__/auth/handler`, and the server checks
+  the token it gets, fetching Google's public signing keys to do so. The window deletes the
+  temporary Firebase user it creates as soon as it has the email address; passwords and accounts
+  live in this server's database. Without `FIREBASE_PROJECT_ID` the button is refused, and the
+  emailed code and the password keep working (section 5, step 3).
+- **Push notifications, if you ever turn them on.** They go through Google's Firebase Cloud
+  Messaging. They are out of scope for go-live (section 5, step 5).
+- **The area lookup when a student registers.** Typing a block number makes the server ask a
+  separate Apps Script web app on `script.google.com` for the area name (`lookupBlockArea` in
+  `gas/dataGet.js`). That script is not part of this repository and is not migrated. The server
+  calls it only with `OUTBOUND_MODE=live`, and if it is ever switched off the area field stays
+  empty.
+- **Mail programs.** The HTML e-mails link a Google Fonts stylesheet (`gas/emailTemplates.js`),
+  which some mail programs fetch when a message is opened. The server does not.

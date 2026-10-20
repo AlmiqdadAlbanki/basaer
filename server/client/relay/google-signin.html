@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تسجيل الدخول - بصائر</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family: 'Tajawal', Tahoma, Arial, sans-serif; background:#fbf8f5; color:#222832; text-align:center; padding:24px;
+  }
+  .box{ max-width:320px; }
+  .spinner{
+    width:40px; height:40px; margin:0 auto 18px; border-radius:50%;
+    border:4px solid #e5e0d8; border-top-color:#b5262c; animation:spin 1s linear infinite;
+    display:none;
+  }
+  .spinner.show{ display:block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  p{ font-size:14px; line-height:1.8; color:#6f7785; }
+  .error{ color:#c83232; }
+  button{
+    display:inline-flex; align-items:center; gap:8px; height:46px; padding:0 20px; border-radius:12px;
+    border:1px solid #dde3e8; background:#fff; color:#3c4043; font-weight:700; font-size:14px;
+    cursor:pointer; box-shadow:0 2px 6px rgba(31,41,55,.08);
+  }
+  button:disabled{ opacity:.6; cursor:not-allowed; }
+  .log-panel{ margin-top:18px; border-radius:10px; overflow:hidden; background:#12161b; text-align:right; }
+  .log-panel-header{ padding:6px 10px; background:#1c232b; color:#c9d1d9; font-size:11px; font-weight:600; }
+  .log-panel-body{ max-height:160px; overflow-y:auto; padding:6px 10px; direction:ltr; text-align:left; font-family:"Courier New",monospace; font-size:10px; line-height:1.6; color:#8fd694; white-space:pre-wrap; word-break:break-word; }
+  .log-panel-body .err{ color:#ff8a8a; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner" id="spinner"></div>
+    <p id="statusText">للمتابعة، يرجى تسجيل الدخول لتأكيد بريدك.</p>
+    <button id="startBtn" type="button">
+      <span id="btnIcon"></span>
+      <span id="btnLabel">المتابعة</span>
+    </button>
+    <div class="log-panel">
+      <div class="log-panel-header">سجل التشخيص</div>
+      <div class="log-panel-body" id="logBody"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script>
+    // سجل تشخيص دائم (نفس نمط website/qr-scan-relay.html المُثبَت جدواه سابقًا اليوم) — لتتبّع
+    // شكوى طالب متكررة "يتحقق من البريد ثم يعيد من البداية"، راجع الشرح الكامل عند sendResult أدناه.
+    function log_(msg, kind) {
+      try {
+        var body = document.getElementById('logBody');
+        if (!body) return;
+        var time = new Date().toLocaleTimeString('ar-BH', { hour12: false });
+        var line = document.createElement('div');
+        if (kind) line.className = kind;
+        line.textContent = '[' + time + '] ' + msg;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+      } catch (e) {}
+    }
+    log_('0) بدأ تحميل الصفحة، opener: ' + (window.opener ? 'موجودة' : 'غير موجودة'));
+    window.addEventListener('error', function (e) {
+      log_('❌ خطأ JS غير متوقع: ' + e.message + ' (سطر ' + e.lineno + ')', 'err');
+    });
+
+    firebase.initializeApp({
+      apiKey: "AIzaSyAzOQqhYH2lZxM6Yv3Ui62TlB4Bw6m3zkg",
+      authDomain: "basaerbh.com",
+      projectId: "coming-soon-basaer"
+    });
+
+    // هذه الصفحة الوسيطة تخدم أكثر من مزوّد OAuth (وليس جوجل فقط)، عبر معامل ?provider= في
+    // الرابط — نفس الآلية والاسم التاريخي للرسالة (basaer-oauth-relay) لتفادي تعديل كل نقاط
+    // الاستدعاء القديمة. المزوّدات المدعومة حاليًا: google (افتراضي)، yahoo.
+    var PROVIDERS = {
+      google: {
+        label: 'المتابعة بحساب جوجل',
+        icon: '<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">' +
+          '<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>' +
+          '<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>' +
+          '<path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>' +
+          '<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>' +
+          '</svg>',
+        makeProvider: function () { return new firebase.auth.GoogleAuthProvider(); }
+      },
+      yahoo: {
+        label: 'المتابعة بحساب ياهو',
+        icon: '<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#6001D2" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/><path fill="#fff" d="M9.5 7l2 4.7L13.5 7H16l-3.4 7.3V17h-2.2v-2.7L7 7h2.5z"/></svg>',
+        makeProvider: function () { return new firebase.auth.OAuthProvider('yahoo.com'); }
+      }
+    };
+
+    var params = new URLSearchParams(window.location.search);
+    var providerKey = params.get('provider') || 'google';
+    var verifyToken = params.get('verifyToken') || '';
+    var cfg = PROVIDERS[providerKey] || PROVIDERS.google;
+    log_('بطاقة استطلاع احتياطية (verifyToken): ' + (verifyToken ? 'موجودة' : 'غير موجودة'));
+
+    var statusText = document.getElementById('statusText');
+    var spinner = document.getElementById('spinner');
+    var startBtn = document.getElementById('startBtn');
+    document.getElementById('btnIcon').innerHTML = cfg.icon;
+    document.getElementById('btnLabel').textContent = cfg.label;
+
+    // مسار احتياطي مواز إلى جانب postMessage: صفحات جوجل/ياهو/مايكروسوفت لتسجيل الدخول قد تقطع
+    // ارتباط window.opener بين هذه النافذة والصفحة الأصلية أثناء signInWithRedirect (الذي
+    // استُخدم لحل مشكلة حجب popup داخل popup على الجوال) — فتصل النتيجة هنا فعليًا لكنها لا
+    // تستطيع إخبار الصفحة الأصلية بها عبر postMessage. لذا نرسلها أيضًا مباشرة للخادم
+    // (doPost في code.js، بنفس أسلوب qr-scan-relay.html) لتستطلعها الصفحة الأصلية (polling) —
+    // أيًّا من المسارين وصل أولًا يُعتمَد، والآخر يُتجاهل.
+    //
+    // [الخادم الجديد المستضاف ذاتيًا] هذه الصفحة تُخدَّم الآن من نطاق التطبيق نفسه، وكل ما تغيّر عن
+    // النسخة الأصلية (على Firebase Hosting) مُعلَّم بـ"[خادم جديد]":
+    //  1) الإرسال إلى /exec على نفس النطاق (JSON، credentials: 'same-origin') بدل رابط Apps Script.
+    //  2) الخادم لم يعد يصدّق البريد الذي تدّعيه الصفحة: يتحقق بنفسه من رمز الهوية (Firebase ID token)
+    //     ويأخذ البريد منه، ويتجاهل أي email/ok تدّعيهما الصفحة. لذلك نرسل { action, verifyToken,
+    //     idToken } فقط، ويُؤخذ الرمز قبل حذف الحساب المؤقت (انظر handleSignedInUser_).
+    //  3) لا يستطيع التطبيق إكمال تسجيل الدخول بهذا البريد قبل أن يسجّله الخادم كمتحقَّق منه، فصار
+    //     الإرسال للخادم يسبق postMessage في حالة النجاح (في الأصل كان العكس، لأن Apps Script كان
+    //     يصدّق البريد الذي يصله كما هو).
+    //  4) postMessage يُوجَّه إلى أصل هذه الصفحة (window.location.origin) بدل '*': الرسالة تحمل
+    //     بريدًا إلكترونيًا، والتطبيق الذي فتح هذه النافذة يُخدَّم الآن من نفس الأصل.
+    //  شكل الرسالة { source: 'basaer-oauth-relay', ok, email | message, provider } كما كان تمامًا،
+    //  ومستمع التطبيق (startOAuthRelay في auth-js.html) لا يفحص event.origin أصلًا.
+    var AUTH_EXEC_URL_ = '/exec'; // [خادم جديد] كان رابط تطبيق الويب في Apps Script
+
+    function postMessageToOpener_(payload) {
+      try {
+        if (window.opener) { window.opener.postMessage(payload, window.location.origin); log_('أُرسلت النتيجة عبر postMessage للنافذة الأصلية'); } // [خادم جديد] كان targetOrigin '*'
+        else log_('⚠ لا وجود لـwindow.opener هنا — الاعتماد كليًّا على المسار الاحتياطي', 'err');
+      } catch (e) {
+        log_('❌ فشل postMessage: ' + (e && e.message || e), 'err');
+      }
+    }
+
+    // إغلاق بعد لحظة قصيرة بدل الفوري، ليصل postMessage قبل إغلاق النافذة.
+    function closeSoon_() {
+      setTimeout(function () { window.close(); }, 300);
+    }
+
+    // idToken: رمز Firebase للحساب الذي سجّل الدخول (نتيجة النجاح فقط). نتيجة الفشل لا تحمل رمزًا، والخادم
+    // يرفض أي إرسال بلا رمز صالح (401) — فلا فائدة من إرسالها له، يكفي إبلاغ الصفحة الأصلية ثم الإغلاق.
+    function sendResult(payload, idToken) {
+      if (!payload.ok || !verifyToken || !idToken) {
+        if (payload.ok) statusText.textContent = 'تم التحقق بنجاح، يمكنك إغلاق هذه النافذة.';
+        postMessageToOpener_(payload);
+        closeSoon_();
+        return;
+      }
+
+      // [خادم جديد] الخادم أولًا: يتحقق من الرمز ويسجّل البريد المتحقَّق منه، وبعدها فقط نخبر الصفحة
+      // الأصلية (التي ستطلب تسجيل الدخول بهذا البريد فتجده مسجَّلًا عند الخادم).
+      log_('إرسال رمز الهوية للخادم للتحقق منه...');
+      var failureMessage_ = '';
+      fetch(AUTH_EXEC_URL_, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'oauthVerify', verifyToken: verifyToken, idToken: idToken })
+      }).then(function (response) {
+        return response.json().then(function (body) { return { httpStatus: response.status, body: body }; }, function () { return { httpStatus: response.status, body: null }; });
+      }).then(function (reply) {
+        if (reply.httpStatus >= 200 && reply.httpStatus < 300 && reply.body && reply.body.status === 'ok') {
+          log_('قبل الخادم رمز الهوية وسجّل البريد المتحقَّق منه');
+          statusText.textContent = 'تم التحقق بنجاح، يمكنك إغلاق هذه النافذة.';
+          postMessageToOpener_(payload);
+          return;
+        }
+        failureMessage_ = (reply.body && (reply.body.message || reply.body.error)) || ('رفض الخادم الطلب (HTTP ' + reply.httpStatus + ')');
+        log_('❌ رفض الخادم رمز الهوية: ' + failureMessage_, 'err');
+      }).catch(function (err) {
+        failureMessage_ = 'تعذّر الاتصال بالخادم لإكمال التحقق';
+        log_('❌ فشل الاتصال بالخادم: ' + (err && err.message || err), 'err');
+      }).then(function () {
+        if (failureMessage_) {
+          statusText.textContent = 'تعذّر تسجيل الدخول.';
+          statusText.classList.add('error');
+          postMessageToOpener_({ source: 'basaer-oauth-relay', ok: false, message: failureMessage_, provider: payload.provider });
+        }
+        closeSoon_();
+      });
+    }
+
+    function handleSignedInUser_(user) {
+      if (!user || !user.email) throw new Error('لم يتم الحصول على بريد إلكتروني من هذا الحساب');
+      var email = user.email;
+      // [خادم جديد] رمز الهوية (ID token) هو ما يتحقق منه الخادم ويأخذ البريد منه؛ ولا يُصدَر إلا
+      // لحساب موجود، فنأخذه قبل حذف الحساب المؤقت أدناه (يبقى صالحًا بعد الحذف: الخادم يفحص توقيعه).
+      return user.getIdToken().then(function (idToken) {
+        // نحذف حساب Firebase المؤقت الناتج عن الدخول فور التقاط البريد؛ نستخدمه فقط
+        // للتحقق من ملكية البريد، ولا نريد أن يبقى مسجَّلًا بشكل دائم في Firebase (وإلا
+        // سيمنع لاحقًا ربط هذا البريد بحساب الطالب الحقيقي عند إنشاء كلمة المرور،
+        // بخطأ auth/email-already-in-use).
+        return user.delete().catch(function () {}).then(function () { return { email: email, idToken: idToken }; });
+      });
+    }
+
+    function onSignInSuccess_(signedIn) {
+      statusText.textContent = 'جارٍ إكمال التحقق...'; // [خادم جديد] رسالة النجاح تظهر بعد أن يقبل الخادم الرمز (sendResult)
+      sendResult({ source: 'basaer-oauth-relay', ok: true, email: signedIn.email, provider: providerKey }, signedIn.idToken);
+    }
+
+    function onSignInError_(err) {
+      log_('❌ خطأ تسجيل الدخول: ' + ((err && err.code) || '') + ' — ' + ((err && err.message) || String(err)), 'err');
+      startBtn.disabled = false;
+      startBtn.style.display = '';
+      spinner.classList.remove('show');
+      if (err && (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/user-cancelled' || err.code === 'auth/redirect-cancelled-by-user')) {
+        statusText.textContent = 'تم إلغاء العملية، يمكنك المحاولة مرة أخرى.';
+        return;
+      }
+      statusText.textContent = 'تعذّر تسجيل الدخول.';
+      statusText.classList.add('error');
+      sendResult({ source: 'basaer-oauth-relay', ok: false, message: (err && err.message) || String(err), provider: providerKey });
+    }
+
+    // signInWithRedirect بدل signInWithPopup عمدًا: هذه الصفحة نفسها مفتوحة أصلًا كنافذة
+    // منبثقة من الصفحة الرئيسية — ومتصفحات الجوال (خصوصًا Safari/iOS) تحجب بقوة أي نافذة
+    // منبثقة ثانية تُفتح من داخل نافذة منبثقة أصلًا (auth/popup-blocked)، وهو بالضبط ما كان
+    // signInWithPopup يحاول فعله هنا. التحويل يُبقي كل شيء داخل نفس النافذة بلا أي نافذة
+    // إضافية إطلاقًا، فيعمل بثبات على الجوال — الصفحة تُعاد تحميلها من الصفر عند العودة من
+    // جوجل/ياهو/مايكروسوفت بنفس الرابط بالضبط، لذا getRedirectResult() تُفحَص أولًا عند كل
+    // تحميل قبل عرض الزر، لالتقاط تلك العودة تلقائيًا.
+    // عَلَم في sessionStorage (يبقى داخل هذه النافذة تحديدًا عبر التحويل الكامل، بخلاف أي متغير
+    // JS يُفقَد عند إعادة تحميل الصفحة) — يميّز "زيارة أولى" عن "عُدنا فعلًا من تحويل OAuth لكن
+    // getRedirectResult لم يجد شيئًا" (فشل صامت في حفظ/استرجاع حالة التحويل، مرصود على بعض
+    // متصفحات الجوال) — الحالة الثانية يجب أن تُعامَل كخطأ صريح لا كزيارة عادية.
+    startBtn.addEventListener('click', function () {
+      try { sessionStorage.setItem('basaerOauthAttempted', '1'); } catch (e) {}
+      startBtn.disabled = true;
+      startBtn.style.display = 'none';
+      spinner.classList.add('show');
+      statusText.textContent = 'جارٍ تحويلك لتسجيل الدخول...';
+      firebase.auth().signInWithRedirect(cfg.makeProvider()).catch(onSignInError_);
+    });
+
+    startBtn.style.display = 'none';
+    spinner.classList.add('show');
+    statusText.textContent = 'جارٍ التحقق...';
+    let alreadyAttempted_ = false;
+    try { alreadyAttempted_ = sessionStorage.getItem('basaerOauthAttempted') === '1'; } catch (e) {}
+    firebase.auth().getRedirectResult().then(function (result) {
+      if (result && result.user) {
+        log_('نتيجة getRedirectResult: تم العثور على مستخدم');
+        try { sessionStorage.removeItem('basaerOauthAttempted'); } catch (e) {}
+        return handleSignedInUser_(result.user).then(onSignInSuccess_);
+      }
+      log_('نتيجة getRedirectResult: لا توجد نتيجة معلَّقة (محاولة سابقة: ' + (alreadyAttempted_ ? 'نعم' : 'لا') + ')');
+      if (alreadyAttempted_) {
+        // عدنا فعليًا من مزوّد الدخول، لكن Firebase لم يجد نتيجة معلَّقة — على الأرجح فشل
+        // صامت في حفظ حالة التحويل على هذا المتصفح (شائع في وضع التصفح الخاص أو بعض إعدادات
+        // خصوصية Safari). نُبلغ الصفحة الأصلية بالفشل بدل ترك الطالب في حلقة تكرار صامتة.
+        try { sessionStorage.removeItem('basaerOauthAttempted'); } catch (e) {}
+        statusText.textContent = 'تعذّر إكمال تسجيل الدخول عبر هذا المتصفح. يمكنك المحاولة مرة أخرى، أو إغلاق هذه النافذة واستخدام "إرسال رمز التحقق" بدلًا من ذلك.';
+        statusText.classList.add('error');
+        startBtn.style.display = '';
+        spinner.classList.remove('show');
+        sendResult({ source: 'basaer-oauth-relay', ok: false, message: 'تعذّر إكمال التحويل (getRedirectResult فارغة رغم محاولة سابقة)', provider: providerKey });
+        return;
+      }
+      // لا توجد نتيجة تحويل معلَّقة — زيارة أولى عادية، نعرض الزر وننتظر ضغط المستخدم
+      spinner.classList.remove('show');
+      statusText.textContent = 'للمتابعة، يرجى تسجيل الدخول لتأكيد بريدك.';
+      startBtn.style.display = '';
+    }).catch(onSignInError_);
+  </script>
+</body>
+</html>

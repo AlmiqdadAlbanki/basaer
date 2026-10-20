@@ -629,7 +629,7 @@ function notifyWPQueueOwner_(provider, kind, reasonText) {
     if (contact.phone) {
       try { sendWPRaw_(toInternationalWhatsAppNumber(contact.phone), msg); } catch (e1) { Logger.log('تعذّر إرسال إشعار واتساب لصاحب الحملة: ' + e1); }
     }
-    if (contact.email) {
+    if (contact.email && !isEmailBlocked_(contact.email)) {
       try {
         GmailApp.sendEmail(contact.email, subject, msg, {
           name: 'بصائر للعلوم الشرعية',

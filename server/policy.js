@@ -102,9 +102,15 @@ const POLICY = {
   linkVerifiedEmailToProfile: { level: 'user', selfCprArg: 0, kind: 'write' },
   checkIsAlsoStudent: { level: 'user', selfCprArg: 0, kind: 'read' },
   hasExamPermission: { level: 'user', selfCprArg: 0, kind: 'read' }, // returns the caller's own permissions only
-  setMazhab: { level: 'user', selfCprArg: 0, kind: 'write' },
+  setMazhab: { level: 'user', selfCprArg: 1, kind: 'write' }, // setMazhab(mazhab, cpr)
   requestStageJoin: { level: 'student', selfCprArg: 0, kind: 'write' },
-  requestAttendance: { level: 'student', selfCprArg: 0, kind: 'write' },
+  // requestAttendance(payload): the subject is payload.cpr, so the object is
+  // rebuilt with the caller's CPR rather than replaced by a string.
+  requestAttendance: {
+    level: 'student',
+    rescope: (ctx, args) => { args[0] = Object.assign({}, args[0] && typeof args[0] === 'object' ? args[0] : {}, { cpr: ctx.cpr }); },
+    kind: 'write',
+  },
   // The subject is "stWork-<cpr>" (the gas function splits on '-'), so a plain
   // CPR rescope would blank the recorded CPR; rebuild the prefix instead.
   submitStWRK: { level: 'student', rescope: (ctx, args) => { args[0] = 'stWork-' + ctx.cpr; }, kind: 'write' },
@@ -156,8 +162,10 @@ const POLICY = {
   setLecAttend: { level: 'staff', kind: 'write' },
   addManualAttendance: { level: 'perm', perm: 'followUp', kind: 'write' }, // TODO verify perm
   deleteAttendance: { level: 'perm', perm: 'followUp', kind: 'write' },
-  acceptAttendanceRequests: { level: 'perm', perm: 'followUp', kind: 'write' },
-  rejectAttendanceRequests: { level: 'perm', perm: 'followUp', kind: 'write' },
+  // The staff page offers the attendance-requests modal to staff with the
+  // registration permission as well as follow-up (EMP_QUICK_LINKS_ in emp.html).
+  acceptAttendanceRequests: { level: 'staff', check: (ctx) => ctx.perms.registration || ctx.perms.followUp || ctx.isAdmin, kind: 'write' },
+  rejectAttendanceRequests: { level: 'staff', check: (ctx) => ctx.perms.registration || ctx.perms.followUp || ctx.isAdmin, kind: 'write' },
   saveLectureRef: { level: 'staff', kind: 'write' },
   deleteLectureRef: { level: 'staff', kind: 'write' },
   submitDectationData: { level: 'perm', perm: 'dictation', kind: 'write' },
@@ -166,6 +174,7 @@ const POLICY = {
   // ---- Student acceptance (admin) -----------------------------------------
   setStudentsQrCard: { level: 'perm', perm: 'registration', kind: 'write' },
   setStudentStudyMode: { level: 'perm', perm: 'registration', kind: 'write' },
+  reissueStudentCard: { level: 'perm', perm: 'registration', kind: 'write' }, // oldJS.js: no check inside; staff target any CPR
   startAcceptBatch: { level: 'perm', perm: 'registration', kind: 'write' },
   updateAcceptBatchProgress: { level: 'perm', perm: 'registration', kind: 'write' },
   endAcceptBatch: { level: 'perm', perm: 'registration', kind: 'write' },
@@ -188,6 +197,9 @@ const POLICY = {
   saveMadhab: { level: 'admin', kind: 'write' }, deleteMadhab: { level: 'admin', kind: 'write' },
   saveMatnsItem: { level: 'admin', kind: 'write' }, deleteMatnsItem: { level: 'admin', kind: 'write' },
   importMatnCatalogFromAwrad: { level: 'admin', kind: 'write' }, getMadhabImpact: { level: 'admin', kind: 'live' },
+  // "Skills" curriculum list (live code of 2026-10): same shape as subjects/curricula.
+  getSkillsList: { level: 'staff', kind: 'read' },
+  saveSkill: { level: 'admin', kind: 'write' }, deleteSkill: { level: 'admin', kind: 'write' },
 
   // ---- Stages & graduation (admin) ----------------------------------------
   saveStageSettings: { level: 'admin', kind: 'write' },
@@ -197,7 +209,8 @@ const POLICY = {
   getStageAttendanceStats: { level: 'user', selfCprArg: 0, kind: 'read' }, // student dashboard (js.html:1260)
   getStageCompletionStatus: { level: 'staff', kind: 'read' },
   getStageCertificateMessageTemplate: { level: 'admin', kind: 'read' },
-  getGraduationCandidates: { level: 'admin', kind: 'read' },
+  getGraduationCandidates: { level: 'admin', kind: 'write' }, // marks class<N> 'done' for issued certificates
+  getPassedStudents: { level: 'admin', kind: 'read' },
   issueStageCertificate: { level: 'admin', kind: 'write' },
   scheduleStageCertWhatsAppNotify: { level: 'admin', kind: 'write' },
 
@@ -262,6 +275,9 @@ const POLICY = {
 
   // ---- Meta WhatsApp settings (superadmin — already ID-token gated) --------
   setWhatsAppProvider: { level: 'superadmin', kind: 'write' },
+  // WhatsApp as an OTP channel (live code of 2026-10); both verify a superadmin ID token inside too.
+  setOtpWhatsAppProvider: { level: 'superadmin', kind: 'write' },
+  submitMetaOtpTemplateForReview: { level: 'superadmin', kind: 'write' },
   saveMetaWhatsAppConfiguration: { level: 'superadmin', kind: 'write' },
   submitMetaWhatsAppTemplateForReview: { level: 'superadmin', kind: 'write' },
   getMetaWhatsAppTemplateStatus: { level: 'superadmin', kind: 'live' },

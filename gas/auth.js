@@ -61,6 +61,7 @@ function findPersonByCpr_(cpr) {
     const cprCol = headers.indexOf('cpr');
     if (cprCol === -1) continue;
     const mailCol = headers.indexOf('email');
+    const phoneCol = headers.indexOf('phone');
     const emailVerifiedCol = headers.indexOf('emailVerified');
     const authUidCol = headers.indexOf('authUid');
     const hasPasswordCol = headers.indexOf('hasPassword');
@@ -79,6 +80,7 @@ function findPersonByCpr_(cpr) {
           authUidCol: authUidCol,
           hasPasswordCol: hasPasswordCol,
           email: mailCol > -1 ? String(data[r][mailCol] || '').trim() : '',
+          phone: phoneCol > -1 ? toInternationalWhatsAppNumber(data[r][phoneCol]) : '',
           emailVerified: emailVerifiedCol > -1 ? !!data[r][emailVerifiedCol] : false,
           authUid: authUidCol > -1 ? String(data[r][authUidCol] || '').trim() : '',
           hasPassword: hasPasswordCol > -1 ? !!data[r][hasPasswordCol] : false,
@@ -104,7 +106,8 @@ function checkCprStatus(cpr) {
     found: true,
     emailVerified: !!person.emailVerified,
     hasPassword: !!person.hasPassword,
-    maskedEmail: person.email ? maskEmail_(person.email) : ''
+    maskedEmail: person.email ? maskEmail_(person.email) : '',
+    maskedPhone: person.phone ? maskPhone_(person.phone) : ''
   };
 }
 
@@ -151,13 +154,15 @@ function checkStudentRegistered(cpr) {
 }
 
 /////////////////////////////////////////////////////////////////////
-// إرسال آمن موحّد لرمز تحقق مكوّن من 6 أرقام: يُولَّد ويُخزَّن ويُتحقَّق منه بالكامل على
-// الخادم (CacheService)، مع فترة انتظار قصيرة بين الطلبات المتتالية وحدّ أقصى يومي احتياطي.
-// يُستخدم من requestLoginCode (تسجيل الدخول/نسيت كلمة المرور) ومن requestRegistrationOtp
-// (التسجيل وتغيير البريد في الملف الشخصي) — نفس الآلية الآمنة في كل موضع، بدل تكرارها بطرق
-// مختلفة (كان التسجيل سابقًا يُولّد الرمز ويُقارنه في المتصفح نفسه، وهو أضعف أمنيًا).
+// إرسال آمن موحّد لرمز تحقق مكوّن من 6 أرقام عبر قناتين ممكنتين (بريد أو واتساب): يُولَّد
+// ويُخزَّن ويُتحقَّق منه بالكامل على الخادم (CacheService)، بفترة انتظار قصيرة وحدّ أقصى يومي
+// مشتركين بين القناتين لنفس cpr (لمنع تفادي الحدّين بمجرد تبديل القناة). يُستخدم من
+// requestLoginCode (تسجيل الدخول/نسيت كلمة المرور، القناتان متاحتان) ومن requestRegistrationOtp
+// (التسجيل وتغيير البريد في الملف الشخصي، بريد فقط — الهدف هناك إثبات ملكية البريد نفسه لا مجرد
+// إثبات الهوية). destination: بريد إلكتروني لقناة email، رقم دولي مطبَّع (toInternationalWhatsAppNumber)
+// لقناة whatsapp.
 /////////////////////////////////////////////////////////////////////
-function sendOtpEmail_(cpr, email, purpose) {
+function sendOtpCode_(cpr, purpose, channel, destination) {
   const props = PropertiesService.getScriptProperties();
   const cooldownKey = 'otpLastSent_' + cpr;
   const lastSent = parseInt(props.getProperty(cooldownKey) || '0', 10);
@@ -176,46 +181,123 @@ function sendOtpEmail_(cpr, email, purpose) {
   }
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const subject = purpose === 'login'
-    ? 'رمز تسجيل الدخول - أكاديمية بصائر'
-    : 'رمز التحقق من البريد الإلكتروني - أكاديمية بصائر';
 
-  try {
-    // نستخدم GmailApp (وليس MailApp) عمدًا: يُرسل فعليًا كحساب Gmail/Workspace نفسه (نفس مسار
-    // الإرسال اليدوي من واجهة Gmail الذي تأكّدنا من وصوله)، بخلاف MailApp التي تمر عبر خدمة
-    // بريد Apps Script العامة الأقل موثوقية في وصول رسائل تشبه رموز التحقق.
-    // القالب المصمَّم (basair-theme-studio) بدل HTML مباشر — راجع emailTemplates.js.
-    GmailApp.sendEmail(email, subject, 'رمز التحقق الخاص بك: ' + code, {
-      name: 'بصائر للعلوم الشرعية',
-      htmlBody: buildBasairOtpEmail_(code, purpose),
-      inlineImages: { basairLogo: getBasairLogoBlob_() }
-    });
-  } catch (err) {
-    // لا نُخزّن الرمز أو وقت الإرسال إن فشل الإرسال، حتى لا نمنع محاولة جديدة لاحقًا دون داعٍ
-    var msgStr = String(err && err.message || err);
-    var quotaExceeded = /invoked too many times|quota/i.test(msgStr);
-    return {
-      ok: false,
-      quotaExceeded: quotaExceeded,
-      message: quotaExceeded
-        ? 'تعذّر إرسال رمز التحقق حاليًا بسبب امتلاء الحصة اليومية لإرسال البريد. يرجى المحاولة لاحقًا.'
-        : 'تعذّر إرسال رمز التحقق: ' + msgStr
-    };
+  if (channel === 'whatsapp') {
+    // محاولتان (الأصلية + إعادة واحدة عبر نفس المزوّد المُفعَّل حاليًا) قبل الاستسلام — راجع
+    // attemptOtpWhatsAppSendWithRetry_ أدناه. فشل المحاولتين معًا يُنبّه الإدارة فورًا بالبريد
+    // بدل اكتشاف المشكلة لاحقًا من شكوى طالب.
+    const wpResult = attemptOtpWhatsAppSendWithRetry_(destination, code, purpose);
+    if (!wpResult || !wpResult.status) {
+      notifyAdminOfOtpWhatsAppFailure_(destination, purpose, wpResult);
+      return { ok: false, message: 'تعذّر الإرسال الآن، يرجى المحاولة مرة أخرى لاحقًا.' };
+    }
+  } else {
+    // عنوان بريد رُصد له فشل تسليم دائم سابق (راجع emailBounces.js) — لا فائدة من محاولة
+    // الإرسال، وقد تستهلك حصة يومية حقيقية بلا طائل. رسالة صريحة بدل خطأ تقني مبهم.
+    if (isEmailBlocked_(destination)) {
+      return {
+        ok: false,
+        blocked: true,
+        message: 'تعذّر إرسال رمز التحقق إلى هذا البريد الإلكتروني (رُصدت مشكلة سابقة في استقباله). يرجى تحديث بريدك الإلكتروني من إعدادات حسابك أو التواصل مع الإدارة.'
+      };
+    }
+    const subject = purpose === 'login'
+      ? 'رمز تسجيل الدخول - أكاديمية بصائر'
+      : 'رمز التحقق من البريد الإلكتروني - أكاديمية بصائر';
+    try {
+      // نستخدم GmailApp (وليس MailApp) عمدًا: يُرسل فعليًا كحساب Gmail/Workspace نفسه (نفس مسار
+      // الإرسال اليدوي من واجهة Gmail الذي تأكّدنا من وصوله)، بخلاف MailApp التي تمر عبر خدمة
+      // بريد Apps Script العامة الأقل موثوقية في وصول رسائل تشبه رموز التحقق.
+      // القالب المصمَّم (basair-theme-studio) بدل HTML مباشر — راجع emailTemplates.js.
+      GmailApp.sendEmail(destination, subject, 'رمز التحقق الخاص بك: ' + code, {
+        name: 'بصائر للعلوم الشرعية',
+        htmlBody: buildBasairOtpEmail_(code, purpose),
+        inlineImages: { basairLogo: getBasairLogoBlob_() }
+      });
+    } catch (err) {
+      // لا نُخزّن الرمز أو وقت الإرسال إن فشل الإرسال، حتى لا نمنع محاولة جديدة لاحقًا دون داعٍ
+      var msgStr = String(err && err.message || err);
+      var quotaExceeded = /invoked too many times|quota/i.test(msgStr);
+      return {
+        ok: false,
+        quotaExceeded: quotaExceeded,
+        message: quotaExceeded
+          ? 'تعذّر إرسال رمز التحقق حاليًا بسبب امتلاء الحصة اليومية لإرسال البريد.'
+          : 'تعذّر إرسال رمز التحقق: ' + msgStr
+      };
+    }
   }
 
-  CacheService.getScriptCache().put('otp_' + cpr, JSON.stringify({ code: code, email: email, attempts: 0 }), AUTH_OTP_TTL_SECONDS);
+  CacheService.getScriptCache().put('otp_' + cpr, JSON.stringify({ code: code, channel: channel, destination: destination, attempts: 0 }), AUTH_OTP_TTL_SECONDS);
   props.setProperty(cooldownKey, String(Date.now()));
   props.setProperty(dayKey, today);
   props.setProperty(countKey, String(count + 1));
 
-  return { ok: true, maskedEmail: maskEmail_(email), cooldownSeconds: AUTH_OTP_COOLDOWN_SECONDS };
+  return {
+    ok: true,
+    channel: channel,
+    maskedEmail: channel === 'email' ? maskEmail_(destination) : '',
+    maskedPhone: channel === 'whatsapp' ? maskPhone_(destination) : '',
+    cooldownSeconds: AUTH_OTP_COOLDOWN_SECONDS
+  };
+}
+
+// نص رسالة الواتساب لرمز التحقق — مقابل buildBasairOtpEmail_ (emailTemplates.js) لكن نص عادي
+// (بلا HTML، واتساب لا يدعمه)، بنفس نبرة الفصحى المعتمدة بكل نصوص المشروع الظاهرة للمستخدم.
+function buildBasairOtpWhatsAppMessage_(code, purpose) {
+  const intro = purpose === 'login'
+    ? 'رمز تسجيل الدخول الخاص بك في منصة بصائر:'
+    : 'رمز التحقق من بريدك الإلكتروني في منصة بصائر:';
+  return 'بصائر للعلوم الشرعية\n' + intro + '\n\n' + code +
+    '\n\nهذا الرمز صالح لمدة عشر دقائق فقط. إذا لم تطلب هذا الرمز، يمكنك تجاهل هذه الرسالة بأمان.';
+}
+
+// محاولة إرسال واحدة عبر المزوّد المُفعَّل حاليًا (getActiveOtpWhatsAppProvider_، dataGet.js —
+// Fonnte افتراضيًا، Meta فقط لو فعَّله Super Admin صراحةً). تُرجع دومًا كائنًا بحقل status
+// (تلتقط أي استثناء وتحوّله لنفس الشكل) بدل رمي، ليسهل فحصها من المستدعي بلا try/catch متكرر.
+function attemptOtpWhatsAppSend_(phone, code, purpose) {
+  try {
+    return getActiveOtpWhatsAppProvider_() === 'meta'
+      ? sendMetaOtpTemplate_(phone, code)
+      : sendWPRaw_(phone, buildBasairOtpWhatsAppMessage_(code, purpose));
+  } catch (err) {
+    return { status: false, reason: String(err && err.message ? err.message : err) };
+  }
+}
+
+// محاولتان فقط: الأصلية، ثم إعادة واحدة بعد تأخير قصير عبر نفس المزوّد — فشل عابر لحظي (اتصال،
+// تحميل خادم Fonnte مؤقتًا...) غالبًا ما يزول خلال ثوانٍ، فلا داعٍ لإفشال تسجيل الدخول من أول
+// محاولة. المُستدعي (sendOtpCode_) يُنبّه الإدارة عند فشل المحاولتين معًا.
+function attemptOtpWhatsAppSendWithRetry_(phone, code, purpose) {
+  const first = attemptOtpWhatsAppSend_(phone, code, purpose);
+  if (first && first.status) return first;
+  Utilities.sleep(1500);
+  return attemptOtpWhatsAppSend_(phone, code, purpose);
+}
+
+// تنبيه فوري للإدارة عند فشل إرسال رمز تحقق عبر واتساب بعد محاولتين — بريد الإدارة الأساسي
+// مباشرة بلا حاجز isEmailBlocked_ (قناة تنبيه داخلية حرجة، بنفس استثناء dfekra@gmail.com في
+// notifyCertificateError_ بdataPost.js). فشل هذا التنبيه نفسه لا يُفسد استجابة الطالب.
+function notifyAdminOfOtpWhatsAppFailure_(phone, purpose, lastResult) {
+  try {
+    GmailApp.sendEmail('admin@basaerbh.com', 'تنبيه: فشل إرسال رمز تحقق عبر واتساب',
+      'تعذّر إرسال رمز تحقق (' + purpose + ') عبر واتساب بعد محاولتين متتاليتين.\n\n' +
+      'الرقم: ' + phone + '\n' +
+      'المزوّد النشط: ' + getActiveOtpWhatsAppProvider_() + '\n' +
+      'سبب آخر فشل: ' + ((lastResult && (lastResult.reason || lastResult.detail)) || 'غير معروف') + '\n' +
+      'الوقت: ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')
+    );
+  } catch (err) {
+    Logger.log('تعذّر إرسال تنبيه فشل واتساب للإدارة: ' + err);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////
 // Step 1: request a login code for a CPR
 /////////////////////////////////////////////////////////////////////
-function requestLoginCode(cpr, emailInput) {
+function requestLoginCode(cpr, emailInput, channel) {
   cpr = String(cpr || '').trim();
+  channel = channel === 'whatsapp' ? 'whatsapp' : 'email';
   if (!isValidPersonId(cpr)) {
     return { ok: false, message: 'يرجى إدخال رقم شخصي أو هوية دخول صحيحة.' };
   }
@@ -223,6 +305,13 @@ function requestLoginCode(cpr, emailInput) {
   const person = findPersonByCpr_(cpr);
   if (!person) {
     return { ok: false, notFound: true };
+  }
+
+  if (channel === 'whatsapp') {
+    if (!person.phone) {
+      return { ok: false, message: 'لا يوجد رقم واتساب مسجَّل لحسابك، يرجى استخدام البريد الإلكتروني بدلًا من ذلك أو التواصل مع الإدارة.' };
+    }
+    return sendOtpCode_(cpr, 'login', 'whatsapp', person.phone);
   }
 
   let targetEmail;
@@ -235,7 +324,7 @@ function requestLoginCode(cpr, emailInput) {
     }
   }
 
-  return sendOtpEmail_(cpr, targetEmail, 'login');
+  return sendOtpCode_(cpr, 'login', 'email', targetEmail);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -251,11 +340,11 @@ function requestRegistrationOtp(cpr, email) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, message: 'يرجى إدخال بريد إلكتروني صحيح.' };
   }
-  return sendOtpEmail_(cpr, email, 'registration');
+  return sendOtpCode_(cpr, 'registration', 'email', email);
 }
 
 /////////////////////////////////////////////////////////////////////
-// تحقق من رمز التسجيل — يقرأ نفس الرمز المُخزَّن عبر sendOtpEmail_، لكن لا يُصدر أي رمز دخول
+// تحقق من رمز التسجيل — يقرأ نفس الرمز المُخزَّن عبر sendOtpCode_، لكن لا يُصدر أي رمز دخول
 // (Firebase token)؛ فقط يؤكد ملكية البريد قبل إتمام نموذج التسجيل العادي.
 /////////////////////////////////////////////////////////////////////
 function verifyRegistrationOtp(cpr, code) {
@@ -278,7 +367,7 @@ function verifyRegistrationOtp(cpr, code) {
     return { ok: false, message: 'الرمز غير صحيح، يرجى المحاولة مرة أخرى.' };
   }
   cache.remove(cacheKey);
-  return { ok: true, email: data.email };
+  return { ok: true, email: data.destination };
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -339,7 +428,7 @@ function skipEmailVerificationLogin(cpr) {
     person.sheet.getRange(person.rowNumber, person.authUidCol + 1).setValue(uid);
   }
 
-  if (person.email) {
+  if (person.email && !isEmailBlocked_(person.email)) {
     try {
       GmailApp.sendEmail(person.email, 'تنبيه أمني بشأن حسابك - أكاديمية بصائر',
         'تم إنشاء كلمة مرور جديدة لحسابك دون التحقق من بريدك الإلكتروني. إذا لم تكن أنت من قام بهذا، يرجى التواصل مع الإدارة فورًا.', {
@@ -428,15 +517,20 @@ function verifyLoginCode(cpr, code) {
   }
 
   const uid = person.authUid || ('u' + cpr);
-  const finalEmail = data.email || person.email;
-  if (person.emailVerifiedCol > -1 && !person.emailVerified) {
-    person.sheet.getRange(person.rowNumber, person.emailVerifiedCol + 1).setValue(true);
+  // قناة واتساب تُثبت الهوية فقط (رقم هاتف مسجَّل مسبقًا لدينا)، لا ملكية البريد — فلا تُعلَّم
+  // emailVerified ولا يُكتَب أي بريد جديد هنا، بخلاف قناة البريد التي تفعل الاثنين كسابقًا.
+  const isEmailChannel = data.channel !== 'whatsapp';
+  const finalEmail = (isEmailChannel && data.destination) || person.email;
+  if (isEmailChannel) {
+    if (person.emailVerifiedCol > -1 && !person.emailVerified) {
+      person.sheet.getRange(person.rowNumber, person.emailVerifiedCol + 1).setValue(true);
+    }
+    if (person.mailCol > -1 && data.destination && data.destination !== person.email) {
+      person.sheet.getRange(person.rowNumber, person.mailCol + 1).setValue(data.destination);
+    }
   }
   if (person.authUidCol > -1 && !person.authUid) {
     person.sheet.getRange(person.rowNumber, person.authUidCol + 1).setValue(uid);
-  }
-  if (person.mailCol > -1 && data.email && data.email !== person.email) {
-    person.sheet.getRange(person.rowNumber, person.mailCol + 1).setValue(data.email);
   }
 
   return {
@@ -726,4 +820,10 @@ function maskEmail_(email) {
   if (parts.length !== 2) return email;
   const visible = parts[0].slice(0, Math.min(2, parts[0].length));
   return visible + '***@' + parts[1];
+}
+
+function maskPhone_(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length <= 4) return digits;
+  return '+' + digits.slice(0, -4).replace(/\d/g, '•') + digits.slice(-4);
 }

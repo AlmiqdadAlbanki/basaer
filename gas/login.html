@@ -48,14 +48,21 @@
             </div>
 
             <div id="cprActionButtons" class="d-none">
-              <div class="d-flex gap-2 mt-4 mb-2">
+              <div class="d-flex flex-wrap gap-2 mt-4 mb-2">
                 <button id="passwordLoginBtn" type="button" class="btn btn-danger rounded-5 flex-fill d-none">
                   دخـول
                   <div id="passwordLoginSpin" class="spinner-border spinner-border-sm text-light d-none ms-2" role="status"></div>
                 </button>
                 <button id="sendCodeBtn" type="button" class="btn btn-danger rounded-5 flex-fill d-none">
-                  إرسال رمز التحقق
+                  <i class="fas fa-envelope"></i> إرسال عبر البريد
                   <div id="sendCodeSpin" class="spinner-border spinner-border-sm text-light d-none ms-2" role="status"></div>
+                </button>
+                <!-- قناة بديلة كاملة للبريد (وليست احتياطًا فقط)، بعد أن ثبت أن حصة إرسال البريد
+                     اليومية عرضة للنفاد فجأة بلا سيطرة من الكود — الطالب يختار صراحةً، وتظهر فقط
+                     لمن له رقم واتساب مسجَّل (checkCprStatus.maskedPhone). -->
+                <button id="sendCodeWhatsAppBtn" type="button" class="btn btn-outline-danger rounded-5 flex-fill d-none">
+                  <i class="fab fa-whatsapp"></i> إرسال عبر واتساب
+                  <div id="sendCodeWhatsAppSpin" class="spinner-border spinner-border-sm text-danger d-none ms-2" role="status"></div>
                 </button>
               </div>
               <!-- نعرف مزوّد بريده المسجَّل مسبقًا، فنعرض زر ذلك المزوّد تحديدًا فقط (تحقق فوري

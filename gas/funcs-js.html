@@ -1835,9 +1835,8 @@ function startCertSelfIssue(examName, level){
 // مُصفَّاة إلى مذاهب مرحلة الطالب الحالية فقط (level بكل مذهب)، ويُبرز المختار حاليًا
 // (studentData[0].mazhab) بحالة "مُختار" بصريًا. يُخفي رابط "المذهب الفقهي" بالقائمة الجانبية
 // بالكامل (#mazhabNav) إن لم يوجد أي مذهب يخص مرحلة الطالب — لا صفحة فارغة بلا خيارات. يُقفل
-// النقر (كلاس .locked) لو كان الطالب قد اختار بالفعل وallowMazhabChange=false (statusData،
-// مفتاح "تغيير المذهب" بتبويب المذاهب — إدارة المواد)؛ اختيار أول مذهب يبقى متاحًا دائمًا مهما
-// كانت حالة هذا المفتاح. تُستدعى عند فتح تبويب "المذهب الفقهي" (js.html، معالج
+// النقر (كلاس .locked) لو كان allowMazhabChange=false (statusData، مفتاح "تغيير المذهب"
+// بتبويب المذاهب — إدارة المواد)، لكل الطلاب بمن فيهم من لم يختر مذهبًا بعد. تُستدعى عند فتح تبويب "المذهب الفقهي" (js.html، معالج
 // navLink=='mazhabNav')، فور نجاح أي حفظ/تغيير مذهب، وفور وصول allMadhabs (setMazhabsList).
 function renderMazhabSelection(){
   var container = document.querySelector('.mazhabCard');
@@ -1856,14 +1855,20 @@ function renderMazhabSelection(){
   if(navLink) navLink.classList.toggle('d-none', matching.length === 0);
   if(matching.length === 0){ container.innerHTML = ''; return; }
 
-  var locked = !!current && statusData && statusData.allowMazhabChange === false;
+  var locked = !!(statusData && statusData.allowMazhabChange === false);
 
   var subtitleEl = document.getElementById('mazhabPageSubtitle');
   if(subtitleEl) subtitleEl.textContent = locked
-    ? 'اخترت مذهبك الفقهي، ولا يمكنك تغييره حاليًا.'
+    ? (current ? 'اخترت مذهبك الفقهي، ولا يمكنك تغييره حاليًا.' : 'تسجيل المذهب الفقهي مغلق حاليًا.')
     : 'اختر المذهب الفقهي الذي ستدرس عليه طوال مراحلك الدراسية، ويمكنك تغيير اختيارك لاحقًا من هذه الصفحة نفسها.';
   var lockedNoteEl = document.getElementById('mazhabLockedNote');
-  if(lockedNoteEl) lockedNoteEl.classList.toggle('d-none', !locked);
+  if(lockedNoteEl){
+    lockedNoteEl.classList.toggle('d-none', !locked);
+    var lockedNoteText = document.getElementById('mazhabLockedNoteText');
+    if(lockedNoteText) lockedNoteText.textContent = current
+      ? 'اخترت مذهبك الفقهي بالفعل، وتغييره غير متاح حاليًا — تواصل مع الإدارة إن كنت بحاجة لذلك.'
+      : 'تسجيل المذهب الفقهي مغلق حاليًا — تواصل مع الإدارة إن كنت بحاجة لذلك.';
+  }
 
   container.innerHTML = matching.map(function(m){
     var isSelected = !!current && m.name === current;
@@ -1970,6 +1975,10 @@ var attendRegControlsBound_ = false;
 
 function loadEmpAttendRegRoute(){
   setupAttendRegControls();
+  // عدد طلبات الحضور المعلَّقة على زر "طلبات الحضور" (جزء من صلاحية التحضير) — مستقل عن جلب الطلاب
+  google.script.run.withSuccessHandler(function(list){
+    setEmpAttendReqCount(Array.isArray(list) ? list.length : 0);
+  }).withFailureHandler(function(){}).getAttendanceRequests();
   loadingStart();
   google.script.run.withSuccessHandler(function(dr){
     allStuData = Array.isArray(dr) ? dr : [];
@@ -2361,7 +2370,7 @@ function empOpenStudentWorks(){ showCurrentStus = true; getAllStWrksData(); show
 // بنمط quick-actions (مطابق لبطاقة "إجراءات سريعة" في لوحة المعلومات الكاملة) — تنقل
 // حقيقي فقط لأقسام يملك المتعاون صلاحية الوصول لها فعليًا، بلا أي بيانات وهمية.
 var EMP_QUICK_LINKS_ = [
-  { perm: 'registration', route: 'emp-attendreg', icon: 'scan-qr-code', title: 'تسجيل الحضور', sub: 'بالرمز QR' },
+  { perm: 'registration', route: 'emp-attendreg', icon: 'scan-qr-code', title: 'تسجيل الحضور', sub: 'بالرمز QR وطلبات الحضور' },
   { perm: 'dictationOrFollowUp', route: 'emp-dictation', icon: 'list-checks', title: 'التسميع', sub: 'تسجيل ومتابعة التسميع' },
   { perm: 'exam', route: 'emp-exams', icon: 'clipboard-check', title: 'الاختبارات', sub: 'متابعة الاختبارات' },
   { perm: 'manage', route: 'emp-manage', icon: 'shield-check', title: 'الإدارة', sub: 'أقسام إدارة الأكاديمية' }

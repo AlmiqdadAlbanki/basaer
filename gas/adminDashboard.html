@@ -21,7 +21,6 @@
     <button class="nav-link" type="button" data-route="lectures"><i data-icon="calendar-days"></i><span>إدارة المحاضرات</span></button>
     <button class="nav-link" type="button" data-route="curriculum"><i data-icon="book-open-check"></i><span>إدارة المواد</span></button>
     <button class="nav-link" type="button" data-route="stages"><i data-icon="list-checks"></i><span>إدارة المراحل</span></button>
-    <button class="nav-link" type="button" data-route="graduationCandidates"><i data-icon="award"></i><span>مرشّحو الاجتياز</span></button>
     <button class="nav-link" type="button" data-route="templates"><i data-icon="copy"></i><span>إدارة القوالب</span></button>
     <button class="nav-link" type="button" data-route="reports"><i data-icon="chart-line"></i><span>التقارير</span></button>
 
@@ -220,7 +219,12 @@
 
     <!-- قوائم الطلاب -->
     <section class="page-view" data-page="students">
-      <header class="page-heading"><div><span class="eyebrow">إدارة الطلاب</span><h1>قوائم الطلاب</h1><p>بيانات الطلاب وتقدمهم في البرامج الدراسية.</p></div><div class="heading-actions"><button class="secondary-button" type="button" onclick="exportStudentsToExcel()"><i data-icon="file-spreadsheet"></i>تصدير Excel</button></div></header>
+      <nav class="students-page-tabs" role="tablist" aria-label="أقسام الطلاب">
+        <button class="active" type="button" role="tab" aria-selected="true" data-route="students"><i data-icon="users-round"></i><span><strong>طلاب حاليون</strong><small>المسجلون في مرحلة نشطة</small></span></button>
+        <button type="button" role="tab" aria-selected="false" data-route="graduationCandidates"><i data-icon="clipboard-check"></i><span><strong>مرشحو الاجتياز</strong><small>متابعة الشروط وإصدار الشهادات</small></span></button>
+        <button type="button" role="tab" aria-selected="false" data-route="passedStudents"><i data-icon="award"></i><span><strong>مجتازون</strong><small>سجل المراحل التي تم اجتيازها</small></span></button>
+      </nav>
+      <header class="page-heading"><div><span class="eyebrow">إدارة الطلاب</span><h1>الطلاب الحاليون</h1><p>بيانات الطلاب المسجلين حاليًا وتقدمهم في البرامج الدراسية.</p></div><div class="heading-actions"><button class="secondary-button" type="button" onclick="exportStudentsToExcel()"><i data-icon="file-spreadsheet"></i>تصدير Excel</button></div></header>
       <section class="panel data-panel" data-live data-skeleton="table">
         <div class="live-content">
           <div class="table-toolbar students-table-toolbar">
@@ -364,6 +368,22 @@
             <button type="button" data-whatsapp-provider="meta" role="radio" aria-checked="false" disabled>Meta الرسمي</button>
           </div>
           <button class="secondary-button" id="metaWhatsappSettingsBtn" type="button" onclick="openMetaWhatsAppSettings_()" hidden><i data-icon="settings-2"></i>إعداد Meta</button>
+        </div>
+      </section>
+
+      <!-- مزوّد رمز تحقق الدخول (OTP) عبر واتساب — مستقل عمدًا عن مزوّد الحملات أعلاه؛ راجع
+           setOtpWhatsAppProvider/sendMetaOtpTemplate_ في dataPost.js وsendOtpCode_ في auth.js. -->
+      <section class="whatsapp-provider-card" aria-labelledby="otpWhatsappProviderTitle">
+        <div class="whatsapp-provider-copy">
+          <span class="message-template-icon green"><i data-icon="shield-check"></i></span>
+          <div><h2 id="otpWhatsappProviderTitle">مزوّد رمز التحقق (OTP) عبر واتساب</h2><p id="otpWhatsappProviderHint">جاري تحميل المزوّد الحالي...</p></div>
+        </div>
+        <div class="whatsapp-provider-actions">
+          <div class="segmented whatsapp-provider-switch" id="otpWhatsappProviderSwitch" role="radiogroup" aria-label="مزوّد رمز التحقق">
+            <button class="active" type="button" data-otp-provider="fonnte" role="radio" aria-checked="true" disabled>Fonnte</button>
+            <button type="button" data-otp-provider="meta" role="radio" aria-checked="false" disabled>Meta الرسمي</button>
+          </div>
+          <button class="secondary-button" id="otpMetaTemplateBtn" type="button" onclick="openOtpMetaTemplatePanel_()" hidden><i data-icon="badge-check"></i>قالب OTP على Meta</button>
         </div>
       </section>
 
@@ -858,6 +878,7 @@
         <button class="matnCatalog" id="curriculumTab-matnCatalog" data-tab="matnCatalog" type="button" role="tab" aria-selected="false" aria-controls="curriculumMatnsPanel"><span class="curriculum-tab-icon"><i data-icon="bookmark"></i></span><span class="curriculum-tab-copy"><small>المحتوى العلمي</small><strong>المتون</strong><span>الكتب والمتون المرتبطة بالمواد</span></span><b id="curriculumCount-matnCatalog">0</b></button>
         <button class="awrad" id="curriculumTab-awrad" data-tab="awrad" type="button" role="tab" aria-selected="false" aria-controls="curriculumAwradPanel"><span class="curriculum-tab-icon"><i data-icon="list-checks"></i></span><span class="curriculum-tab-copy"><small>خطة الإنجاز</small><strong>الأوراد</strong><span>تقسيمات القراءة والتسميع</span></span><b id="curriculumCount-awrad">0</b></button>
         <button class="madhabs" id="curriculumTab-madhabs" data-tab="madhabs" type="button" role="tab" aria-selected="false" aria-controls="curriculumMadhabsPanel"><span class="curriculum-tab-icon"><i data-icon="graduation-cap"></i></span><span class="curriculum-tab-copy"><small>المسار الفقهي</small><strong>المذاهب</strong><span>خيارات التخصص المتاحة للطلاب</span></span><b id="curriculumCount-madhabs">0</b></button>
+        <button class="skills" id="curriculumTab-skills" data-tab="skills" type="button" role="tab" aria-selected="false" aria-controls="curriculumSkillsPanel"><span class="curriculum-tab-icon"><i data-icon="lightbulb"></i></span><span class="curriculum-tab-copy"><small>الكفايات العلمية</small><strong>المهارات</strong><span>المهارات التي يكتسبها الطالب في كل مادة</span></span><b id="curriculumCount-skills">0</b></button>
       </div>
 
       <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumSubjectsPanel" role="tabpanel" aria-labelledby="curriculumTab-subjects">
@@ -992,6 +1013,28 @@
           </footer>
         </div>
       </section>
+
+      <!-- "المهارات" — قائمة بسيطة بنفس بنية المقررات (اسم/وصف/مادة اختيارية/مراحل). -->
+      <section class="panel data-panel academic-data-panel curriculum-data-panel" data-live data-skeleton="table" id="curriculumSkillsPanel" role="tabpanel" aria-labelledby="curriculumTab-skills" hidden>
+        <div class="live-content">
+          <header class="academic-panel-header"><div><span class="academic-panel-icon purple"><i data-icon="lightbulb"></i></span><span><strong>المهارات</strong><small>المهارات والكفايات العلمية المرتبطة بالمواد والمراحل.</small></span></div><div class="academic-panel-actions">
+              <button class="icon-button" id="refreshSkillsBtn" type="button" title="تحديث بيانات الجدول"><i data-icon="refresh-cw"></i></button>
+              <button class="primary-button" id="addSkillBtn" type="button"><i data-icon="plus"></i>إضافة مهارة</button>
+            </div></header>
+          <div class="academic-table-tools"><label class="academic-search"><i data-icon="search"></i><input id="skills-search-input" type="search" placeholder="ابحث باسم المهارة أو وصفها..."></label></div>
+          <div class="responsive-table academic-table-wrap">
+            <table id="skillsTable">
+              <thead><tr><th data-sort="name">الاسم</th><th>المادة</th><th>المرحلة</th><th data-sort="description">الوصف</th><th></th></tr></thead>
+              <tbody id="skillsRows"><tr><td colspan="5" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="skills-visible-count">0</b></span>
+            <div class="page-size"><label for="skills-page-size">عدد الصفوف</label><select id="skills-page-size"><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="pagination" id="skillsPagination"></div>
+          </footer>
+        </div>
+      </section>
     </section>
 
     <!-- إدارة المراحل — منتقي للمراحل الأربع الثابتة + محرّر مستقل للتسجيل والمدة والقوالب
@@ -1011,6 +1054,11 @@
     <!-- مرشّحو الاجتياز — طلاب حقّقوا كل شروط الاجتياز الإلزامية لمرحلتهم الحالية ولم تُصدَر
          شهادتهم بعد. راجع مناقشات.md "نظام إدارة المراحل" للسياق الكامل. -->
     <section class="page-view" data-page="graduationCandidates">
+      <nav class="students-page-tabs" role="tablist" aria-label="أقسام الطلاب">
+        <button type="button" role="tab" aria-selected="false" data-route="students"><i data-icon="users-round"></i><span><strong>طلاب حاليون</strong><small>المسجلون في مرحلة نشطة</small></span></button>
+        <button class="active" type="button" role="tab" aria-selected="true" data-route="graduationCandidates"><i data-icon="clipboard-check"></i><span><strong>مرشحو الاجتياز</strong><small>متابعة الشروط وإصدار الشهادات</small></span></button>
+        <button type="button" role="tab" aria-selected="false" data-route="passedStudents"><i data-icon="award"></i><span><strong>مجتازون</strong><small>سجل المراحل التي تم اجتيازها</small></span></button>
+      </nav>
       <header class="page-heading"><div><span class="eyebrow">الشؤون الأكاديمية</span><h1>مرشّحو الاجتياز</h1><p>جميع الطلاب وتقدّمهم بشروط اجتياز مرحلتهم الحالية — يُسمح بتحديد من اجتاز فقط لإصدار شهادته.</p></div>
         <div class="heading-actions">
           <button class="icon-button" id="refreshGraduationCandidatesBtn" type="button" title="تحديث القائمة"><i data-icon="refresh-cw"></i></button>
@@ -1061,6 +1109,69 @@
             <span>عرض النتائج: <b id="gradCand-visible-count">0</b></span>
             <div class="page-size"><label for="gradCand-page-size">عدد الصفوف</label><select id="gradCand-page-size"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="all">الجميع</option></select></div>
             <div class="pagination" id="gradCandPagination"></div>
+          </footer>
+        </div>
+      </section>
+    </section>
+
+    <!-- مجتازون — سجل رسمي للمراحل التي صدرت شهادات اجتيازها، مع تفاصيل كل مرحلة. -->
+    <section class="page-view" data-page="passedStudents">
+      <nav class="students-page-tabs" role="tablist" aria-label="أقسام الطلاب">
+        <button type="button" role="tab" aria-selected="false" data-route="students"><i data-icon="users-round"></i><span><strong>طلاب حاليون</strong><small>المسجلون في مرحلة نشطة</small></span></button>
+        <button type="button" role="tab" aria-selected="false" data-route="graduationCandidates"><i data-icon="clipboard-check"></i><span><strong>مرشحو الاجتياز</strong><small>متابعة الشروط وإصدار الشهادات</small></span></button>
+        <button class="active" type="button" role="tab" aria-selected="true" data-route="passedStudents"><i data-icon="award"></i><span><strong>مجتازون</strong><small>سجل المراحل التي تم اجتيازها</small></span></button>
+      </nav>
+      <header class="page-heading"><div><span class="eyebrow">إدارة الطلاب</span><h1>المجتازون</h1><p>سجل الطلاب الذين اجتازوا مرحلة دراسية، مع تفاصيل المرحلة وشهادة الاجتياز.</p></div>
+        <div class="heading-actions">
+          <button class="icon-button" id="refreshPassedStudentsBtn" type="button" title="تحديث القائمة"><i data-icon="refresh-cw"></i></button>
+          <button class="secondary-button" id="exportPassedStudentsBtn" type="button"><i data-icon="file-spreadsheet"></i>تصدير Excel</button>
+        </div>
+      </header>
+      <section class="panel data-panel" data-live data-skeleton="table">
+        <div class="live-content">
+          <div class="table-toolbar students-table-toolbar">
+            <div class="reg-filter-unit">
+              <span class="reg-filter-label">المرحلة المجتازة</span>
+              <div class="segmented" data-filter-group="passedStage" id="passedStageFilterGroup">
+                <button class="active" data-filter="all" type="button">الجميع <b id="passedStageCount-all">0</b></button>
+                <button data-filter="0" type="button">التأهيلية <b id="passedStageCount-0">0</b></button>
+                <button data-filter="1" type="button">التأسيسية <b id="passedStageCount-1">0</b></button>
+                <button data-filter="2" type="button">التأصيلية <b id="passedStageCount-2">0</b></button>
+                <button data-filter="3" type="button">التحصيلية <b id="passedStageCount-3">0</b></button>
+              </div>
+            </div>
+            <div class="reg-filter-unit">
+              <span class="reg-filter-label">الجنس</span>
+              <div class="segmented" data-filter-group="passedGender" id="passedGenderFilterGroup">
+                <button class="active" data-filter="all" type="button">الكل</button>
+                <button data-filter="ذكر" type="button">ذكور</button>
+                <button data-filter="أنثى" type="button">إناث</button>
+              </div>
+            </div>
+            <div class="reg-filter-unit students-search-unit">
+              <span class="reg-filter-label">البحث</span>
+              <label class="table-search"><i data-icon="search"></i><input id="passedStudentsSearchInput" type="search" placeholder="اسم الطالب أو الرقم الشخصي..."></label>
+            </div>
+          </div>
+          <div class="responsive-table">
+            <table id="passedStudentsTable">
+              <thead><tr>
+                <th data-sort="name">الطالب</th>
+                <th data-sort="stageIndex">المرحلة المجتازة</th>
+                <th data-sort="attendance">الحضور</th>
+                <th data-sort="examPassRate">النجاح</th>
+                <th data-sort="recitationRate">التسميع</th>
+                <th data-sort="mandatoryAvg">المتوسط</th>
+                <th data-sort="issuedAt">تاريخ الاجتياز</th>
+                <th>الشهادة والتفاصيل</th>
+              </tr></thead>
+              <tbody id="passedStudentsRows"><tr><td colspan="8" style="text-align:center;padding:24px;">جاري التحميل...</td></tr></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <span>عرض النتائج: <b id="passedStudents-visible-count">0</b></span>
+            <div class="page-size"><label for="passedStudents-page-size">عدد الصفوف</label><select id="passedStudents-page-size"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="all">الجميع</option></select></div>
+            <div class="pagination" id="passedStudentsPagination"></div>
           </footer>
         </div>
       </section>

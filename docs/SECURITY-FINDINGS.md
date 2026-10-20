@@ -392,8 +392,8 @@ Line numbers are those of the `gas/` files in this repository.
 
 Five weaknesses were confirmed in this pass. Four of them are the same ones as findings 5, 6, 9
 and 13 above, now with the exact path through the server and what closes it. The fifth, A4, is
-new. All five are closed in the server and none needs a change to the `gas/` files, but A1 and A3
-also depend on changes to pages outside this repository (named in each entry).
+new. All five are closed in the server and none needs a change to the `gas/` files, but A3 also
+depends on a page outside this repository (named in its entry).
 
 | # | Severity | Finding | Earlier finding |
 |---|---|---|---|
@@ -421,10 +421,12 @@ checks its signature against Google's published keys, its issuer, audience, expi
 verified email. That email is remembered in the server's memory for 5 minutes, and
 `loginWithGoogleVerifiedEmail` is refused (403) for any email not remembered; the entry is used
 up by one successful login. With neither `FIREBASE_PROJECT_ID` nor `GOOGLE_OAUTH_CLIENT_ID` set,
-the whole path is refused (503 on `/exec`). The `google-signin-relay` page (outside this
-repository) must send the ID token; until it does, Google sign-in fails closed and users sign in
-with the emailed code or a password (`docs/DEPLOY.md`, section 5). Tests: `server/security.test.js`
-("login gates", "/exec") and `server/auth/google-token.test.js`.
+the whole path is refused (503 on `/exec`). The Google sign-in page used to run on Firebase
+Hosting, outside this repository, and had to be changed to send the ID token. The server now serves
+its own version (`server/client/relay/google-signin.html`, at `/relay/google-signin`), which sends
+it (`docs/DEPLOY.md`, section 5). A page that did not would fail closed, and users would sign in
+with the emailed code or a password. Tests: `server/security.test.js` ("login gates", "/exec") and
+`server/auth/google-token.test.js`.
 
 ---
 
@@ -523,6 +525,7 @@ the legacy code, the codes included, is now unpredictable.
 | Logging | One JSON line per API request in the journal: time, IP, method, path, status, duration, caller CPR and, on a server error, the reference. No request bodies. |
 | Isolation | The HTTP thread never runs the legacy code. It runs on worker threads, and a call that hangs for 5 minutes is cut off by replacing its worker (any script lock it held is freed). |
 | Uploaded files | The content type of a student upload is decided by the server from the file name, never taken from the browser; `.html`, `.svg` and executables are refused. Files are shown inline only when they are PDF, image, audio, video or plain text; anything else is a download with a sandboxing `Content-Security-Policy`. Without this, a file called `homework.pdf` uploaded as `text/html` would have run as a page on the app's origin for whoever opened it. |
+| Files from Drive | Files imported from Google Drive keep their Drive ids and are all marked public (`is_public`), the same as "anyone with the link" was on Drive, and are served from `/files/<id>/<name>` by the same code as uploads (shown inline only if PDF, image, audio, video or plain text; anything else downloads under a sandboxing `Content-Security-Policy`). Only the files the sheets and pages refer to are imported, never whole Drive trees (the seven working folders that the code itself names are the one exception). A link is still the only protection, as it was on Drive: the ids are long and random, but they sit in the sheets and in the messages sent. Folder pages (`/files/folder/<id>`) need a login. |
 | Registration | `newStuReg` records `emailVerified` only for an email this server saw verified (the registration code exchange, or Google); the browser's own flag is otherwise overridden to `false` and the student verifies at first login. This is the server-side half of finding 12. |
 
 ### Residual risks
@@ -557,3 +560,11 @@ What the administrator should know after the above:
    third-party assets, so the policy sets only framing, base-URI and plugin rules. It does not
    stop injected script. The session cookie cannot be read by script, and the in-memory access
    token lasts 15 minutes, which limits what injected script can do.
+7. **The QR scanner and Google sign-in pages load scripts from CDNs.** `/relay/qr-scan` loads
+   `html5-qrcode` (version 2.3.8) from cdn.jsdelivr.net, and `/relay/google-signin` loads the
+   Firebase SDK (version 10.14.0) from gstatic.com, as the original pages did. The originals ran on
+   `basaerbh.com`; these now run on the app's own origin, so a compromised CDN file could make
+   requests as the logged-in user for anyone who opens one of the two pages. Script cannot read the
+   httpOnly session cookie, but the browser still sends it with the requests the script makes. The
+   policy in item 6 does not limit where scripts come from. To close this, serve the two libraries
+   from this server or add integrity hashes to the script tags.

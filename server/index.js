@@ -44,6 +44,7 @@ const { forceReleaseLockHeldBy, LOCK_BUFFER_BYTES } = require('./shims/platform.
 const { Scheduler } = require('./scheduler.js');
 const { WorkerPool } = require('./worker-pool.js');
 const { RateLimiter } = require('./rate-limit.js');
+const { rewriteLegacyPartial, rewriteLegacyShell } = require('./page-rewrites.js');
 
 // --- Configuration ----------------------------------------------------------
 const ROOT = path.join(__dirname, '..');
@@ -306,7 +307,9 @@ function buildPartials() {
     const raw = fs.readFileSync(file, 'utf8');
     const styleMatch = raw.match(/^\s*<style[^>]*>([\s\S]*)<\/style>\s*$/i);
     const scriptMatch = raw.match(/^\s*<script[^>]*>([\s\S]*)<\/script>\s*$/i);
-    const body = styleMatch ? styleMatch[1] : (scriptMatch ? scriptMatch[1] : raw);
+    // The legacy relay-page and Drive URLs are repointed at our own routes before
+    // hashing, so the hashed file name changes with them (see page-rewrites.js).
+    const body = rewriteLegacyPartial(name, styleMatch ? styleMatch[1] : (scriptMatch ? scriptMatch[1] : raw));
     const ext = styleMatch ? 'css' : 'js';
     const type = styleMatch ? 'text/css' : 'application/javascript';
     const servedName = hashedName(name, body, ext);
@@ -340,6 +343,9 @@ function buildIndexHtml() {
 
   // `<base target="_top">` only matters inside the Apps Script iframe.
   html = html.replace(/<base\s+target=["']_top["']\s*\/?>/i, '');
+  // What the shell loads from Google Drive, Google Fonts and the old Firebase-hosted
+  // site comes from the local store and this server's own routes instead.
+  html = rewriteLegacyShell(html);
   // Drop the real Firebase SDK scripts — our firebase-shim replaces them.
   html = html.replace(/<script[^>]*gstatic\.com\/firebasejs\/[^>]*><\/script>\s*/gi, '');
   // Inject, first in <head>: the RPC cache classification, firebase-shim (gas
@@ -387,10 +393,11 @@ app.use((req, res, next) => {
 });
 
 const jsonBody = express.json({ limit: '15mb' });
-// The relay pages on Firebase Hosting post to /exec cross-origin as a
-// `no-cors` text/plain request (the only kind the browser sends without a
-// CORS preflight — the same trick they used against Apps Script's doPost), so
-// /exec takes the raw body whatever its content type and parses it itself.
+// /exec is the doPost port for the two relay pages (served from /relay/*, same
+// origin, JSON). The retired Firebase-hosted versions posted cross-origin as a
+// `no-cors` text/plain request (the only kind the browser sends without a CORS
+// preflight — the same trick they used against Apps Script's doPost), so /exec
+// still takes the raw body whatever its content type and parses it itself.
 const rawTextBody = express.text({ type: () => true, limit: '1mb' });
 function parseExecBody(rawBody) {
   if (rawBody && typeof rawBody === 'object') return rawBody;
@@ -407,12 +414,51 @@ app.get('/partials/:file', (req, res) => {
   res.type(partial.type).set('Cache-Control', 'public, max-age=31536000, immutable').send(partial.body);
 });
 
+// --- Self-hosted fonts and old-site files ---------------------------------------
+// The pages used to load web fonts from Google Fonts, and a script, a font and a logo
+// from the old Firebase-hosted site; page-rewrites.js points them at these two
+// directories instead, so no visitor's browser has to contact those hosts:
+//   /fonts/*        server/client/fonts/        Google Fonts stylesheets and their woff2 files
+//   /site-assets/*  server/client/site-assets/  the old site's assets/ files the pages reference
+// Cached for a year without revalidation, like the hashed partials above. Unlike those,
+// these names carry no content hash: a file that changes later has to be saved under a
+// new name (and page-rewrites.js pointed at it), or visitors keep the old copy.
+// Dotfiles are never served, and directories are neither listed nor redirected.
+function serveStaticDirectory(directory) {
+  return express.static(directory, { immutable: true, maxAge: '365d', dotfiles: 'deny', index: false, redirect: false });
+}
+app.use('/fonts', serveStaticDirectory(path.join(__dirname, 'client', 'fonts')));
+app.use('/site-assets', serveStaticDirectory(path.join(__dirname, 'client', 'site-assets')));
+
 // Serve the page from the one-time build. Set BASAER_REBUILD=1 to re-inline the
 // partials on every request while actively editing them. The SPA keeps its
 // place in the URL (view-restore.js), so any /p/... path serves the same page.
 app.get(['/', '/p/*'], (_req, res) => {
   res.type('html').set('Cache-Control', 'no-store').send(process.env.BASAER_REBUILD ? buildIndexHtml() : INDEX_HTML);
 });
+
+// --- Relay pages ----------------------------------------------------------------
+// The two helper pages the legacy client opens as popups: Google sign-in and the
+// QR scanner (server/client/relay/). They used to live on Firebase Hosting; the
+// client is repointed at these routes in page-rewrites.js. They are served from
+// the app's own origin so they can post to /exec without CORS, and so the
+// camera=(self) Permissions-Policy above lets the scanner use the camera.
+// Never cached: the sign-in page carries a per-attempt verifyToken in its query
+// string, and a stale copy of either page would outlive a fix.
+const RELAY_PAGES_DIR = path.join(__dirname, 'client', 'relay');
+
+function serveRelayPage(fileName) {
+  // The relay pages name Google Fonts like the app's own pages do, so they get the same
+  // serve-time rewrite (page-rewrites.js): the files in client/relay/ stay as written.
+  const readPage = () => rewriteLegacyShell(fs.readFileSync(path.join(RELAY_PAGES_DIR, fileName), 'utf8'));
+  const pageHtml = readPage(); // a missing page stops the server at startup, not at the first scan
+  return (_req, res) => {
+    res.type('html').set('Cache-Control', 'no-store').send(process.env.BASAER_REBUILD ? readPage() : pageHtml);
+  };
+}
+
+app.get('/relay/google-signin', serveRelayPage('google-signin.html'));
+app.get('/relay/qr-scan', serveRelayPage('qr-scan.html'));
 
 // --- Sessions -----------------------------------------------------------------
 app.use('/api/auth', (req, res, next) => {
@@ -695,9 +741,10 @@ app.post('/api/upload/student-work', async (req, res) => {
   });
 });
 
-app.get('/files/:id/:name?', async (req, res) => {
-  if (!FILE_ID_RE.test(req.params.id)) return res.status(404).send('Not found');
-  const fileRecord = storage.db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id);
+// Serve one stored file by id: public files to anyone, the rest to a session.
+async function serveStoredFile(req, res, fileId) {
+  if (!FILE_ID_RE.test(String(fileId || ''))) return res.status(404).send('Not found');
+  const fileRecord = storage.db.prepare('SELECT * FROM files WHERE id = ?').get(fileId);
   if (!fileRecord || fileRecord.is_folder || fileRecord.trashed) return res.status(404).send('Not found');
   if (!fileRecord.is_public) {
     const caller = await callerFrom(req);
@@ -722,7 +769,14 @@ app.get('/files/:id/:name?', async (req, res) => {
   res.sendFile(contentPath, { headers, dotfiles: 'deny' }, (err) => {
     if (err && !res.headersSent) res.status(err.status || 500).send('Not found');
   });
-});
+}
+
+app.get('/files/:id/:name?', (req, res) => serveStoredFile(req, res, req.params.id));
+
+// The legacy pages load logos, avatars and carousel images from
+// drive.google.com/thumbnail?id=<id>&sz=w500; page-rewrites.js turns that into
+// /thumb?id=<id>&sz=w500. The size hint is ignored: the stored image is served.
+app.get('/thumb', (req, res) => serveStoredFile(req, res, req.query.id));
 
 app.get('/healthz', (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ ok: true, mode: OUTBOUND_MODE, rpc: rpcPool.stats(), background: backgroundPool.stats() });
