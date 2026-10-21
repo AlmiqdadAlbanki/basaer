@@ -50,6 +50,25 @@ config in `/etc/basaer.env`.
    `journalctl -u basaer -n 20` shows the start-up lines, including `workers: 1 rpc + 1 background`
    and `google sign-in: enabled` or `disabled`.
 
+What the server answers. The academy's public website, which used to be on Firebase Hosting, is
+served from here too, at the addresses it had there:
+
+- `/` is the home page and `/student-guide` the student guide (`/student-guide.pdf` its PDF).
+  `/assets/...`, `/favicon.ico`, `/robots.txt` and `/sitemap.xml` are the website's files, kept in
+  `server/client/site/`. The old names `/index.html`, `/platform.html` and `/student-guide.html`
+  redirect to the addresses without `.html`.
+- `/platform` is the address to give people: the header bar with the logo, and the app below it in a
+  frame. Its query string is passed on to the app (`/platform?logout=1` opens `/app?logout=1`).
+- `/app` is the app itself, the page `/platform` frames. It keeps the open view in the address as
+  `/app/p/<view>`; the older `/p/<view>` addresses redirect there.
+- `/relay/...`, `/api/...`, `/exec`, `/files/...`, `/thumb`, `/doc/...`, `/partials/...`, `/fonts/...`
+  and `/site-assets/...` are used by the app, and `/healthz` is the check in step 5.
+
+The website's pages give `https://basaerbh.com/` as their address (to search engines and link
+previews), so they belong on that domain, although they work the same under another name such as
+`app.basaerbh.com`. Read section 5, step 4 before pointing `basaerbh.com` itself at this server:
+Google sign-in needs `https://basaerbh.com/__/auth/handler`, which only Firebase Hosting serves.
+
 All writable state (database, keys, uploaded files and generated documents) lives under
 `/var/lib/basaer`, set by `BASAER_DB`, `BASAER_KEYS` and `BASAER_FILES` in `/etc/basaer.env`.
 The app directory itself is read-only to the service.
@@ -377,15 +396,18 @@ Until this step the server records emails, WhatsApp messages and push notificati
    - Keep `https://basaerbh.com/__/auth/handler` working. The sign-in page still uses `basaerbh.com`
      as its Firebase sign-in domain, so Google sends the user back through that address. Firebase
      Hosting serves it for that domain, so for as long as Google sign-in is wanted, do not point
-     `basaerbh.com` at another host.
+     `basaerbh.com` at another host. The website no longer needs Firebase Hosting (this server
+     serves it, section 2); only this address does. Moving `basaerbh.com` here therefore needs a
+     way to keep it answering first, which this runbook does not cover yet.
 
    Until this is done, "sign in with Google" fails and users sign in with the emailed code or
    their password.
-5. Browser push (FCM) registration. `/exec` with `saveFcmToken` now needs a logged-in session, and
-   the session cookie is only sent to the app's own domain. So the `platform.html` push page must
-   be served from `https://<domain>`, not from Firebase Hosting. The server has no route for that
-   page today; adding one is a code change. Until it is done, push registration from that page is
-   refused (401) and FCM stays out of scope for go-live.
+5. Browser push (FCM) registration is not available. The platform page is served by this server at
+   `/platform` (section 2), but without its "تفعيل إشعارات المتابعة" button, the dialog behind it
+   and the Firebase scripts: they registered the device with Firebase Cloud Messaging through the
+   old Apps Script, and come back only when FCM is replaced by Web Push (section 11). `/exec` with
+   `saveFcmToken` still needs a logged-in session (401 otherwise). FCM stays out of scope for
+   go-live.
 6. Leave `ALLOW_CPR_ONLY_LOGIN` unset (section 2). Send a test to yourself first, then set
    `OUTBOUND_MODE=live` in `/etc/basaer.env`:
    ```
@@ -456,13 +478,11 @@ in-memory rate-limit counters (section 9).
    section 5, step 4 first: the domain under Authorized domains, and `basaerbh.com/__/auth/handler`
    still answering. Sign in with Google using an account whose email is on file, and scan one QR
    code.
-7. Serve `platform.html` (the push registration page) from the app's own domain, not from
-   Firebase Hosting. Its `saveFcmToken` post to `/exec` needs the login cookie, so it must be
-   same-origin and send the header `X-Requested-With: basaer`. This needs a code change (the
-   server has no route for the page). Until it is done, FCM stays out of scope: leave push
-   notifications out of the announcement.
+7. Leave push notifications out of the announcement: `/platform` is served by this server, but
+   without its push button until FCM is replaced by Web Push (section 5, step 5).
 8. Switch on `OUTBOUND_MODE=live` (section 5) once step 4 looks right.
-9. Announce the new URL to staff, students and parents.
+9. Announce the new URL to staff, students and parents: `https://<domain>/platform` opens the app
+   (section 2).
 10. Rotate the keys and tokens listed in `docs/SECURITY-FINDINGS.md` (findings 1 and 11:
     Google OAuth access, the exposed keys, the Fonnte token), and revoke the old ones.
 11. Keep the old Apps Script read-only for a few weeks as a fallback, then archive it.
@@ -615,7 +635,8 @@ its data. What still reaches Google, honestly:
   Drive files are in `/var/lib/basaer/files` under their old ids, mail leaves through the SMTP
   server you set in `/etc/basaer.env` (pointing `SMTP_HOST` at a Google mail server would be your
   own choice of provider, not something the app needs), and QR codes are drawn on this server.
-  Fonts and the old site's assets are served from this server.
+  Fonts and the old site's assets are served from this server, and so is the public website
+  (section 2), without its Google Analytics.
 - **The "sign in with Google" button, which is optional.** Firebase Authentication is used as the
   identity provider only. The sign-in window loads the Firebase script from Google, the user signs
   in at Google and comes back through `https://basaerbh.com/__/auth/handler`, and the server checks
@@ -624,7 +645,16 @@ its data. What still reaches Google, honestly:
   live in this server's database. Without `FIREBASE_PROJECT_ID` the button is refused, and the
   emailed code and the password keep working (section 5, step 3).
 - **Push notifications, if you ever turn them on.** They go through Google's Firebase Cloud
-  Messaging. They are out of scope for go-live (section 5, step 5).
+  Messaging. They are out of scope for go-live (section 5, step 5). Push notifications (the
+  platform page's تفعيل إشعارات المتابعة button) are not available until FCM is replaced by Web
+  Push: the button, its dialog and the Firebase scripts were taken out of `/platform`, so no new
+  device can register.
+- **The fatawa panel on the website's home page.** The site's `assets/js/app.js` loads the fatawa it
+  shows from a public Google Sheet (a `<script>` from `docs.google.com/spreadsheets/d/1vWIF38.../gviz`,
+  fetched by the visitor's browser). That sheet is not one of the workbooks section 4 imports. When
+  it cannot be reached the panel shows the three sample fatawa built into the script. The website
+  also uses three services that are not Google: `cdn.jsdelivr.net` (icon fonts, as the app does),
+  `api.aladhan.com` (prayer times) and `api.web3forms.com` (the contact form).
 - **The area lookup when a student registers.** Typing a block number makes the server ask a
   separate Apps Script web app on `script.google.com` for the area name (`lookupBlockArea` in
   `gas/dataGet.js`). That script is not part of this repository and is not migrated. The server

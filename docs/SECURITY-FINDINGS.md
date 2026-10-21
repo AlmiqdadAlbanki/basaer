@@ -456,7 +456,8 @@ reading them), or replacing a working token to stop the student receiving any.
 **Fix.** `/exec` with `saveFcmToken` now needs a logged-in session (401 otherwise). For anyone who
 is not staff, the server overwrites `studentId` with the caller's own CPR, so a student can only
 register their own device. Because the session is a same-origin cookie, the `platform.html` push
-page must be served from the app's own domain (`docs/DEPLOY.md`, sections 5 and 8). Test:
+page must be served from the app's own domain. It now is (`/platform`), but without its push
+button until FCM is replaced by Web Push (`docs/DEPLOY.md`, sections 5 and 11). Test:
 `server/security.test.js` ("/exec").
 
 ---
