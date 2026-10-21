@@ -227,6 +227,32 @@ describe('the running server', () => {
     assert.strictEqual(platformFrameStart((await getText('/platform?')).text), '<iframe id="platform-frame" src="/app"');
   });
 
+  it('shows the app\'s view in its own address: /platform/p/<view> frames /app/p/<view>', async () => {
+    assert.strictEqual(platformFrameStart((await getText('/platform/p/students')).text), '<iframe id="platform-frame" src="/app/p/students"');
+    assert.strictEqual(platformFrameStart((await getText('/platform/p/students?logout=1')).text), '<iframe id="platform-frame" src="/app/p/students?logout=1"');
+    assert.strictEqual(platformFrameStart((await getText('/platform/p/%D8%B7%D9%84%D8%A7%D8%A8')).text), '<iframe id="platform-frame" src="/app/p/%D8%B7%D9%84%D8%A7%D8%A8"');
+    // Deeper or odd paths fall back to the plain page (view-restore reads one segment only).
+    for (const oddPath of ['/platform/p/students/extra', '/platform/p/', '/platform/p']) {
+      const response = await fetch(`${baseUrl}${oddPath}?x=1`, { redirect: 'manual' });
+      assert.strictEqual(response.status, 301, oddPath);
+      assert.strictEqual(response.headers.get('location'), '/platform?x=1', oddPath);
+    }
+    // The frame reports its view to the page above (view-restore.js) and the page mirrors it.
+    assert.ok(readSiteFile('platform.html').includes("event.data.type !== 'basaer:view-path'"), 'platform.html listens for the view path');
+    assert.ok(fs.readFileSync(path.join(__dirname, 'client', 'view-restore.js'), 'utf8').includes("type: 'basaer:view-path'"), 'view-restore.js reports it');
+  });
+
+  it('sends a top-level visit to /app back under /platform, but serves the frame\'s own request', async () => {
+    for (const [appPath, platformPath] of [['/app', '/platform'], ['/app/p/students', '/platform/p/students'], ['/app?logout=1', '/platform?logout=1']]) {
+      const topLevel = await fetch(`${baseUrl}${appPath}`, { redirect: 'manual', headers: { 'Sec-Fetch-Dest': 'document' } });
+      assert.strictEqual(topLevel.status, 302, appPath);
+      assert.strictEqual(topLevel.headers.get('location'), platformPath, appPath);
+      const framed = await fetch(`${baseUrl}${appPath}`, { headers: { 'Sec-Fetch-Dest': 'iframe' } });
+      assert.strictEqual(framed.status, 200, appPath);
+      assert.ok((await framed.text()).includes(SHELL_TITLE), appPath);
+    }
+  });
+
   it('never lets the query string out of the iframe\'s src attribute', async () => {
     // fetch() percent-encodes < > and quotes in a query; the raw request sends them as they are.
     const viaFetch = await getText('/platform?x=<script>alert(1)</script>');

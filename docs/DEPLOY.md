@@ -58,9 +58,12 @@ served from here too, at the addresses it had there:
   `server/client/site/`. The old names `/index.html`, `/platform.html` and `/student-guide.html`
   redirect to the addresses without `.html`.
 - `/platform` is the address to give people: the header bar with the logo, and the app below it in a
-  frame. Its query string is passed on to the app (`/platform?logout=1` opens `/app?logout=1`).
-- `/app` is the app itself, the page `/platform` frames. It keeps the open view in the address as
-  `/app/p/<view>`; the older `/p/<view>` addresses redirect there.
+  frame. Its query string is passed on to the app (`/platform?logout=1` opens `/app?logout=1`), and
+  the open view shows in its address: the app reports its view to the page, which shows it as
+  `/platform/p/<view>`, and that address frames `/app/p/<view>` again on a refresh or from a bookmark.
+- `/app` is the app itself, the address of the frame inside `/platform`; it keeps the open view as
+  `/app/p/<view>` (the older `/p/<view>` addresses redirect there). Opened directly in a tab it
+  redirects to the same view under `/platform`, so the header bar is always there.
 - `/relay/...`, `/api/...`, `/exec`, `/files/...`, `/thumb`, `/doc/...`, `/partials/...`, `/fonts/...`
   and `/site-assets/...` are used by the app, and `/healthz` is the check in step 5.
 

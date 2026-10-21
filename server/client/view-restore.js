@@ -25,7 +25,10 @@
  *   nothing recorded           -> /app       (no hash)
  * The server serves the same page for "/app" and any "/app/p/*" path, so a refresh
  * or a pasted link lands on the app instead of a 404 ("/" is the public website, and
- * the app's old "/p/*" paths redirect to "/app/p/*"). Only the first segment
+ * the app's old "/p/*" paths redirect to "/app/p/*"). The app normally runs inside
+ * the website's /platform page, which mirrors this path as /platform/p/X (it is told
+ * through postMessage below, and the server frames /app/p/X for /platform/p/X), so
+ * the visible address is the /platform one. Only the first segment
  * after /app/p/ is meaningful and any other path is ignored. A path alone cannot
  * say whether X is a data-page or a Bootstrap tab id, so replay tries
  * [data-page="X"] first and then the tab with data-bs-target="#X".
@@ -100,6 +103,11 @@
     var path = topLevel ? PATH_PREFIX + encodeURIComponent(topValue) : APP_PATH;
     var hash = parts.length ? '#v=' + encodeURIComponent(parts.join('|')) : '';
     try { history.replaceState(null, '', path + location.search + hash); } catch (e) { /* ignore */ }
+    // Inside the /platform frame the page above mirrors this view as /platform/p/...
+    // (without the query: ?logout=1 must not outlive the logout it belongs to).
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ type: 'basaer:view-path', path: path + hash }, location.origin); } catch (e) { /* ignore */ }
+    }
   }
 
   function markerOf(el) {

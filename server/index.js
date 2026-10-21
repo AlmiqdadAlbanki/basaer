@@ -442,7 +442,15 @@ app.use('/site-assets', serveStaticDirectory(path.join(__dirname, 'client', 'sit
 // partials on every request while actively editing them. The app lives under /app
 // (/ is the public website, below), and the SPA keeps its place in the URL
 // (view-restore.js), so /app and any /app/p/... path serve the same page.
-app.get(['/app', '/app/p/*'], (_req, res) => {
+// /app is the address of the frame inside the website's /platform page, not a page
+// of its own: a visitor who opens it directly (a top-level navigation, which browsers
+// mark with Sec-Fetch-Dest: document) is sent to the same view under /platform, so
+// the website's header bar is always there. The frame's own request (Sec-Fetch-Dest:
+// iframe), tools and old browsers without the header get the page.
+app.get(['/app', '/app/p/*'], (req, res) => {
+  if (req.get('Sec-Fetch-Dest') === 'document') {
+    return res.redirect(302, req.path.replace(/^\/app/, '/platform') + queryStringOf(req));
+  }
   res.type('html').set('Cache-Control', 'no-store').send(process.env.BASAER_REBUILD ? buildIndexHtml() : INDEX_HTML);
 });
 
@@ -508,18 +516,29 @@ const readPlatformPage = siteFileReader('platform.html');
 // The platform page's iframe gets the query string /platform was asked with, as the Apps
 // Script URL in it did, so /platform?logout=1 frames /app?logout=1 (gas/js.html clears the
 // login the browser stored when the app starts with logout=1; doGet in gas/code.js read it too).
+// It also gets the view: /platform/p/<view> frames /app/p/<view>. The app writes its view
+// into its own URL (client/view-restore.js) and reports it to the platform page, which shows
+// the same path under /platform; a refresh, bookmark or pasted link of that address comes
+// back here. Anything else under /platform (a trailing slash, /Platform, a deeper path) is
+// redirected to the plain page, since the page names its files by absolute /assets/ paths
+// but the app's view-restore only reads one segment.
 const PLATFORM_FRAME_START = '<iframe id="platform-frame" src="/app"';
 if (!readPlatformPage().includes(PLATFORM_FRAME_START)) {
   throw new Error(`server/client/site/platform.html no longer contains ${PLATFORM_FRAME_START}`);
 }
+const PLATFORM_VIEW_PATH_RE = /^\/platform(\/p\/[^/]+)?$/;
 function platformPageFor(req) {
-  const frameStart = `<iframe id="platform-frame" src="${escapeHtmlAttribute('/app' + queryStringOf(req))}"`;
+  const viewPath = (PLATFORM_VIEW_PATH_RE.exec(req.path) || [])[1] || '';
+  const frameStart = `<iframe id="platform-frame" src="${escapeHtmlAttribute('/app' + viewPath + queryStringOf(req))}"`;
   // A replacer function, not a replacement string: a "$&" or "$'" in the query must stay literal.
   return readPlatformPage().replace(PLATFORM_FRAME_START, () => frameStart);
 }
 
 app.get('/', serveSitePage('/', readHomePage));
-app.get('/platform', serveSitePage('/platform', platformPageFor));
+app.get(['/platform', '/platform/p', '/platform/p/*'], (req, res) => {
+  if (!PLATFORM_VIEW_PATH_RE.test(req.path)) return res.redirect(301, '/platform' + queryStringOf(req));
+  res.type('html').set('Cache-Control', 'no-store').send(platformPageFor(req));
+});
 app.get('/student-guide', serveSitePage('/student-guide', readStudentGuidePage));
 
 // The old file names (still in old links, and in the site's own app.js, which writes
