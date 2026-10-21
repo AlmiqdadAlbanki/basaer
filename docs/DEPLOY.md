@@ -12,8 +12,8 @@ config in `/etc/basaer.env`.
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
 3. An Elastic IP attached to the instance.
 4. A DNS A record for the domain pointing at the Elastic IP. Since this server also serves the
-   public website, that is the apex `basaerbh.com` (plus a `www` record), not a separate `app.`
-   name. The domain's DNS is managed at Squarespace Domains (the former Google Domains; name
+   public website, that is the apex `basaerbh.com` (A record `@` → the Elastic IP) plus a `www`
+   record (CNAME `www` → `basaerbh.com`; it has no record today), not a separate `app.` name. The domain's DNS is managed at Squarespace Domains (the former Google Domains; name
    servers `nse1-4.squarespacedns.com`): account.squarespace.com → Domains → basaerbh.com → DNS.
    Today the apex A record is Firebase Hosting's `199.36.158.100`; the MX record
    (`smtp.google.com`) and the `google-site-verification` TXT are the domain's e-mail and must
@@ -22,10 +22,12 @@ config in `/etc/basaer.env`.
 
 ## 2. Install
 
-1. Clone the repo:
+1. Clone the repo. The server clones from GitHub, so first push the development machine's
+   commits there (`git push origin master`; the repository is
+   `https://github.com/AlmiqdadAlbanki/basaer.git` and should stay private):
    ```
    sudo mkdir -p /opt/basaer
-   sudo git clone <repo-url> /opt/basaer/app
+   sudo git clone https://github.com/AlmiqdadAlbanki/basaer.git /opt/basaer/app
    ```
 2. Run the bootstrap (installs packages, Node 22, nginx, certbot, the `basaer` user, units, timer):
    ```
@@ -38,14 +40,15 @@ config in `/etc/basaer.env`.
    sudo nano /etc/basaer.env
    sudo systemctl restart basaer
    ```
-4. Set the domain: edit `server_name` in `/etc/nginx/sites-available/basaer` (replace
-   `app.basaerbh.com`), reload nginx, then get the certificate. certbot obtains it, adds the 443
-   block and the HTTP to HTTPS redirect, and installs an auto-renew timer
+4. Set the domain: `server_name` in `/etc/nginx/sites-available/basaer` is already
+   `basaerbh.com www.basaerbh.com` (change it only for another domain), reload nginx, then — once
+   DNS points here (section 1, step 4) — get the certificate for both names. certbot obtains it,
+   adds the 443 block and the HTTP to HTTPS redirect, and installs an auto-renew timer
    (`systemctl list-timers | grep certbot`):
    ```
    sudo nano /etc/nginx/sites-available/basaer
    sudo nginx -t && sudo systemctl reload nginx
-   sudo certbot --nginx -d <domain> --redirect -m <email> --agree-tos
+   sudo certbot --nginx -d basaerbh.com -d www.basaerbh.com --redirect -m <email> --agree-tos
    ```
    After HTTPS works you may enable HSTS (see the comment in the site file).
    To test without a domain, use `server_name _;`, skip certbot, use plain HTTP, and set

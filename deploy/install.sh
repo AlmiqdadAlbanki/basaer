@@ -102,7 +102,7 @@ Install finished. Next steps:
   2. Set server_name in $site_conf, then:
        sudo nginx -t && sudo systemctl reload nginx
      DNS must already point at this server. Then get the HTTPS certificate:
-       sudo certbot --nginx -d <domain> --redirect -m <email> --agree-tos
+       sudo certbot --nginx -d basaerbh.com -d www.basaerbh.com --redirect -m <email> --agree-tos
      This obtains the Let's Encrypt certificate, adds the 443 block and the
      HTTP to HTTPS redirect, and installs an auto-renew timer. Confirm with:
        systemctl list-timers | grep certbot
