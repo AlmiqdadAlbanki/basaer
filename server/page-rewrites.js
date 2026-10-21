@@ -86,7 +86,8 @@ function rewriteLegacyDriveUrls(text) {
 // To add or refresh one: fetch its stylesheet URL with a current browser User-Agent (Google
 // answers other agents with other formats and without the unicode-range subsets), download
 // every woff2 the CSS names, save the CSS with the src URLs changed, and list the URL below.
-// server/self-hosted-assets.test.js fails for a Google Fonts URL in any page that is not listed.
+// server/self-hosted-assets.test.js fails for a Google Fonts URL in any page that is not listed, and
+// server/site.test.js does the same for the public website's pages and stylesheet.
 //
 // Each URL is matched as a whole, query string included, because the query string chooses
 // the families, weights and styles the local CSS has to contain. gas/ writes the same URL with
@@ -110,6 +111,12 @@ const GOOGLE_FONTS_STYLESHEET_REWRITES = [
   // gas/admin-js.html asks for 800 as well, but IBM Plex Sans Arabic has no 800: Google answered
   // with the 400, 600 and 700 faces only, so the same local file is the exact equivalent.
   { googleUrl: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700;800&display=swap', ownUrl: '/fonts/ibm-plex-sans-arabic-400-600-700.css' },
+  // server/client/site/student-guide.html (the public website's student guide). Its font files are
+  // the ones the 300-400-500-700-800 stylesheet above already uses: Google names the same files.
+  { googleUrl: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap', ownUrl: '/fonts/tajawal-400-500-700-800.css' },
+  // server/client/site/assets/css/style.css (an @import; the public website's stylesheet) asks for 600
+  // as well, but Tajawal has no 600: Google answered with exactly the stylesheet of the line above.
+  { googleUrl: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap', ownUrl: '/fonts/tajawal-400-500-700-800.css' },
 ];
 
 // gas/Main.html also links the stylesheets of two icon fonts, Material Icons and Material
@@ -207,7 +214,10 @@ function rewriteOldSiteAssetUrls(text) {
 
 // Everything that applies to any text the browser receives, whichever page or script it is:
 // Drive URLs, Google Fonts, and the old site's assets. Used for the shell page (gas/Main.html)
-// and the relay pages, and inside rewriteLegacyPartial for every partial.
+// and the relay pages, and inside rewriteLegacyPartial for every partial. Not for the public
+// website's own pages (server/client/site/), which get rewriteGoogleFontsUrls alone: their
+// https://basaerbh.com/assets/... URLs (og:image, the logo in their JSON-LD) must stay absolute,
+// and they name the website's own files, which this server serves under /assets/, not /site-assets/.
 function rewriteLegacyShell(html) {
   return rewriteOldSiteAssetUrls(rewriteGoogleFontsUrls(rewriteLegacyDriveUrls(html)));
 }
