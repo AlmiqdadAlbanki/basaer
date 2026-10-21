@@ -1,13 +1,6 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-4TN6E5Y74V"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-4TN6E5Y74V');
-</script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="noindex" name="robots"/>
@@ -17,10 +10,6 @@
 <link rel="icon" type="image/png" sizes="96x96" href="assets/images/favicon-96.png"/>
 <link rel="apple-touch-icon" href="assets/images/favicon-180.png"/>
 <link href="assets/css/style.css" rel="stylesheet"/>
-<link rel="preconnect" href="https://script.google.com">
-<link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="dns-prefetch" href="https://script.google.com">
-<link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <style>
   html,body{height:100%;margin:0}
   .platform-bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 6px 18px rgba(55,42,30,.05)}
@@ -49,7 +38,7 @@
 </head>
 <body>
 <div class="platform-bar">
-<a class="brand" href="index.html" aria-label="العودة إلى الرئيسية">
+<a class="brand" href="/" aria-label="العودة إلى الرئيسية">
   <picture>
     <source media="(max-width:700px)" srcset="assets/images/favicon-96.png">
     <img alt="بصائر" src="assets/images/logo-color.png"/>
@@ -57,137 +46,26 @@
 </a>
 <div class="bar-links">
 <a class="escape-hatch" href="#" id="platform-reload"><span class="full-label">تواجه مشكلة في تحميل الصفحة؟ أعد التحميل</span><span class="short-label">إعادة التحميل</span></a>
-<button type="button" class="back" id="fcm-open-btn" style="border:0;background:none;cursor:pointer;font:inherit"><span class="full-label">🔔 تفعيل إشعارات المتابعة</span><span class="short-label">🔔 الإشعارات</span></button>
-<a class="back" href="index.html"><span class="full-label">← العودة إلى الرئيسية</span><span class="short-label">← الرئيسية</span></a>
+<a class="back" href="/"><span class="full-label">← العودة إلى الرئيسية</span><span class="short-label">← الرئيسية</span></a>
 </div>
 </div>
 
-<div class="contact-modal" id="fcm-modal" aria-hidden="true">
-  <div class="modal-backdrop"></div>
-  <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="fcm-modal-title">
-    <button class="modal-close" type="button" aria-label="إغلاق">×</button>
-    <div class="modal-scroll">
-      <div class="contact-modal-head">
-        <span class="contact-modal-icon" style="font-size:22px">🔔</span>
-        <div class="contact-modal-head-text">
-          <h2 id="fcm-modal-title">تفعيل إشعارات المتابعة</h2>
-          <p class="contact-modal-intro">اكتب الرقم الشخصي للطالب لتصلك إشعارات الغياب والدرجات على هذا الجهاز.</p>
-        </div>
-      </div>
-      <form class="contact-form" id="fcm-form" novalidate>
-        <label>
-          <span>الرقم الشخصي</span>
-          <input name="studentId" type="text" required>
-          <small class="field-error"></small>
-        </label>
-        <button type="submit" class="btn btn-primary contact-submit" id="fcm-submit-btn">تفعيل الإشعارات</button>
-        <p class="contact-status" id="fcm-status" role="status"></p>
-      </form>
-    </div>
-  </div>
-</div>
 <div class="platform-frame-wrap">
 <div class="platform-loading" id="platform-loading"><div class="platform-spinner"></div><span>جاري تحميل المنصة...</span></div>
-<iframe id="platform-frame" src="https://script.google.com/macros/s/AKfycbw7iF6IeyMQvpsLmkO9w3l0vCri2CkIxQo_h4hFxipvcYVPRJTNycXqu78TyMK-m58_cA/exec" title="منصة بصائر التعليمية" allow="clipboard-write"></iframe>
+<iframe id="platform-frame" src="/app" title="منصة بصائر التعليمية" allow="clipboard-write"></iframe>
 </div>
 <script>
   const frame = document.getElementById('platform-frame');
   const loading = document.getElementById('platform-loading');
   frame.addEventListener('load', () => loading.classList.add('hidden'));
 
+  // [خادم جديد] كان هذا الرابط يبدّل الإطار بين صيغتَي رابط Apps Script؛ التطبيق الآن على /app
+  // من الخادم نفسه، فتكفي إعادة تحميل الإطار.
   document.getElementById('platform-reload').addEventListener('click', (e) => {
     e.preventDefault();
-    const current = frame.src;
-    const next = current.includes('/a/~/macros/s/')
-      ? current.replace('/a/~/macros/s/', '/macros/s/')
-      : current.replace('/macros/s/', '/a/~/macros/s/');
     loading.classList.remove('hidden');
-    frame.src = next;
+    frame.src = frame.src;
   });
-</script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
-<script>
-(() => {
-  // رابط اختباري مؤقت لنسخة التطوير (BasaerAcademy-NEW) — منفصل تمامًا عن رابط الإنتاج المستخدَم
-  // في الـ iframe فوق، حتى لا يتأثر الموقع الحي أثناء اختبار الإشعارات. يُستبدل برابط الإنتاج
-  // بعد ترحيل هذه الميزة فعليًا (راجع ملاحظة الترحيل في نقاش الإعداد).
-  const FCM_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzumtOVN-Mbz-wYmnVaYcK8nRwRq0qwhMyZOv-NRRFLVu8Byw34uw4DNBaSHixXt0z-pg/exec';
-  const VAPID_KEY = 'BBZ0aeVGgNgyHX8QptGCCnk4ZXHeCTr-CgoIS6YBhaHMCKqr4oFXCKtOpR1qC6iwsI-bAdxOIPc-3xHwLNzc5c8';
-
-  const modal = document.querySelector('#fcm-modal');
-  const openBtn = document.querySelector('#fcm-open-btn');
-  const form = document.querySelector('#fcm-form');
-  const status = document.querySelector('#fcm-status');
-  const submitBtn = document.querySelector('#fcm-submit-btn');
-  if (!modal || !openBtn || !form) return;
-
-  const open = () => { modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; };
-  const close = () => { modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; };
-  openBtn.addEventListener('click', open);
-  modal.querySelector('.modal-close')?.addEventListener('click', close);
-  modal.querySelector('.modal-backdrop')?.addEventListener('click', close);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
-
-  if (!firebase.apps.length) {
-    firebase.initializeApp({
-      apiKey: "AIzaSyAzOQqhYH2lZxM6Yv3Ui62TlB4Bw6m3zkg",
-      authDomain: "coming-soon-basaer.firebaseapp.com",
-      projectId: "coming-soon-basaer",
-      storageBucket: "coming-soon-basaer.firebasestorage.app",
-      messagingSenderId: "199656683288",
-      appId: "1:199656683288:web:c5a1162d8b4fc7cec6d06d"
-    });
-  }
-
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const studentId = form.querySelector('[name="studentId"]').value.trim();
-    status.textContent = '';
-    status.className = 'contact-status';
-    if (!studentId) {
-      status.textContent = 'الرجاء كتابة الرقم الشخصي.';
-      status.classList.add('is-error');
-      return;
-    }
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'جارٍ التفعيل...';
-    try {
-      if (!('serviceWorker' in navigator) || !('Notification' in window)) {
-        throw new Error('هذا المتصفح لا يدعم إشعارات الويب.');
-      }
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') throw new Error('لم يتم منح إذن الإشعارات.');
-
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      const messaging = firebase.messaging();
-      const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
-      if (!token) throw new Error('تعذّر الحصول على بيانات الجهاز.');
-
-      const response = await fetch(FCM_EXEC_URL, {
-        method: 'POST',
-        // text/plain عمدًا: يتجنّب CORS preflight غير المدعوم من Apps Script Web App — نفس أسلوب
-        // qr-scan-relay.html بالضبط.
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveFcmToken', studentId, token })
-      });
-      const result = await response.json();
-      if (result.status === 'ok') {
-        status.textContent = result.message || 'تم تفعيل الإشعارات بنجاح.';
-        status.classList.add('is-success');
-        setTimeout(close, 1800);
-      } else {
-        throw new Error(result.message || 'تعذّر تفعيل الإشعارات.');
-      }
-    } catch (err) {
-      status.textContent = err && err.message ? err.message : 'حدث خطأ غير متوقع.';
-      status.classList.add('is-error');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'تفعيل الإشعارات';
-    }
-  });
-})();
 </script>
 </body>
 </html>
