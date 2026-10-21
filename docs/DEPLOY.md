@@ -9,7 +9,13 @@ config in `/etc/basaer.env`.
 1. An EC2 instance: t3.small, Ubuntu 24.04.
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
 3. An Elastic IP attached to the instance.
-4. A DNS A record for the app domain (for example `app.basaerbh.com`) pointing at the Elastic IP.
+4. A DNS A record for the domain pointing at the Elastic IP. Since this server also serves the
+   public website, that is the apex `basaerbh.com` (plus a `www` record), not a separate `app.`
+   name. The domain's DNS is managed at Squarespace Domains (the former Google Domains; name
+   servers `nse1-4.squarespacedns.com`): account.squarespace.com → Domains → basaerbh.com → DNS.
+   Today the apex A record is Firebase Hosting's `199.36.158.100`; the MX record
+   (`smtp.google.com`) and the `google-site-verification` TXT are the domain's e-mail and must
+   stay; the `hosting-site=coming-soon-basaer` TXT belongs to Firebase Hosting and can go.
    DNS must point at the IP before you run certbot, which needs it to issue the HTTPS certificate.
 
 ## 2. Install
