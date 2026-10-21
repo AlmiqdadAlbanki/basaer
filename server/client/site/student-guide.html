@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دليل الطالب | أكاديمية بصائر</title>
+<meta name="description" content="دليل مبسّط لاستخدام منصة أكاديمية بصائر: إنشاء الحساب، تسجيل الدخول، المقررات، الحضور، التسميع، الاختبارات والشهادات.">
+<link rel="icon" type="image/png" href="assets/images/favicon-96.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+:root{
+  --primary:#b5262c;
+  --primary-dark:#8d1d22;
+  --secondary:#27747a;
+  --gold:#f2b441;
+  --ink:#202936;
+  --muted:#5f6772;
+  --canvas:#f6f0e8;
+  --surface:#ffffff;
+  --soft:#fbf8f3;
+  --line:#e7e1d9;
+  --tint:#fff2f2;
+  --ok:#17875a;
+  --ok-bg:#eefaf4;
+  --warn:#8a5a10;
+  --warn-bg:#fff7e8;
+  --info-bg:#eef6f7;
+  --radius:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:'Tajawal',Tahoma,Arial,sans-serif;font-size:16px;line-height:1.85}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,p{margin:0}
+ul,ol{margin:0;padding:0}
+.wrap{width:min(920px,100% - 32px);margin-inline:auto}
+
+/* ── Hero ── */
+.hero{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;inset:0;background:url("assets/images/pattern.png") center/180px repeat;opacity:.06;pointer-events:none}
+.hero .wrap{position:relative;z-index:1;padding:34px 0 44px}
+.hero-logo{height:46px;width:auto;display:block}
+.logo-link{display:inline-block;margin-bottom:34px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.hbtn{display:inline-flex;align-items:center;gap:8px;border-radius:13px;padding:10px 20px;font-weight:800;font-size:15px;background:#fff;color:var(--primary-dark);transition:.2s}
+.hbtn:hover{text-decoration:none;transform:translateY(-2px)}
+.hbtn.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.55)}
+.hero .eyebrow{display:inline-block;background:rgba(255,255,255,.14);border-radius:999px;padding:3px 14px;font-size:14px;font-weight:700;margin-bottom:12px}
+.hero h1{font-size:clamp(30px,6vw,46px);line-height:1.3;font-weight:800;margin-bottom:12px}
+.hero p{max-width:640px;color:#fbe3e3;font-size:17px}
+.journey{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:30px}
+.journey li{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:14px 14px 12px;font-size:14px;font-weight:700;line-height:1.6}
+.journey b{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#fff;color:var(--primary);font-size:14px;margin-bottom:8px}
+
+/* ── Sticky nav ── */
+.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.toc-scroll{display:flex;gap:6px;overflow-x:auto;padding:10px 0;scrollbar-width:none}
+.toc-scroll::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;padding:4px 14px;border-radius:999px;font-size:14px;font-weight:700;color:#4a525d;border:1px solid var(--line);background:#fff;white-space:nowrap}
+.toc a:hover{text-decoration:none;border-color:rgba(181,38,44,.4);color:var(--primary)}
+.toc a.on{background:var(--primary);border-color:var(--primary);color:#fff}
+
+/* ── Sections ── */
+main{padding:28px 0 20px}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:26px 26px 22px;margin-bottom:20px}
+.sec-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.sec-head .ico{flex:0 0 auto;width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:var(--tint);color:var(--primary);font-size:22px}
+.sec-head small{display:block;color:var(--primary);font-weight:800;font-size:13px;line-height:1.4}
+.sec-head h2{font-size:24px;line-height:1.4;font-weight:800}
+.sec p{margin-bottom:12px}
+.sec h3{font-size:18px;font-weight:800;margin:22px 0 8px}
+.lead{color:var(--muted)}
+
+.steps{list-style:none;counter-reset:s;margin:14px 0}
+.steps>li{counter-increment:s;position:relative;padding:2px 46px 14px 0;min-height:36px}
+.steps>li:before{content:counter(s);position:absolute;right:0;top:2px;width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
+.steps>li:after{content:"";position:absolute;right:15px;top:38px;bottom:2px;width:2px;background:var(--line)}
+.steps>li:last-child:after{display:none}
+.steps strong{font-weight:800}
+
+.list{list-style:none;margin:10px 0 14px}
+.list li{position:relative;padding:3px 24px 3px 0}
+.list li:before{content:"";position:absolute;right:4px;top:15px;width:8px;height:8px;border-radius:50%;background:var(--primary);opacity:.75}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 6px}
+.card{background:var(--soft);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}
+.card i{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#fff;color:var(--primary);font-size:18px;margin-bottom:8px;border:1px solid var(--line)}
+.card strong{display:block;font-size:16px;font-weight:800;line-height:1.5}
+.card span{display:block;color:var(--muted);font-size:14px;line-height:1.65;margin-top:2px}
+
+.note{display:flex;gap:12px;border-radius:14px;padding:12px 16px;margin:14px 0;font-size:15.5px;line-height:1.8}
+.note>i{flex:0 0 auto;font-size:19px;line-height:1.5}
+.note.tip{background:var(--ok-bg);color:#155f42;border:1px solid rgba(23,135,90,.25)}
+.note.warn{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(167,106,20,.3)}
+.note.info{background:var(--info-bg);color:#1d5b60;border:1px solid rgba(39,116,122,.25)}
+.note b{font-weight:800}
+
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:0 11px;font-size:13.5px;font-weight:800;line-height:1.9;vertical-align:baseline;white-space:nowrap}
+.pill.red{background:var(--primary);color:#fff}
+.pill.soft{background:var(--tint);color:var(--primary)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.gray{background:#eef0f2;color:#59616d}
+kbd,.btnlabel{display:inline-block;background:#f1ece5;border:1px solid var(--line);border-radius:8px;padding:0 9px;font-family:inherit;font-size:14.5px;font-weight:700;line-height:1.7;color:var(--ink)}
+
+.table-wrap{overflow-x:auto;margin:12px 0 4px;border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:520px}
+th,td{padding:10px 14px;text-align:right;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--soft);font-weight:800;font-size:14px;color:#4a525d}
+tr:last-child td{border-bottom:0}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.mini{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--soft)}
+.mini strong{display:block;font-weight:800;margin-bottom:2px}
+.mini span{color:var(--muted);font-size:14.5px;line-height:1.7;display:block}
+
+.stages{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.stages li{border-radius:14px;padding:11px 12px;color:#fff;font-weight:800;font-size:15px;line-height:1.5}
+.stages li small{display:block;font-weight:500;opacity:.9;font-size:12.5px}
+.s0{background:#a77d52}.s1{background:#325969}.s2{background:#7b7364}.s3{background:#8a4b3b}
+
+details{border:1px solid var(--line);border-radius:14px;background:var(--soft);margin-bottom:10px}
+summary{cursor:pointer;list-style:none;padding:12px 16px;font-weight:800;display:flex;justify-content:space-between;gap:12px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"+";flex:0 0 auto;font-size:22px;color:var(--primary);line-height:1;transition:.2s}
+details[open] summary:after{transform:rotate(45deg)}
+details[open]{background:#fff}
+details .ans{padding:0 16px 12px;color:#3c4550;font-size:15.5px}
+details .ans p:last-child{margin-bottom:0}
+
+.contact{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+.contact a{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--soft);color:var(--ink)}
+.contact a:hover{text-decoration:none;border-color:rgba(181,38,44,.45);background:#fff9f9}
+.contact i{flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-size:20px;color:var(--primary)}
+.contact strong{display:block;font-weight:800;line-height:1.4}
+.contact span{display:block;color:var(--muted);font-size:14px;direction:ltr;text-align:right}
+
+footer{padding:8px 0 40px;text-align:center;color:var(--muted);font-size:14px}
+
+@media (max-width:760px){
+  .journey{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr 1fr}
+  .stages{grid-template-columns:1fr 1fr}
+  .two,.contact{grid-template-columns:1fr}
+  .sec{padding:20px 16px 16px;border-radius:18px}
+  .sec-head h2{font-size:21px}
+}
+@media (max-width:420px){
+  .grid{grid-template-columns:1fr}
+  .card{display:grid;grid-template-columns:38px 1fr;column-gap:12px;align-items:start}
+  .card i{grid-row:1 / span 2;margin-bottom:0}
+}
+@page{size:A4;margin:12mm}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;font-size:14px;line-height:1.75}
+  .toc,.hero-actions{display:none}
+  .hero .wrap{padding:22px 0 26px}
+  .journey{margin-top:18px}
+  .sec{break-inside:auto;border-color:#d8d2c8;padding:18px 18px 12px;margin-bottom:14px}
+  .sec-head,h3{break-after:avoid}
+  .steps>li,.note,.card,.mini,.contact a,.stages li,tr,details{break-inside:avoid}
+  summary:after{display:none}
+  summary{padding-bottom:6px}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+  .journey,.stages{grid-template-columns:repeat(4,1fr)}
+  .grid{grid-template-columns:repeat(3,1fr)}
+  .two,.contact{grid-template-columns:1fr 1fr}
+  .card{display:block}
+  .card i{margin-bottom:8px}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="logo-link" href="index.html" aria-label="العودة إلى موقع أكاديمية بصائر"><img class="hero-logo" src="assets/images/logo-white-horizontal.png" alt="أكاديمية بصائر"></a><br>
+    <span class="eyebrow">دليل الاستخدام</span>
+    <h1>دليل الطالب لاستخدام المنصة</h1>
+    <p>كل ما تحتاج إلى معرفته لتستفيد من منصة أكاديمية بصائر، من إنشاء الحساب حتى استخراج شهادة الاجتياز. اقرأ القسم الذي يهمّك، أو ابدأ من الأعلى.</p>
+    <div class="hero-actions">
+      <a class="hbtn" href="student-guide.pdf" download="دليل-الطالب-أكاديمية-بصائر.pdf"><i class="bi bi-file-earmark-arrow-down"></i>تحميل الدليل PDF</a>
+      <a class="hbtn ghost" href="platform.html"><i class="bi bi-box-arrow-in-right"></i>الدخول إلى المنصة</a>
+    </div>
+    <ol class="journey">
+      <li><b>1</b>انضمّ وأنشئ حسابك</li>
+      <li><b>2</b>ادخل إلى بوابتك</li>
+      <li><b>3</b>ادرس، وتابع حضورك وأوراد حفظك</li>
+      <li><b>4</b>اختبر، ثم استخرج شهادتك</li>
+    </ol>
+  </div>
+</header>
+
+<nav class="toc" aria-label="أقسام الدليل">
+  <div class="wrap toc-scroll">
+    <a href="#overview">نظرة عامة</a>
+    <a href="#join">الانضمام</a>
+    <a href="#login">تسجيل الدخول</a>
+    <a href="#home">الرئيسية</a>
+    <a href="#courses">المقررات</a>
+    <a href="#attendance">الحضور</a>
+    <a href="#recitation">التسميع</a>
+    <a href="#exams">الاختبارات</a>
+    <a href="#madhhab">المذهب الفقهي</a>
+    <a href="#profile">الملف الشخصي</a>
+    <a href="#faq">أسئلة شائعة</a>
+    <a href="#support">الدعم</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ───────────── نظرة عامة ───────────── -->
+<section class="sec" id="overview">
+  <header class="sec-head"><span class="ico"><i class="bi bi-grid"></i></span><div><small>البداية</small><h2>ماذا ستجد في بوابة الطالب؟</h2></div></header>
+  <p class="lead">بعد تسجيل الدخول تفتح لك بوابة واحدة تجمع مسيرتك الدراسية كلها. تجد القائمة على يمين الشاشة، وفي الجوال تُفتح بزر <kbd>☰</kbd> أعلى الصفحة.</p>
+  <div class="grid">
+    <div class="card"><i class="bi bi-house"></i><strong>الرئيسية</strong><span>مرحلتك الحالية، ورحلتك العلمية، وأبرز أرقامك.</span></div>
+    <div class="card"><i class="bi bi-journal-bookmark"></i><strong>المقررات</strong><span>المواد العلمية لكل مقرر، مرتبة في مكان واحد.</span></div>
+    <div class="card"><i class="bi bi-calendar-check"></i><strong>الحضور والانضباط</strong><span>سجل أيام حضورك، وبطاقة الحضور.</span></div>
+    <div class="card"><i class="bi bi-mic"></i><strong>التسميع والأوراد</strong><span>الأوراد التي سمّعتها وتقييم كل ورد.</span></div>
+    <div class="card"><i class="bi bi-clipboard2-check"></i><strong>الاختبارات والشهادات</strong><span>أداء الاختبارات، ونتائجك، وشهادات الاجتياز.</span></div>
+    <div class="card"><i class="bi bi-signpost-2"></i><strong>المذهب الفقهي</strong><span>اختيار المذهب الذي ستدرس عليه.</span></div>
+    <div class="card"><i class="bi bi-megaphone"></i><strong>الإعلانات</strong><span>تعميمات الأكاديمية وإعلاناتها.</span></div>
+    <div class="card"><i class="bi bi-person-gear"></i><strong>الملف الشخصي</strong><span>بياناتك، والبريد والهاتف، وكلمة المرور.</span></div>
+    <div class="card"><i class="bi bi-headset"></i><strong>المساعدة والدعم</strong><span>طرق التواصل مع إدارة الأكاديمية.</span></div>
+  </div>
+  <div class="note info"><i class="bi bi-info-circle"></i><div>لا تظهر بعض الأقسام إلا لمن تنطبق عليه؛ فمثلًا لا يظهر قسم <b>المذهب الفقهي</b> إلا إذا كانت لمرحلتك مذاهب معتمدة، ولا تظهر قائمة الأقسام كاملةً لمن لا يدرس في مرحلة نشطة بعد (انظر قسم «الرئيسية»).</div></div>
+</section>
+
+<!-- ───────────── الانضمام ───────────── -->
+<section class="sec" id="join">
+  <header class="sec-head"><span class="ico"><i class="bi bi-person-plus"></i></span><div><small>القسم الأول</small><h2>الانضمام وإنشاء حساب جديد</h2></div></header>
+  <p class="lead">إن لم يكن لديك حساب في الأكاديمية، فسجّل بياناتك أولًا ليراجعها فريق الأكاديمية.</p>
+  <ol class="steps">
+    <li><strong>افتح صفحة الدخول</strong> من موقع الأكاديمية (basaerbh.com) بزر «تسجيل الدخول»، ثم اضغط <span class="btnlabel">إنشاء حساب جديد</span>. وإن كتبتَ رقمًا شخصيًا غير مسجَّل فستظهر لك رسالة «غير مسجل: هل تود الانضمام إلى بصائر؟»، فاختر <span class="btnlabel">نعم، أودّ التسجيل</span>.</li>
+    <li><strong>حدّد مكان إقامتك:</strong> «مقيم بالبحرين»، أو «خارج البحرين». من اختار الثانية فدراسته عن بُعد بالكامل.</li>
+    <li><strong>أكمل البيانات المطلوبة:</strong> الرقم الشخصي (تسعة أرقام)، والاسم كاملًا كما في البطاقة السكانية ودون رموز، وتاريخ الميلاد، والجنس، والجنسية. ثم رقم النقال، والمجمع والمنطقة للمقيمين بالبحرين، ودولة الإقامة لمن هم خارجها.</li>
+    <li><strong>تحقّق من بريدك الإلكتروني</strong> بإحدى طرق ثلاث: زر جوجل، أو زر ياهو (تحقّق سريع)، أو الإدخال اليدوي مع رمز تحقق يصل إلى بريدك.</li>
+    <li><strong>أجب عن سؤال الدراسة السابقة:</strong> هل درست العلوم الشرعية من قبل؟ فإن كانت الإجابة «نعم» فاذكر العلوم التي سبقت لك دراستها.</li>
+    <li>اضغط <span class="btnlabel">تسجيل البيانات</span>. ستُراجع الأكاديمية طلبك، ثم تتواصل معك عبر البريد الإلكتروني إذا قُبل انضمامك.</li>
+  </ol>
+  <div class="note warn"><i class="bi bi-exclamation-triangle"></i><div><b>اكتب اسمك كما في البطاقة السكانية.</b> لا تكتب رموزًا أو ألقابًا؛ فالاسم يظهر لاحقًا على الشهادات.</div></div>
+  <div class="note info"><i class="bi bi-globe2"></i><div><b>للطلاب من خارج البحرين:</b> لا يملكون رقمًا شخصيًا بحرينيًا، فيُنشئ النظام لك <b>معرّف دخول</b> من تسعة أرقام يصلك على بريدك الإلكتروني عند التسجيل. احفظه، فستستخدمه بدل الرقم الشخصي عند كل دخول.</div></div>
+  <div class="note tip"><i class="bi bi-lightbulb"></i><div>قد يُغلَق باب التسجيل في بعض الأوقات، فتظهر رسالة بذلك. تابع حساب الأكاديمية على إنستغرام ليصلك إعلان فتح التسجيل.</div></div>
+</section>
+
+<!-- ───────────── تسجيل الدخول ───────────── -->
+<section class="sec" id="login">
+  <header class="sec-head"><span class="ico"><i class="bi bi-box-arrow-in-right"></i></span><div><small>القسم الثاني</small><h2>تسجيل الدخول</h2></div></header>
+
+  <h3>الدخول لأول مرة (تفعيل الحساب)</h3>
+  <ol class="steps">
+    <li>اكتب <strong>الرقم الشخصي</strong> (أو معرّف الدخول لمن هم خارج البحرين) في الحقل. يبحث النظام عن حسابك تلقائيًا.</li>
+    <li>إن لم يكن في حسابك بريد إلكتروني، فسيطلب منك النظام إدخاله لإرسال رمز التفعيل إليه.</li>
+    <li><strong>تحقّق من بريدك</strong> بإحدى طريقتين: زر جوجل أو ياهو (يظهر الزر المطابق لمزوّد بريدك المسجَّل مع جزء من عنوان البريد للتأكد)، أو زر <span class="btnlabel">إرسال رمز التحقق</span>، ثم اكتب الرمز المكوّن من ستة أرقام واضغط <span class="btnlabel">دخول</span>. الرمز صالح لمدة عشر دقائق.</li>
+    <li><strong>أنشئ كلمة مرور</strong> (ستة أحرف على الأقل) وأكّدها. هذه الخطوة إلزامية، وبها تدخل لاحقًا دون انتظار رمز.</li>
+    <li>ستظهر لك رسالة «مرحبًا بك»، ثم تفتح بوابتك.</li>
+  </ol>
+
+  <h3>الدخول في المرات التالية</h3>
+  <p>اكتب رقمك الشخصي ثم كلمة المرور، واضغط <span class="btnlabel">دخول</span>. يمكنك تفعيل خيار «تذكرني» على جهازك الخاص.</p>
+
+  <h3>نسيت كلمة المرور</h3>
+  <p>اكتب رقمك الشخصي، ثم اضغط <span class="btnlabel">نسيت كلمة المرور؟</span>. يُرسَل رمز تحقق إلى بريدك المسجَّل (يظهر لك مخفيًّا جزئيًا)، وبعد إدخاله تختار كلمة مرور جديدة.</p>
+
+  <div class="note warn"><i class="bi bi-shield-exclamation"></i><div><b>إن تعذّر عليك الوصول إلى بريدك،</b> ففي أول دخول يتيح لك خيار «تجاوز التحقق من البريد الإلكتروني إلى وقت لاحق». يدخل به الحساب مؤقتًا وتنشئ كلمة مرور جديدة، ويصل إشعار أمني إلى بريدك المسجَّل. استخدمه عند الضرورة فقط.</div></div>
+  <div class="note tip"><i class="bi bi-lightbulb"></i><div><b>لا تشارك كلمة المرور أو رمز التحقق مع أي شخص،</b> ولن تطلبهما منك إدارة الأكاديمية عبر الرسائل أو الهاتف.</div></div>
+  <p>للخروج من حسابك اضغط أيقونة الخروج أسفل القائمة الجانبية، أو من قائمتك أعلى الصفحة، ثم أكّد.</p>
+</section>
+
+<!-- ───────────── الرئيسية ───────────── -->
+<section class="sec" id="home">
+  <header class="sec-head"><span class="ico"><i class="bi bi-house"></i></span><div><small>القسم الثالث</small><h2>الصفحة الرئيسية ورحلتك العلمية</h2></div></header>
+  <p>تعرض لك الرئيسية تاريخ اليوم، وشارة <strong>مرحلتك الحالية</strong>، وزر <span class="btnlabel">بطاقة الحضور</span>، ثم رحلتك عبر مراحل الأكاديمية الأربع:</p>
+  <ul class="stages">
+    <li class="s0">1 · التأهيلية</li>
+    <li class="s1">2 · التأسيسية</li>
+    <li class="s2">3 · التأصيلية</li>
+    <li class="s3">4 · التحصيلية</li>
+  </ul>
+  <p>وتظهر حالة كل مرحلة هكذا:</p>
+  <div class="table-wrap"><table>
+    <tr><th>الحالة</th><th>معناها</th></tr>
+    <tr><td><span class="pill red">أنت هنا الآن</span></td><td>مرحلتك الدراسية الحالية.</td></tr>
+    <tr><td><span class="pill ok">مكتملة</span></td><td>أتممتَ المرحلة. وإن صدرت شهادة اجتيازها تظهر شارة ذهبية تفتح الشهادة عند الضغط عليها.</td></tr>
+    <tr><td><span class="pill warn">الطلب قيد المراجعة</span></td><td>سجّلتَ رغبتك في المرحلة، وتنتظر مراجعة الإدارة.</td></tr>
+    <tr><td><span class="pill gray">مقفلة</span></td><td>تُفتح بعد اجتياز المرحلة السابقة.</td></tr>
+  </table></div>
+
+  <h3>بطاقات الأرقام</h3>
+  <ul class="list">
+    <li><strong>نسبة الحضور:</strong> عدد المحاضرات التي حضرتها مقسومًا على إجمالي محاضرات مرحلتك منذ بداية الدورة. تظهر شرطة «—» إذا لم تُحدَّد بداية الدورة بعد.</li>
+    <li><strong>الأوراد المسمّعة:</strong> عدد الأوراد التي سمّعتها في مرحلتك الحالية.</li>
+    <li><strong>الاختبارات الناجحة:</strong> عدد الاختبارات التي اجتزتها في مرحلتك الحالية.</li>
+    <li>بطاقتا «خطوتك التالية» و«الدروس المكتملة» قيد التحضير، وستُفعَّلان لاحقًا بإذن الله.</li>
+  </ul>
+
+  <h3>إن لم تكن في مرحلة نشطة</h3>
+  <p>تظهر لك الرئيسية فقط مع رسالة تبيّن حالتك؛ فإن كان التسجيل مفتوحًا لمرحلة ما فستجد زر <span class="btnlabel">التسجيل في مرحلة …</span>، فاضغطه وأكّد رغبتك. وإن لم يكن هناك تسجيل مفتوح فتُوجَّه إلى مواقع التواصل لمتابعة إعلان الفتح.</p>
+</section>
+
+<!-- ───────────── المقررات ───────────── -->
+<section class="sec" id="courses">
+  <header class="sec-head"><span class="ico"><i class="bi bi-journal-bookmark"></i></span><div><small>القسم الرابع</small><h2>المقررات والمواد التعليمية</h2></div></header>
+  <p>هنا حقيبتك العلمية: بطاقة لكل مقرر، وتتحدّث الملفات تلقائيًا من مجلد Google Drive الخاص بالأكاديمية.</p>
+  <ol class="steps">
+    <li>اضغط على بطاقة المقرر لتفتح <strong>لوحة محتوياته</strong> من ملفات ومجلدات.</li>
+    <li>استخدم مربع البحث في أعلى الصفحة للبحث باسم المقرر أو الملف، أو مربع البحث داخل لوحة المقرر للبحث داخله فقط.</li>
+    <li>الملفات الصوتية والمرئية تُشغَّل في نافذة معاينة داخل المنصة، أما بقية الملفات فتُفتح عبر Google Drive.</li>
+    <li>بدّل بين <strong>العرض الشبكي</strong> والعرض على شكل <strong>قائمة</strong> بحسب ما يريحك.</li>
+  </ol>
+  <div class="note info"><i class="bi bi-cloud-arrow-up"></i><div><b>رفع أعمال الطالب:</b> يظهر زر «رفع أعمال الطالب» في المرحلة التأهيلية فقط. اسحب الملف إلى منطقة الرفع أو اضغط عليها لاختياره، ثم اضغط <span class="btnlabel">رفع</span>.</div></div>
+</section>
+
+<!-- ───────────── الحضور ───────────── -->
+<section class="sec" id="attendance">
+  <header class="sec-head"><span class="ico"><i class="bi bi-calendar-check"></i></span><div><small>القسم الخامس</small><h2>الحضور والانضباط</h2></div></header>
+  <p>يعرض هذا القسم عدد أيام حضورك، وسجلًّا بكل يوم مع وقته، مرتبًا من الأحدث إلى الأقدم.</p>
+  <div class="two">
+    <div class="mini"><strong><i class="bi bi-qr-code"></i> بطاقة الحضور</strong><span>بطاقتك الشخصية التي تحمل رمز QR لتسجيل حضورك. يظهر زرها في الرئيسية وفي هذا القسم، ولا يظهر إلا إذا أُصدرت لك بطاقة.</span></div>
+    <div class="mini"><strong><i class="bi bi-calendar-plus"></i> طلب إضافة حضور</strong><span>إن فاتك تسجيل يوم حضرتَه فعلًا، فاطلب إضافته. يظهر الزر فقط حين تفتح الإدارة باب هذه الطلبات.</span></div>
+  </div>
+  <h3>طريقة طلب إضافة حضور</h3>
+  <ol class="steps">
+    <li>اضغط <span class="btnlabel">طلب إضافة حضور</span>.</li>
+    <li>اختر <strong>التاريخ</strong> (اليوم أو يومًا سابقًا؛ لا يمكن اختيار تاريخ مستقبلي).</li>
+    <li>اكتب <strong>سبب الإضافة</strong>، وهو إلزامي، ثم اضغط <span class="btnlabel">إرسال الطلب</span>.</li>
+  </ol>
+  <div class="note info"><i class="bi bi-hourglass-split"></i><div>لا يُحتسب اليوم في سجل حضورك إلا بعد أن تقبل الإدارة طلبك، فلا تقلق إن لم يظهر فورًا.</div></div>
+</section>
+
+<!-- ───────────── التسميع ───────────── -->
+<section class="sec" id="recitation">
+  <header class="sec-head"><span class="ico"><i class="bi bi-mic"></i></span><div><small>القسم السادس</small><h2>التسميع والأوراد</h2></div></header>
+  <p>سجلّ لأوراد الحفظ التي سمّعتها في مرحلتك الحالية، مع تقييم كل ورد وتاريخ تسميعه. تُسجَّل الأوراد من جهة الأكاديمية، وأنت تتابعها هنا.</p>
+  <div class="grid">
+    <div class="card"><i class="bi bi-journal-check"></i><strong>عدد الأوراد</strong><span>الأوراد المسموعة منك.</span></div>
+    <div class="card"><i class="bi bi-star"></i><strong>متوسط التقييم</strong><span>معدّل تقييمات أوراد مرحلتك.</span></div>
+    <div class="card"><i class="bi bi-fire"></i><strong>أسابيع متتالية</strong><span>عدد الأسابيع المتصلة التي سمّعتَ فيها.</span></div>
+  </div>
+</section>
+
+<!-- ───────────── الاختبارات ───────────── -->
+<section class="sec" id="exams">
+  <header class="sec-head"><span class="ico"><i class="bi bi-clipboard2-check"></i></span><div><small>القسم السابع</small><h2>الاختبارات والشهادات</h2></div></header>
+  <p>في هذا القسم تجد الاختبار المتاح لك الآن (إن وُجد) في بطاقة بارزة، وتحتها قائمة بجميع اختباراتك؛ ما كان في مرحلتك الحالية وما سبقها (تحت عنوان «مستويات سابقة»)، مع ثلاث إحصاءات: الاختبارات المجتازة، ومتوسط درجات النجاح، ونسبة الاجتياز.</p>
+
+  <h3>حالة كل اختبار</h3>
+  <div class="table-wrap"><table>
+    <tr><th>ما يظهر أمامك</th><th>معناه</th></tr>
+    <tr><td><span class="pill red"><i class="bi bi-play-fill"></i>ابدأ</span></td><td>الاختبار متاح لمرحلتك، ويمكنك البدء.</td></tr>
+    <tr><td><span class="pill red"><i class="bi bi-arrow-repeat"></i>استكمال</span></td><td>لديك جلسة اختبار مفتوحة لم تُسلَّم. العدّاد ما زال يعمل.</td></tr>
+    <tr><td><span class="pill ok">تقدير النجاح</span> <i class="bi bi-award"></i></td><td>اجتزتَ الاختبار. تفتح أيقونة الشهادة شهادتك، أو تُصدرها لك إن لم تُصدَر بعد.</td></tr>
+    <tr><td><span class="pill warn">غير متاح</span></td><td>الاختبار مغلق حاليًا. تفتحه الإدارة في موعده.</td></tr>
+    <tr><td><span class="pill warn"><i class="bi bi-lock-fill"></i>الإعادة مغلقة</span></td><td>لم تجتز الاختبار، وإعادة المحاولة مغلقة حتى تفتحها الإدارة.</td></tr>
+  </table></div>
+
+  <h3>خطوات أداء الاختبار</h3>
+  <ol class="steps">
+    <li><strong>ابدأ:</strong> اضغط <span class="btnlabel">بدء الاختبار</span> من البطاقة البارزة أو من قائمة الاختبارات. (اختبار الفقه يتطلب أن تكون قد اخترتَ مذهبك أولًا.)</li>
+    <li><strong>استبيان قبل الاختبار (إلزامي):</strong> قيّم المادة والمحاضر والإدارة من 1 إلى 5، ويمكنك إضافة ملاحظات اختيارية. لا يمكن تجاوزه.</li>
+    <li><strong>صفحة الإقرار:</strong> اقرأ مدة الاختبار وضوابطه، وفعّل خيار «أقرّ وأتعهد» ليُفعَّل زر البدء. لا يبدأ احتساب الوقت إلا بعد ضغطك على زر البدء.</li>
+    <li><strong>أجب عن الأسئلة:</strong> تظهر الأسئلة كلها في صفحة واحدة، ولكل سؤال إجابة صحيحة واحدة، ويمكنك تغيير إجابتك قبل التسليم.</li>
+    <li><strong>سلّم الاختبار:</strong> اضغط <span class="btnlabel">إنهاء وتسليم الاختبار</span> ثم <span class="btnlabel">تأكيد التسليم</span>. لا يُقبل التسليم اليدوي قبل الإجابة عن جميع الأسئلة، وسينقلك النظام إلى أول سؤال ناقص.</li>
+    <li><strong>استبيان بعد الاختبار (إلزامي):</strong> قيّم مستوى الاختبار وطوله وشموله ووضوح صياغته، ثم تظهر نتيجتك.</li>
+    <li><strong>النتيجة:</strong> تظهر نسبتك المئوية وعدد إجاباتك الصحيحة. وإن فعّلت الإدارة مراجعة الإجابات لهذا الاختبار، فتضغط <span class="btnlabel">مراجعة الإجابات</span> فتظهر الصحيحة باللون الأخضر.</li>
+  </ol>
+
+  <h3>أدوات تعينك أثناء الاختبار</h3>
+  <ul class="list">
+    <li><strong>خريطة الأسئلة:</strong> أرقام الأسئلة بألوان تميّز <span class="pill ok">تمت الإجابة</span> و<span class="pill warn">للمراجعة</span> و<span class="pill gray">لم يُجب</span>؛ اضغط أي رقم للانتقال إليه.</li>
+    <li><strong>وضع علامة للمراجعة:</strong> زر الإشارة في رأس كل سؤال لتعود إليه لاحقًا. وزر «أول سؤال غير مجاب» ينقلك مباشرة إلى ما فاتك.</li>
+    <li><strong>المؤقّت:</strong> حلقة الوقت المتبقي في الشاشات الكبيرة، وعدّاد نصّي أعلى الصفحة في الجوال. يتحوّل لون الحلقة إلى الأصفر حين يتبقى خمس دقائق أو أقل.</li>
+  </ul>
+
+  <div class="note warn"><i class="bi bi-clock-history"></i><div><b>تنبيه بشأن الوقت:</b> إذا انتهى الوقت قبل أن تسلّم، فيُسلَّم تلقائيًا ما أجبتَ عنه فقط، وتُحتسب الأسئلة غير المجابة خاطئة.</div></div>
+  <div class="note info"><i class="bi bi-wifi-off"></i><div><b>إن أُغلقت الصفحة أو انقطع الاتصال:</b> ادخل من جديد واضغط <span class="btnlabel">استكمال</span> قبل انتهاء الوقت. لكنّ العدّاد لا يتوقف أثناء غيابك. وتُحفَظ اختياراتك على جهازك أثناء الاختبار، فاستكمِل من <b>الجهاز والمتصفح نفسيهما</b> ما أمكن.</div></div>
+  <div class="note tip"><i class="bi bi-shield-check"></i><div>يتضمّن الإقرار أن تعتمد على نفسك دون أي وسيلة مساعدة، وألّا تشارك أسئلة الاختبار أو تصوّرها. للاختبار <b>محاولة واحدة</b>.</div></div>
+
+  <h3>الشهادات</h3>
+  <p>عند اجتياز اختبار تظهر أيقونة الشهادة <i class="bi bi-award"></i> بجوار نتيجته. إن كانت الشهادة صادرة فتفتحها بالضغط، وإن لم تصدر بعد فاضغط الأيقونة لإصدارها فورًا، وانتظر حتى تظهر رسالة نجاح ثم اختر <span class="btnlabel">فتح الشهادة</span>. وقد يكون إصدار الشهادة بنفسك غير مفعَّل في وقتٍ ما، فتظهر رسالة توضّح ذلك.</p>
+
+  <h3>لماذا لا أستطيع بدء الاختبار؟</h3>
+  <div class="table-wrap"><table>
+    <tr><th>الرسالة التي تظهر</th><th>ما تفعله</th></tr>
+    <tr><td>يلزم اختيار مذهبك الفقهي أولًا</td><td>اضغط «اختيار المذهب الآن» أو افتح قسم المذهب الفقهي واختر مذهبك.</td></tr>
+    <tr><td>الاختبار غير متاح في الوقت الحالي</td><td>ما زال مغلقًا. تابع الإعلانات حتى تفتحه الإدارة.</td></tr>
+    <tr><td>هذا الاختبار لا يخص مرحلتك الحالية</td><td>يقتصر البدء على اختبارات مرحلتك النشطة.</td></tr>
+    <tr><td>رسبتَ وإعادة المحاولة مغلقة</td><td>تواصل مع الإدارة.</td></tr>
+    <tr><td>سبق تسجيل نتيجة ناجحة لك</td><td>لا حاجة لإعادته.</td></tr>
+    <tr><td>لا يوجد نموذج أسئلة معتمد</td><td>نبّهت المنصة الإدارة تلقائيًا؛ حاول لاحقًا.</td></tr>
+    <tr><td>النظام مشغول للحظات</td><td>أعد المحاولة بعد قليل.</td></tr>
+  </table></div>
+</section>
+
+<!-- ───────────── المذهب ───────────── -->
+<section class="sec" id="madhhab">
+  <header class="sec-head"><span class="ico"><i class="bi bi-signpost-2"></i></span><div><small>القسم الثامن</small><h2>المذهب الفقهي</h2></div></header>
+  <p>يبني الطالب اختياره للمذهب على ما استمع إليه من محاضرة «المدخل إلى علم الفقه»، أو على استشارته لمشايخ متخصصين. تظهر لك المذاهب المعتمدة لمرحلتك فقط.</p>
+  <ol class="steps">
+    <li>افتح قسم <strong>المذهب الفقهي</strong>.</li>
+    <li>اضغط بطاقة المذهب الذي تريده. <strong>يُحفَظ اختيارك فور الضغط</strong> دون نافذة تأكيد، وتظهر رسالة «تم تسجيل رغبتك»، وعلامة صحّ على المذهب المختار. فتأنَّ قبل الضغط.</li>
+    <li>عند تغيير مذهبك لاحقًا (إن أُتيح ذلك) تُطلب منك مصادقة صريحة بزر «نعم، أكّد التغيير».</li>
+  </ol>
+  <div class="note info"><i class="bi bi-lock"></i><div>اختيار المذهب لأول مرة متاح دائمًا. أما <b>تغييره لاحقًا</b> فيتاح حين تفتحه الإدارة؛ فإن ظهرت لك عبارة «اخترتَ مذهبك بالفعل وتغييره غير متاح حاليًا» فتواصل مع الإدارة إن كانت لديك حاجة إلى ذلك.</div></div>
+  <div class="note warn"><i class="bi bi-exclamation-triangle"></i><div>لا يمكنك بدء اختبار الفقه قبل اختيار مذهبك.</div></div>
+</section>
+
+<!-- ───────────── الملف الشخصي ───────────── -->
+<section class="sec" id="profile">
+  <header class="sec-head"><span class="ico"><i class="bi bi-person-gear"></i></span><div><small>القسم التاسع</small><h2>الملف الشخصي</h2></div></header>
+  <p>حدّث بياناتك من مكان واحد. يعرض أعلى الصفحة صورتك واسمك ونسبة <strong>اكتمال الملف</strong> مع تلميح بما ينقصك. ولتغيير الصورة الشخصية اضغط أيقونة الكاميرا، واختر ملفًا بصيغة PNG أو JPG.</p>
+  <div class="two">
+    <div class="mini"><strong><i class="bi bi-person-vcard"></i> البيانات الشخصية</strong><span>الاسم، وتاريخ الميلاد، والجنس، والجنسية. أما <b>الرقم الشخصي فلا يمكن تعديله</b>. طابق الاسم وتاريخ الميلاد مع البطاقة السكانية. وتُحدَّث المرحلة والحالة الأكاديمية تلقائيًا من الأكاديمية.</span></div>
+    <div class="mini"><strong><i class="bi bi-at"></i> التواصل والعنوان</strong><span>البريد الإلكتروني (مع التحقق منه)، ورقم الهاتف وهاتف بديل اختياري، ووسيلة التواصل المفضلة: واتساب أو البريد. أما المجمع والمنطقة فللعرض فقط.</span></div>
+    <div class="mini"><strong><i class="bi bi-shield-check"></i> الأمان والدخول</strong><span>تغيير كلمة المرور: أدخل الحالية ثم الجديدة (ستة أحرف على الأقل) وأكّدها. يبيّن المؤشّر قوة كلمة المرور.</span></div>
+    <div class="mini"><strong><i class="bi bi-bell"></i> الإشعارات</strong><span>تفضيلات التنبيهات قيد التجهيز، وستُتاح قريبًا بإذن الله.</span></div>
+  </div>
+  <ol class="steps">
+    <li>عدّل ما تريد في أي تبويب؛ فيتفعّل زر <span class="btnlabel">حفظ التغييرات</span> ويظهر تنبيه بوجود تغييرات غير محفوظة.</li>
+    <li>اضغط <span class="btnlabel">حفظ التغييرات</span>، أو <span class="btnlabel">تراجع</span> إن غيّرت رأيك.</li>
+  </ol>
+  <div class="note info"><i class="bi bi-eye-slash"></i><div>حرصًا على الخصوصية، لا تظهر صور الطالبات إلا داخل صفحة «الملف الشخصي»، ولا تظهر في القائمة الجانبية أو الشريط العلوي.</div></div>
+</section>
+
+<!-- ───────────── الأسئلة الشائعة ───────────── -->
+<section class="sec" id="faq">
+  <header class="sec-head"><span class="ico"><i class="bi bi-question-circle"></i></span><div><small>مساعدة سريعة</small><h2>أسئلة شائعة</h2></div></header>
+
+  <details><summary>لم يصلني رمز التحقق، فماذا أفعل؟</summary><div class="ans">
+    <p>تأكد من كتابة بريدك بلا خطأ، وابحث في مجلد الرسائل غير المرغوب فيها (Spam)، وانتظر انتهاء العدّ التنازلي ثم اضغط «إعادة إرسال الرمز». وإن أخطأتَ في اسم مزوّد البريد (مثل gmial.com) فستنبّهك المنصة وتقترح التصحيح.</p>
+  </div></details>
+
+  <details><summary>لا تفتح نافذة التحقق عبر جوجل أو ياهو</summary><div class="ans">
+    <p>اسمح بالنوافذ المنبثقة (Pop-ups) لموقع الأكاديمية في متصفحك ثم أعد المحاولة، أو استخدم خيار «إرسال رمز التحقق» بدلًا منها.</p>
+  </div></details>
+
+  <details><summary>ظهرت رسالة أن حسابي يحتاج إعدادًا إضافيًا</summary><div class="ans">
+    <p>يعني ذلك أن بياناتك مسجّلة لدينا، لكن حسابك يحتاج إعدادًا من الإدارة. تواصل معها عبر واتساب لإتمامه.</p>
+  </div></details>
+
+  <details><summary>أريد تعديل رقمي الشخصي أو اسمي</summary><div class="ans">
+    <p>الرقم الشخصي لا يمكن تعديله من المنصة، فتواصل مع الإدارة إن كان فيه خطأ. أما الاسم فيمكنك تعديله من «الملف الشخصي»، على أن يطابق البطاقة السكانية.</p>
+  </div></details>
+
+  <details><summary>لماذا لا أرى زر «طلب إضافة حضور»؟</summary><div class="ans">
+    <p>يظهر الزر فقط حين تفتح الإدارة باب طلبات الحضور. وإن كنتَ لا ترى زر «بطاقة الحضور» فذلك لأن بطاقتك لم تُصدر بعد.</p>
+  </div></details>
+
+  <details><summary>لماذا لا يظهر قسم «المذهب الفقهي» في القائمة؟</summary><div class="ans">
+    <p>لا يظهر إلا إذا كانت هناك مذاهب معتمدة لمرحلتك الدراسية الحالية.</p>
+  </div></details>
+
+  <details><summary>ماذا لو انتهى الوقت وأنا في منتصف الاختبار؟</summary><div class="ans">
+    <p>يُسلَّم الاختبار تلقائيًا بما أجبتَ عنه، وتُعدّ الأسئلة غير المجابة خاطئة. فاحرص على مراقبة المؤقّت، ولا تبدأ الاختبار إلا وأنت مستعد.</p>
+  </div></details>
+
+  <details><summary>أغلقتُ الصفحة أثناء الاختبار، فهل تضيع إجاباتي؟</summary><div class="ans">
+    <p>لا، فتُحفَظ اختياراتك أثناء الاختبار. ادخل من جديد واضغط «استكمال» قبل انتهاء الوقت، والأفضل أن تفعل ذلك من الجهاز والمتصفح نفسيهما. لكن انتبه: العدّاد لا يتوقف أثناء غيابك.</p>
+  </div></details>
+
+  <details><summary>لم تصدر شهادتي رغم اجتيازي الاختبار</summary><div class="ans">
+    <p>اضغط أيقونة الشهادة بجوار الاختبار في قائمة اختباراتك لإصدارها. وإن ظهرت رسالة بأن الإصدار غير متاح حاليًا فتواصل مع الإدارة.</p>
+  </div></details>
+
+  <details><summary>كيف أستفيد من المنصة على الجوال؟</summary><div class="ans">
+    <p>المنصة مهيأة لشاشات الجوال. تفتح القائمة الجانبية بزر <kbd>☰</kbd> في أعلى الصفحة، ويظهر مؤقّت الاختبار في رأس الصفحة.</p>
+  </div></details>
+</section>
+
+<!-- ───────────── الدعم ───────────── -->
+<section class="sec" id="support">
+  <header class="sec-head"><span class="ico"><i class="bi bi-headset"></i></span><div><small>نحن معك</small><h2>المساعدة والدعم</h2></div></header>
+  <p>إن لم تجد جوابك هنا، فتواصل مع إدارة الأكاديمية. وحين تراسلها، اذكر <strong>اسمك ورقمك الشخصي</strong> واكتب ما ظهر لك من رسالة أو ما حدث معك بدقة، ليسهل علينا مساعدتك.</p>
+  <div class="contact">
+    <a href="https://wa.me/97334440790" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i><div><strong>واتساب</strong><span>+973 3444 0790</span></div></a>
+    <a href="mailto:basaerbah@gmail.com"><i class="bi bi-envelope"></i><div><strong>البريد الإلكتروني</strong><span>basaerbah@gmail.com</span></div></a>
+    <a href="https://www.instagram.com/basaer.bh/" target="_blank" rel="noopener"><i class="bi bi-instagram"></i><div><strong>إنستغرام</strong><span>@basaer.bh</span></div></a>
+    <a href="https://www.youtube.com/@basaer_bh" target="_blank" rel="noopener"><i class="bi bi-youtube"></i><div><strong>يوتيوب</strong><span>@basaer_bh</span></div></a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">أكاديمية بصائر للعلوم الشرعية · نسأل الله لك التوفيق والسداد</div>
+</footer>
+
+<script>
+// إبراز القسم الحالي في شريط الأقسام أثناء التمرير
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var byId = {};
+  links.forEach(function(a){ byId[a.getAttribute('href').slice(1)] = a; });
+  if(!('IntersectionObserver' in window)) return;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(!en.isIntersecting) return;
+      links.forEach(function(a){ a.classList.remove('on'); });
+      var a = byId[en.target.id];
+      if(a){
+        a.classList.add('on');
+        var box = a.parentElement;
+        box.scrollTo({ left: a.offsetLeft - box.clientWidth / 2 + a.clientWidth / 2, behavior: 'smooth' });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('main .sec').forEach(function(s){ io.observe(s); });
+})();
+// عند الطباعة تُفتح كل الأسئلة الشائعة
+window.addEventListener('beforeprint', function(){
+  document.querySelectorAll('details').forEach(function(d){ d.setAttribute('open', ''); });
+});
+</script>
+</body>
+</html>

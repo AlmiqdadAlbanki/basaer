@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /platform.html
+Disallow: /platform
+
+Sitemap: https://basaerbh.com/sitemap.xml
