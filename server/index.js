@@ -45,7 +45,7 @@ const { forceReleaseLockHeldBy, LOCK_BUFFER_BYTES } = require('./shims/platform.
 const { Scheduler } = require('./scheduler.js');
 const { WorkerPool } = require('./worker-pool.js');
 const { RateLimiter } = require('./rate-limit.js');
-const { rewriteLegacyPartial, rewriteLegacyShell, legacyShellMeta } = require('./page-rewrites.js');
+const { rewriteLegacyPartial, rewriteLegacyShell, rewriteGoogleFontsUrls, legacyShellMeta } = require('./page-rewrites.js');
 
 // --- Configuration ----------------------------------------------------------
 const ROOT = path.join(__dirname, '..');
@@ -437,11 +437,112 @@ app.use('/fonts', serveStaticDirectory(path.join(__dirname, 'client', 'fonts')))
 app.use('/site-assets', serveStaticDirectory(path.join(__dirname, 'client', 'site-assets')));
 
 // Serve the page from the one-time build. Set BASAER_REBUILD=1 to re-inline the
-// partials on every request while actively editing them. The SPA keeps its
-// place in the URL (view-restore.js), so any /p/... path serves the same page.
-app.get(['/', '/p/*'], (_req, res) => {
+// partials on every request while actively editing them. The app lives under /app
+// (/ is the public website, below), and the SPA keeps its place in the URL
+// (view-restore.js), so /app and any /app/p/... path serve the same page.
+app.get(['/app', '/app/p/*'], (_req, res) => {
   res.type('html').set('Cache-Control', 'no-store').send(process.env.BASAER_REBUILD ? buildIndexHtml() : INDEX_HTML);
 });
+
+// The app used to answer at / and /p/...: a bookmarked /p/... view lands on the same
+// view under /app, query string included.
+app.get('/p/*', (req, res) => res.redirect(301, '/app' + req.originalUrl));
+
+// --- Public website ---------------------------------------------------------------
+// The academy's public website used to be on Firebase Hosting at basaerbh.com, and its
+// /platform page put a header bar over an iframe of the Apps Script web app. This server
+// serves both, at the paths the public already knows:
+//   /                    the home page                       server/client/site/index.html
+//   /platform            header bar + the app (/app) in an iframe       .../platform.html
+//   /student-guide       the student guide (and /student-guide.pdf)     .../student-guide.html
+//   /assets/*            the site's css, js, images and fonts           .../assets/
+//   /favicon.ico, /robots.txt, /sitemap.xml
+// server/client/site/ is the site as exported from Firebase Hosting
+// (data/google-exports/newweb/website/), without the two relay pages (ported to
+// server/client/relay/), the FCM service worker and the export's README. The pages were
+// edited only where they reached Google or named the old file names: Google Analytics is gone,
+// links name the clean paths, and platform.html frames /app instead of the Apps Script URL,
+// its reload link reloads that frame, and its push-notification button, dialog and FCM
+// scripts are gone (web push needs a Web Push port first, docs/DEPLOY.md section 11).
+const SITE_DIR = path.join(__dirname, 'client', 'site');
+
+function escapeHtmlAttribute(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// The query string of a request ('' when it has none), as the WHATWG URL parser writes it:
+// quotes, spaces and angle brackets come out percent-encoded, so the result can go into a
+// redirect's Location header, and HTML-escaped into an attribute.
+function queryStringOf(req) {
+  try { return new URL(req.originalUrl, 'http://localhost').search; } catch (_) { return ''; }
+}
+
+// The pages and the stylesheet below are read once at startup (a missing file stops the server
+// there, not at the first visit) and on every request with BASAER_REBUILD=1. student-guide.html
+// links a Google Fonts stylesheet with preconnect hints to Google's font hosts; the serve-time
+// rewrite the app's own pages get (page-rewrites.js) points it at /fonts/* and drops the hints,
+// so the file stays as exported.
+function siteFileReader(relativePath) {
+  const readFile = () => rewriteGoogleFontsUrls(fs.readFileSync(path.join(SITE_DIR, relativePath), 'utf8'));
+  const fileText = readFile();
+  return () => (process.env.BASAER_REBUILD ? readFile() : fileText);
+}
+
+// The pages name the site's files relatively (assets/css/style.css), which resolves to
+// /assets/... only from a root-level path. Express also routes /platform/ (and /Platform) to
+// app.get('/platform'), so anything other than the exact clean path is redirected to it.
+// Never cached, like the app's shell: the pages carry no content hash.
+function serveSitePage(cleanPath, pageFor) {
+  return (req, res) => {
+    if (req.path !== cleanPath) return res.redirect(301, cleanPath + queryStringOf(req));
+    res.type('html').set('Cache-Control', 'no-store').send(pageFor(req));
+  };
+}
+
+const readHomePage = siteFileReader('index.html');
+const readStudentGuidePage = siteFileReader('student-guide.html');
+const readPlatformPage = siteFileReader('platform.html');
+
+// The platform page's iframe gets the query string /platform was asked with, as the Apps
+// Script URL in it did, so /platform?logout=1 frames /app?logout=1 (gas/js.html clears the
+// login the browser stored when the app starts with logout=1; doGet in gas/code.js read it too).
+const PLATFORM_FRAME_START = '<iframe id="platform-frame" src="/app"';
+if (!readPlatformPage().includes(PLATFORM_FRAME_START)) {
+  throw new Error(`server/client/site/platform.html no longer contains ${PLATFORM_FRAME_START}`);
+}
+function platformPageFor(req) {
+  const frameStart = `<iframe id="platform-frame" src="${escapeHtmlAttribute('/app' + queryStringOf(req))}"`;
+  // A replacer function, not a replacement string: a "$&" or "$'" in the query must stay literal.
+  return readPlatformPage().replace(PLATFORM_FRAME_START, () => frameStart);
+}
+
+app.get('/', serveSitePage('/', readHomePage));
+app.get('/platform', serveSitePage('/platform', platformPageFor));
+app.get('/student-guide', serveSitePage('/student-guide', readStudentGuidePage));
+
+// The old file names (still in old links, and in the site's own app.js, which writes
+// href="platform.html" into the menu) redirect to the clean paths, query string included.
+for (const [oldPath, cleanPath] of [['/index.html', '/'], ['/platform.html', '/platform'], ['/student-guide.html', '/student-guide']]) {
+  app.get(oldPath, (req, res) => res.redirect(301, cleanPath + queryStringOf(req)));
+}
+
+// Files with fixed, well-known names: browsers ask for /favicon.ico and crawlers for
+// /robots.txt and /sitemap.xml by name, and the guide links its PDF by name. Unlike the files
+// under /assets they cannot be renamed when they change, so they are cached for an hour, not
+// a year.
+for (const fileName of ['favicon.ico', 'robots.txt', 'sitemap.xml', 'student-guide.pdf']) {
+  const filePath = path.join(SITE_DIR, fileName);
+  app.get('/' + fileName, (_req, res) => res.sendFile(filePath, { maxAge: '1h' }));
+}
+
+// The site's stylesheet starts with an @import of Tajawal from Google Fonts. It gets the same
+// rewrite as the pages (so it names /fonts/tajawal-400-500-700-800.css and the file stays as
+// exported) and the same caching as the rest of /assets.
+const readSiteStylesheet = siteFileReader(path.join('assets', 'css', 'style.css'));
+app.get('/assets/css/style.css', (_req, res) => {
+  res.type('css').set('Cache-Control', 'public, max-age=31536000, immutable').send(readSiteStylesheet());
+});
+app.use('/assets', serveStaticDirectory(path.join(SITE_DIR, 'assets')));
 
 // --- Relay pages ----------------------------------------------------------------
 // The two helper pages the legacy client opens as popups: Google sign-in and the

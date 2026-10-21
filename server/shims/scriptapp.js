@@ -73,7 +73,10 @@ function makeScriptApp(storage, opts) {
       const id = t && (t._row ? t._row.id : (typeof t.getUniqueId === 'function' ? t.getUniqueId() : t));
       storage.db.prepare('DELETE FROM triggers WHERE id = ?').run(String(id));
     },
-    getService: () => ({ getUrl: () => baseUrl, isEnabled: () => true }),
+    // On Apps Script this is the web app's address. The public entry to the app is now the
+    // website's /platform page (the app itself is framed from /app), so that is what a link
+    // built from it should open.
+    getService: () => ({ getUrl: () => baseUrl + '/platform', isEnabled: () => true }),
     getScriptId: () => 'basaer-local',
     getOAuthToken: () => {
       throw new Error('ScriptApp.getOAuthToken is disabled: it exposed the owner\'s Google token (see SECURITY-FINDINGS #1).');

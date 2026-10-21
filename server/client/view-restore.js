@@ -18,14 +18,15 @@
  *
  * The two top levels live in the path and the lower levels in the hash, so the
  * address bar (and a bookmark) reads like a real location, e.g.
- *   /p/students#v=data-emp-tab:security
- *   data-page "X"              -> /p/X
- *   data-bs-target "#Y"        -> /p/Y   (the "#" is dropped; replay adds it back)
+ *   /app/p/students#v=data-emp-tab:security
+ *   data-page "X"              -> /app/p/X
+ *   data-bs-target "#Y"        -> /app/p/Y   (the "#" is dropped; replay adds it back)
  *   data-tab, data-emp-tab     -> #v=data-tab:...|data-emp-tab:...
- *   nothing recorded           -> /      (no hash)
- * The server serves the same page for "/" and any "/p/*" path, so a refresh
- * or a pasted link lands on the app instead of a 404. Only the first segment
- * after /p/ is meaningful and any other path is ignored. A path alone cannot
+ *   nothing recorded           -> /app       (no hash)
+ * The server serves the same page for "/app" and any "/app/p/*" path, so a refresh
+ * or a pasted link lands on the app instead of a 404 ("/" is the public website, and
+ * the app's old "/p/*" paths redirect to "/app/p/*"). Only the first segment
+ * after /app/p/ is meaningful and any other path is ignored. A path alone cannot
  * say whether X is a data-page or a Bootstrap tab id, so replay tries
  * [data-page="X"] first and then the tab with data-bs-target="#X".
  * The URL is updated with history.replaceState (never pushState) so the back
@@ -40,7 +41,10 @@
   // Precedence: clicking a higher level clears everything below it.
   var LEVELS = ['data-page', 'data-bs-target', 'data-tab', 'data-emp-tab'];
   var MAIN_VIEWS = { loadPageStudent: 1, loadPageEmp: 1, loadPageAdminDashboard: 1 };
-  var PATH_PREFIX = '/p/';
+  // Where the server serves the app; it is also the address when nothing is recorded,
+  // because "/" is the public website, not the app.
+  var APP_PATH = '/app';
+  var PATH_PREFIX = APP_PATH + '/p/';
   var state = {};        // level -> value
   var restored = false;  // replay happens at most once per page load
 
@@ -59,9 +63,9 @@
     return out;
   }
 
-  // First segment after /p/, decoded ('' for "/" and for any unknown path).
+  // First segment after /app/p/, decoded ('' for "/app" and for any unknown path).
   function readPath() {
-    var m = /^\/p\/([^\/]+)/.exec(location.pathname || '');
+    var m = /^\/app\/p\/([^\/]+)/.exec(location.pathname || '');
     return m ? decode(m[1]) : '';
   }
 
@@ -93,7 +97,7 @@
     // and data-bs-target set) cannot share the path, so it uses the old-style entry.
     var parts = [];
     LEVELS.forEach(function (k) { if (state[k] && k !== topLevel) parts.push(k + ':' + state[k]); });
-    var path = topLevel ? PATH_PREFIX + encodeURIComponent(topValue) : '/';
+    var path = topLevel ? PATH_PREFIX + encodeURIComponent(topValue) : APP_PATH;
     var hash = parts.length ? '#v=' + encodeURIComponent(parts.join('|')) : '';
     try { history.replaceState(null, '', path + location.search + hash); } catch (e) { /* ignore */ }
   }

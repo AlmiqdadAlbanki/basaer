@@ -444,7 +444,7 @@ describe('the running server', () => {
   }
 
   it('serves a shell page that names no Google Fonts or old-site URL and links the local copies', async () => {
-    const shell = await getText('/');
+    const shell = await getText('/app');
     assert.strictEqual(shell.status, 200);
     assertTextLacks(shell.text, FORBIDDEN_HOSTS, 'the shell page');
     // The shell is stricter than the other pages: its only other Google references were the Firebase
@@ -459,7 +459,7 @@ describe('the running server', () => {
   });
 
   it('serves partials that carry the rewritten font and old-site URLs, and none of the old ones', async () => {
-    const shell = await getText('/');
+    const shell = await getText('/app');
     const partialPaths = Array.from(shell.text.matchAll(/(?:href|src)="(\/partials\/[^"]+)"/g), (match) => match[1]);
     assert.ok(partialPaths.length >= 10, 'expected the shell to reference its partials');
     let fontOrAssetReferencesSeen = 0;
