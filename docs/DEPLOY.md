@@ -6,7 +6,9 @@ config in `/etc/basaer.env`.
 
 ## 1. Prerequisites
 
-1. An EC2 instance: t3.small, Ubuntu 24.04.
+1. An EC2 instance: t3.small, Ubuntu 24.04, with a root volume of **at least 40 GB** (gp3). The
+   default 8 GB is not enough: the Drive file store alone is about 16 GB (~6,000 files), and
+   backups (section 6) and logs need room next to it.
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
 3. An Elastic IP attached to the instance.
 4. A DNS A record for the domain pointing at the Elastic IP. Since this server also serves the
@@ -127,6 +129,26 @@ The aim is that nothing is left on Google. Two things come over: the spreadsheet
 file they link to (student folders, certificates, ID cards, course material). The files keep their
 original Google ids, and the links stored in the sheets are then rewritten to this server's own
 addresses. The access to Google is read-only, so nothing is ever written to it.
+
+**Shortcut when the import was already done on another machine** (it was, on the developer's PC:
+`data/basaer.sqlite`, 30 MB, and `data/files/`, 16 GB). Copying that result is simpler than
+repeating the Google pull on the server; the pull is only needed again for the final refresh of
+the sheets at cut-over (section 8, step 3). From that machine, with the app stopped on the server:
+```
+# on the server, once
+sudo mkdir -p /var/lib/basaer/files && sudo chown -R basaer:basaer /var/lib/basaer
+# from the machine that holds the data (WSL; rsync resumes if the connection drops)
+rsync -avz --partial --info=progress2 -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/tmp/basaer-files/
+rsync -avz -e "ssh -i <key.pem>" data/basaer.sqlite ubuntu@<ip>:/tmp/basaer.sqlite
+# on the server
+sudo systemctl stop basaer
+sudo rsync -a /tmp/basaer-files/ /var/lib/basaer/files/ && sudo mv /tmp/basaer.sqlite /var/lib/basaer/basaer.sqlite
+sudo chown -R basaer:basaer /var/lib/basaer && sudo systemctl start basaer
+```
+16 GB over a home connection takes hours; run it in `screen`/`tmux`, and re-run the same rsync
+to top it up later (it only sends what changed). After the copy, run step 9 of this section with
+the real `--base-url https://basaerbh.com`: the links in the copied sheets still say
+`http://localhost:3000`.
 
 Run the whole section on the server, in `/opt/basaer/app`, as the `basaer` user, so that the
 database and the files end up owned by the service. The service stays stopped while you work.
