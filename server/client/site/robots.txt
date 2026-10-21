@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /platform.html
 Disallow: /platform
+Disallow: /app
 
 Sitemap: https://basaerbh.com/sitemap.xml

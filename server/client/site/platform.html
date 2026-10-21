@@ -64,7 +64,9 @@
   document.getElementById('platform-reload').addEventListener('click', (e) => {
     e.preventDefault();
     loading.classList.remove('hidden');
-    frame.src = frame.src;
+    // Reload the page the frame is on now (same origin), so the user's current view
+    // (/app/p/...) survives; resetting src would send them back to the first page.
+    try { frame.contentWindow.location.reload(); } catch (err) { frame.src = frame.src; }
   });
 </script>
 </body>

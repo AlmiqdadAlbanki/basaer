@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }));
 })();
 
-// Rotating "فتاوى مختارة" widget — pulls from the public "fatawa" sheet in the basaer-REF workbook, with a fallback sample set until the sheet ID is wired in.
+// Rotating "فتاوى مختارة" widget — reads assets/data/fatawa.json (a snapshot of the "fatawa" sheet of the basaer-REF workbook, served by this site), with a fallback sample set until it loads.
 document.addEventListener('DOMContentLoaded', () => {
   const ticker = document.querySelector('#fatwa-ticker');
   if (!ticker) return;
@@ -383,9 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleBtn = ticker.querySelector('[data-fatwa-toggle]');
   const tagsBox = document.querySelector('#fatwa-tags');
 
-  // معرف ملف basaer-REF — الشيت لازم يكون مشاركًا للعرض العام (أي شخص لديه الرابط - قارئ) حتى يقدر يقرأه الموقع.
-  const SHEET_ID = '1vWIF38NEOt9wR_O79k16ZZnwtpPr8bZAumXWqh2mcyY';
-  const SHEET_NAME = 'fatawa';
+  // Snapshot of the "fatawa" sheet (rows of {title, question, answer, category}), kept on
+  // this server next to the other site assets; edit that file to change the fatawa.
+  const FATAWA_URL = 'assets/data/fatawa.json';
 
   const FALLBACK = [
     { title: 'حكم الجمع بين الصلاتين للمسافر', question: 'هل يجوز للمسافر أن يجمع بين الظهر والعصر وبين المغرب والعشاء؟', answer: 'نعم، يجوز للمسافر سفرًا تُقصر فيه الصلاة أن يجمع بين الظهر والعصر تقديمًا أو تأخيرًا، وبين المغرب والعشاء كذلك؛ تخفيفًا عنه ورفعًا للحرج.', category: 'الصلاة' },
@@ -484,16 +484,18 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTags();
   start(allItems);
 
-  // يُحمَّل عبر <script> (أسلوب JSONP) لا عبر fetch، لأن نقطة gviz التابعة لجوجل شيتس لا ترسل رؤوس CORS
-  // فيرفض المتصفح أي استدعاء fetch/XHR لها حتى لو الملف كان عامًا بالكامل.
-  if (SHEET_ID) {
-    window.__basaerFatawaCallback = json => {
-      if (json.status !== 'ok') return;
-      const live = (json.table.rows || []).map(r => ({
-        title: r.c[0]?.v || '',
-        question: r.c[1]?.v || '',
-        answer: r.c[2]?.v || '',
-        category: r.c[3]?.v || ''
+  // The fatawa used to be read straight from a public Google Sheet through a docs.google.com
+  // <script> (JSONP). A script from another origin running on this site's origin is not
+  // acceptable now that the site and the app share it, so the rows come from a local file
+  // instead; while it loads, or if it is missing, the built-in sample set stays on screen.
+  fetch(FATAWA_URL, { cache: 'no-cache' })
+    .then(response => (response.ok ? response.json() : []))
+    .then(rows => {
+      const live = (Array.isArray(rows) ? rows : []).map(r => ({
+        title: r.title || '',
+        question: r.question || '',
+        answer: r.answer || '',
+        category: r.category || ''
       })).filter(item => item.title && item.question && item.answer);
       if (live.length) {
         allItems = live;
@@ -501,11 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTags();
         start(allItems);
       }
-    };
-    const script = document.createElement('script');
-    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:__basaerFatawaCallback&sheet=${encodeURIComponent(SHEET_NAME)}&headers=1`;
-    document.body.appendChild(script);
-  }
+    })
+    .catch(() => {});
 });
 
 // Rotating "من كلمات الطلاب" widget — same rotating-card mechanism as the fatawa widget above. Sample quotes until real ones are supplied.

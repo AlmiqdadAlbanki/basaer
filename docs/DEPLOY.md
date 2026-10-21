@@ -649,11 +649,13 @@ its data. What still reaches Google, honestly:
   platform page's تفعيل إشعارات المتابعة button) are not available until FCM is replaced by Web
   Push: the button, its dialog and the Firebase scripts were taken out of `/platform`, so no new
   device can register.
-- **The fatawa panel on the website's home page.** The site's `assets/js/app.js` loads the fatawa it
-  shows from a public Google Sheet (a `<script>` from `docs.google.com/spreadsheets/d/1vWIF38.../gviz`,
-  fetched by the visitor's browser). That sheet is not one of the workbooks section 4 imports. When
-  it cannot be reached the panel shows the three sample fatawa built into the script. The website
-  also uses three services that are not Google: `cdn.jsdelivr.net` (icon fonts, as the app does),
+- **The fatawa panel on the website's home page** used to load its fatawa from a public Google
+  Sheet (the `fatawa` sheet of the basaer-REF workbook, through a `docs.google.com/.../gviz`
+  `<script>` run by the visitor's browser). It now reads `server/client/site/assets/data/fatawa.json`,
+  a snapshot of that sheet's rows (`title`, `question`, `answer`, `category`) taken on 2026-10-21;
+  edit that file to change the fatawa (the sheet is no longer consulted). When the file cannot be
+  loaded the panel shows the three sample fatawa built into the script. The website also uses
+  three services that are not Google: `cdn.jsdelivr.net` (icon fonts, as the app does),
   `api.aladhan.com` (prayer times) and `api.web3forms.com` (the contact form).
 - **The area lookup when a student registers.** Typing a block number makes the server ask a
   separate Apps Script web app on `script.google.com` for the area name (`lookupBlockArea` in

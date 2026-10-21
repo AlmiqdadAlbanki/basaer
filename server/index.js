@@ -426,12 +426,14 @@ app.get('/partials/:file', (req, res) => {
 // directories instead, so no visitor's browser has to contact those hosts:
 //   /fonts/*        server/client/fonts/        Google Fonts stylesheets and their woff2 files
 //   /site-assets/*  server/client/site-assets/  the old site's assets/ files the pages reference
-// Cached for a year without revalidation, like the hashed partials above. Unlike those,
-// these names carry no content hash: a file that changes later has to be saved under a
-// new name (and page-rewrites.js pointed at it), or visitors keep the old copy.
+// Cached for a year without revalidation by default, like the hashed partials above.
+// Unlike those, these names carry no content hash: a file that changes later has to be
+// saved under a new name (and page-rewrites.js pointed at it), or visitors keep the old
+// copy — a directory whose files are edited in place passes a shorter `cache` instead.
 // Dotfiles are never served, and directories are neither listed nor redirected.
-function serveStaticDirectory(directory) {
-  return express.static(directory, { immutable: true, maxAge: '365d', dotfiles: 'deny', index: false, redirect: false });
+const CACHE_FOR_A_YEAR = { immutable: true, maxAge: '365d' };
+function serveStaticDirectory(directory, cache = CACHE_FOR_A_YEAR) {
+  return express.static(directory, { ...cache, dotfiles: 'deny', index: false, redirect: false });
 }
 app.use('/fonts', serveStaticDirectory(path.join(__dirname, 'client', 'fonts')));
 app.use('/site-assets', serveStaticDirectory(path.join(__dirname, 'client', 'site-assets')));
@@ -527,22 +529,27 @@ for (const [oldPath, cleanPath] of [['/index.html', '/'], ['/platform.html', '/p
 }
 
 // Files with fixed, well-known names: browsers ask for /favicon.ico and crawlers for
-// /robots.txt and /sitemap.xml by name, and the guide links its PDF by name. Unlike the files
-// under /assets they cannot be renamed when they change, so they are cached for an hour, not
-// a year.
+// /robots.txt and /sitemap.xml by name, and the guide links its PDF by name. Like the files
+// under /assets they are edited in place when the website changes, so they are cached for an
+// hour, not a year.
 for (const fileName of ['favicon.ico', 'robots.txt', 'sitemap.xml', 'student-guide.pdf']) {
   const filePath = path.join(SITE_DIR, fileName);
   app.get('/' + fileName, (_req, res) => res.sendFile(filePath, { maxAge: '1h' }));
 }
 
+// The website's own css/js/images/fonts. Their names carry no content hash and the site is
+// edited in place (style.css, app.js, the fatawa snapshot), so they are cached for an hour
+// only: a year-long immutable cache would keep returning visitors on a stale site after
+// every update.
+const SITE_ASSET_CACHE = { maxAge: '1h' };
 // The site's stylesheet starts with an @import of Tajawal from Google Fonts. It gets the same
 // rewrite as the pages (so it names /fonts/tajawal-400-500-700-800.css and the file stays as
 // exported) and the same caching as the rest of /assets.
 const readSiteStylesheet = siteFileReader(path.join('assets', 'css', 'style.css'));
 app.get('/assets/css/style.css', (_req, res) => {
-  res.type('css').set('Cache-Control', 'public, max-age=31536000, immutable').send(readSiteStylesheet());
+  res.type('css').set('Cache-Control', 'public, max-age=3600').send(readSiteStylesheet());
 });
-app.use('/assets', serveStaticDirectory(path.join(SITE_DIR, 'assets')));
+app.use('/assets', serveStaticDirectory(path.join(SITE_DIR, 'assets'), SITE_ASSET_CACHE));
 
 // --- Relay pages ----------------------------------------------------------------
 // The two helper pages the legacy client opens as popups: Google sign-in and the

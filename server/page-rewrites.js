@@ -222,9 +222,22 @@ function rewriteLegacyShell(html) {
   return rewriteOldSiteAssetUrls(rewriteGoogleFontsUrls(rewriteLegacyDriveUrls(html)));
 }
 
+// performLogout in gas/auth-js.html sends the top window to the app's own URL with
+// ?logout=1. Under Apps Script that was the only address there was; here the app runs
+// inside the /platform frame, so the same jump would strand the user on the bare /app
+// page without the website's header bar. Served in its place: back to /platform when
+// framed, /app when the app was opened directly (/platform forwards the query string
+// to the frame, so ?logout=1 still reaches the app either way).
+const LEGACY_LOGOUT_BASE_URL = "const baseUrl = window.location.href.split('?')[0];";
+const FRAMED_LOGOUT_BASE_URL = "const baseUrl = window.top === window ? '/app' : '/platform'; // served rewrite, see server/page-rewrites.js";
+function rewriteLogoutRedirect(partialBody) {
+  return partialBody.split(LEGACY_LOGOUT_BASE_URL).join(FRAMED_LOGOUT_BASE_URL);
+}
+
 // Everything a served partial needs: relay URLs (per partial) plus the rewrites common to all text.
 function rewriteLegacyPartial(partialName, partialBody) {
-  return rewriteLegacyShell(rewriteLegacyRelayUrls(partialName, partialBody));
+  const body = partialName === 'auth-js' ? rewriteLogoutRedirect(partialBody) : partialBody;
+  return rewriteLegacyShell(rewriteLegacyRelayUrls(partialName, body));
 }
 
 // The page title and favicon that doGet in gas/code.js sets on its HtmlOutput
@@ -246,7 +259,7 @@ function legacyShellMeta(codeSource) {
 
 module.exports = {
   rewriteLegacyRelayUrls, rewriteLegacyDriveUrls, rewriteGoogleFontsUrls, rewriteOldSiteAssetUrls,
-  rewriteLegacyShell, rewriteLegacyPartial, legacyShellMeta,
+  rewriteLegacyShell, rewriteLegacyPartial, rewriteLogoutRedirect, legacyShellMeta,
   LEGACY_RELAY_URL_REWRITES, LEGACY_DRIVE_URL_PREFIXES,
   GOOGLE_FONTS_STYLESHEET_REWRITES, UNUSED_ICON_FONT_STYLESHEET_URLS, OLD_SITE_ASSET_URL_PREFIXES,
 };

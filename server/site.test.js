@@ -31,10 +31,11 @@ const SITE_STYLESHEET = path.join('assets', 'css', 'style.css');
 const GOOGLE_HOSTS = /googletagmanager|gstatic|googleapis|firebase|script\.google/i;
 const GOOGLE_FONTS_URL_TOKEN_RE = /https:\/\/fonts\.googleapis\.com\/[^\s"'<>()\\]*/g;
 
-// Files the pages name that were not in the Firebase Hosting export, so they answer 404 here.
-// If one turns up, copy it into server/client/site/assets/ and take it off this list.
+// Files the pages name that were not in the Firebase Hosting export, so they answer 404 here
+// (they answer 404 on basaerbh.com itself too: the live home page shows the same broken
+// lecturer photos). If one turns up, copy it into server/client/site/assets/ and take it off
+// this list.
 const NAMED_BUT_MISSING_FROM_THE_EXPORT = new Set([
-  'assets/images/favicon-mark.svg', // an icon <link> in index.html and platform.html; browsers use the PNG/ICO icons instead
   'assets/images/lecturer-temp-1.png', // the five lecturer photos on the home page
   'assets/images/lecturer-temp-2.png',
   'assets/images/lecturer-temp-3.png',
@@ -134,7 +135,9 @@ function rawGet(port, rawPath) {
   });
 }
 
-const IMMUTABLE_FOR_A_YEAR = 'public, max-age=31536000, immutable';
+// The website is edited in place (no content hashes in its file names), so its files are
+// cached for an hour, not for a year like the app's hashed partials.
+const SITE_FILE_CACHE_CONTROL = 'public, max-age=3600';
 const SHELL_TITLE = '<title>بصائر للعلوم الشرعية</title>';
 
 // The opening tag of the platform page's iframe, up to the end of its src attribute.
@@ -294,15 +297,16 @@ describe('the running server', () => {
     const stylesheet = await getText('/assets/css/style.css');
     assert.strictEqual(stylesheet.status, 200);
     assert.match(stylesheet.headers.get('content-type'), /^text\/css/);
-    assert.strictEqual(stylesheet.headers.get('cache-control'), IMMUTABLE_FOR_A_YEAR);
+    assert.strictEqual(stylesheet.headers.get('cache-control'), SITE_FILE_CACHE_CONTROL);
     assert.ok(stylesheet.text.startsWith("@import url('/fonts/tajawal-400-500-700-800.css');"), stylesheet.text.slice(0, 120));
     assertTextLacks(stylesheet.text, /googleapis|gstatic/, '/assets/css/style.css');
     assert.strictEqual(stylesheet.text, rewriteGoogleFontsUrls(readSiteFile(SITE_STYLESHEET)), 'only the font URL differs from the file');
   });
 
-  it('serves the other site files byte for byte under /assets/, immutable for a year', async () => {
+  it('serves the other site files byte for byte under /assets/, cached for an hour', async () => {
     for (const [relativePath, contentTypePattern] of [
       ['assets/js/app.js', /^(?:application|text)\/javascript/],
+      ['assets/data/fatawa.json', /^application\/json/],
       ['assets/images/logo-color.png', /^image\/png$/],
       ['assets/images/hero-basair.jpg', /^image\/jpeg$/],
       ['assets/fonts/IBMPlexSansArabic-Regular.woff2', /^font\/woff2$/],
@@ -310,7 +314,7 @@ describe('the running server', () => {
       const response = await fetch(`${baseUrl}/${relativePath}`);
       assert.strictEqual(response.status, 200, relativePath);
       assert.match(response.headers.get('content-type'), contentTypePattern, relativePath);
-      assert.strictEqual(response.headers.get('cache-control'), IMMUTABLE_FOR_A_YEAR, relativePath);
+      assert.strictEqual(response.headers.get('cache-control'), SITE_FILE_CACHE_CONTROL, relativePath);
       assert.ok(Buffer.from(await response.arrayBuffer()).equals(fs.readFileSync(path.join(SITE_DIR, ...relativePath.split('/')))), relativePath);
     }
   });
