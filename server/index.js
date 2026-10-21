@@ -45,7 +45,7 @@ const { forceReleaseLockHeldBy, LOCK_BUFFER_BYTES } = require('./shims/platform.
 const { Scheduler } = require('./scheduler.js');
 const { WorkerPool } = require('./worker-pool.js');
 const { RateLimiter } = require('./rate-limit.js');
-const { rewriteLegacyPartial, rewriteLegacyShell } = require('./page-rewrites.js');
+const { rewriteLegacyPartial, rewriteLegacyShell, legacyShellMeta } = require('./page-rewrites.js');
 
 // --- Configuration ----------------------------------------------------------
 const ROOT = path.join(__dirname, '..');
@@ -354,6 +354,11 @@ function buildIndexHtml() {
   // across a refresh).
   const clientTags = CLIENT_SCRIPTS.map((name) => `  <script src="/partials/${PARTIAL_REF.get(name)}"></script>`).join('\n');
   html = html.replace(/<head>/i, `<head>\n  ${RPC_KINDS_SCRIPT}\n${clientTags}`);
+  // The tab title and icon doGet sets with setTitle/setFaviconUrl (gas/Main.html
+  // has neither, Apps Script's wrapper page used to carry them).
+  const { title, faviconUrl } = legacyShellMeta(fs.readFileSync(path.join(GAS_DIR, 'code.js'), 'utf8'));
+  const escapeHtmlText = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  html = html.replace(/<\/head>/i, `  <title>${escapeHtmlText(title)}</title>\n  <link rel="icon" type="image/png" href="${escapeHtmlText(faviconUrl)}">\n</head>`);
   return html;
 }
 

@@ -217,9 +217,26 @@ function rewriteLegacyPartial(partialName, partialBody) {
   return rewriteLegacyShell(rewriteLegacyRelayUrls(partialName, partialBody));
 }
 
+// The page title and favicon that doGet in gas/code.js sets on its HtmlOutput
+// (`.setTitle("…").setFaviconUrl(myLogo)`). Apps Script applied them to the page
+// it wrapped around the app; here the shell is served directly, so index.js
+// writes them into <head> itself. The favicon is the logo's Drive URL, repointed
+// at the local store like every other Drive URL. Falls back to a generic title
+// and the site's own icon when the code is ever edited away from this shape.
+const SHELL_TITLE_RE = /\.setTitle\(\s*(["'])((?:(?!\1).)*)\1\s*\)/;
+const SHELL_LOGO_RE = /\bvar\s+myLogo\s*=\s*(["'])((?:(?!\1).)*)\1/;
+function legacyShellMeta(codeSource) {
+  const titleMatch = SHELL_TITLE_RE.exec(codeSource);
+  const logoMatch = SHELL_LOGO_RE.exec(codeSource);
+  return {
+    title: titleMatch ? titleMatch[2] : 'بصائر',
+    faviconUrl: logoMatch ? rewriteLegacyDriveUrls(logoMatch[2]) : '/site-assets/favicon-96.png',
+  };
+}
+
 module.exports = {
   rewriteLegacyRelayUrls, rewriteLegacyDriveUrls, rewriteGoogleFontsUrls, rewriteOldSiteAssetUrls,
-  rewriteLegacyShell, rewriteLegacyPartial,
+  rewriteLegacyShell, rewriteLegacyPartial, legacyShellMeta,
   LEGACY_RELAY_URL_REWRITES, LEGACY_DRIVE_URL_PREFIXES,
   GOOGLE_FONTS_STYLESHEET_REWRITES, UNUSED_ICON_FONT_STYLESHEET_URLS, OLD_SITE_ASSET_URL_PREFIXES,
 };
