@@ -28,7 +28,10 @@ apt-get update -y
 apt-get install -y \
   ca-certificates curl gnupg nginx certbot python3-certbot-nginx \
   libreoffice-core libreoffice-writer libreoffice-impress \
-  poppler-utils fonts-hosny-amiri sqlite3 build-essential python3 git
+  poppler-utils fonts-hosny-amiri fonts-noto-core sqlite3 build-essential python3 git
+# Fonts: the certificate templates embed their own (Cairo, Readex Pro, Markazi Text, IBM Plex
+# Sans Arabic travel inside the .docx), so they render the same on any machine; Amiri and
+# Noto (Kufi/Naskh Arabic) are only the fallback for a template that embeds nothing.
 
 echo "==> Node 22"
 node_major=""

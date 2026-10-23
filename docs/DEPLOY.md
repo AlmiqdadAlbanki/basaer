@@ -501,6 +501,12 @@ in-memory rate-limit counters (section 9).
    ahead of the freeze and repeated: it only adds what is missing. After the freeze, run steps 2,
    4 to 7 and 9 again, so that the final sheets, the newest files and the rewritten links all match.
    Step 9 is not optional: freshly imported sheets hold Google links again.
+   Test accounts made during development disappear with the rebuilt sheets (their rows were only
+   in the local copy), but their login rows in the identity store do not; delete those by hand —
+   the development admin was CPR `191919191`:
+   ```
+   sudo -u basaer sqlite3 /var/lib/basaer/basaer.sqlite "DELETE FROM auth_users WHERE uid = 'u191919191'"
+   ```
 4. Verify counts: export from the new system and compare row counts per sheet with the Google Sheets.
    ```
    sudo -u basaer node tools/export-xlsx.js --dir /tmp/verify --db /var/lib/basaer/basaer.sqlite
