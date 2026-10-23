@@ -49,7 +49,7 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
    # on the server, as ubuntu (ssh)
    cd / && sudo nano /etc/basaer.env && sudo systemctl restart basaer
    ```
-   Check: `journalctl -u basaer -n 20 --no-pager | grep listening` → `listening on https://<domain>`.
+   Check: `journalctl -u basaer -n 20 --no-pager | grep -E "listening|outbound"` → a `listening on` line and `outbound: dry-run`.
 7. **HTTPS** (§2.4). Needs DNS (step 2).
    ```
    # on the server, as ubuntu (ssh)
@@ -76,7 +76,7 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
     # on your PC, in WSL (in tmux; re-run to resume or top up)
     cd <repo>
     rsync -av --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
-    node -e "require('./server/storage.js').Storage && new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
+    node -e "new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
     rsync -av --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
     ```
     ```
@@ -98,7 +98,9 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
 13. **Cut-over** (§8). In order:
     - DNS at the real domain; if a temporary domain was used, do the three places (Need to know).
     - Freeze the Apps Script (read-only).
-    - Final refresh on the server: §4 steps 1 (if not set up), 2, 4–7, 9, 10. Watch `/var/tmp` space (Need to know).
+    - Final refresh **on the PC** (it has the Google pull set up; the server never touches Google):
+      §4 steps 2, 4–7 and 10 there, then ship again exactly as step 10 above (rsync top-up, fresh DB copy,
+      `--rebase-from http://localhost:3000`).
     - Delete the test admin:
       ```
       # on the server, as ubuntu (ssh)
@@ -123,8 +125,8 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
   `sudo -u basaer node tools/rewrite-drive-links.js --db /var/lib/basaer/basaer.sqlite --base-url https://basaerbh.com --rebase-from https://<temp-domain>`
   from `/opt/basaer/app`. Always pass `--db`. Everyone signs in again once.
 - **Never stage data under `/tmp` (or `/var/tmp`) on the server**: both are on the 8 GB root. rsync with
-  `--rsync-path="sudo rsync"` straight to `/var/lib/basaer`. The Google pull's `/var/tmp/drive-copy` is on
-  the root too: check `df -h /var/tmp` first (§4.6).
+  `--rsync-path="sudo rsync"` straight to `/var/lib/basaer`. The Google pull (§4) is done on the PC for the
+  same reason; the server only ever receives the result.
 - **Database = consistent copy** (`db.backup`, or `sqlite3 .backup`), never `cp` of a live WAL database.
 - **dry-run vs live**: `OUTBOUND_MODE=dry-run` records mail/WhatsApp/push and sends nothing. `live` sends
   for real. Stay on dry-run until SMTP and WhatsApp are set (§5).

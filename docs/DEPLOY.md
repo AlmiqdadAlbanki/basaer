@@ -461,7 +461,7 @@ on the 8 GB root volume, and 16 GB does not fit there.
    ```
    # on your PC, in WSL
    cd <repo>
-   node -e "require('./server/storage.js').Storage && new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
+   node -e "new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
    rsync -av --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
    ```
    This `/tmp` is on your PC, not on the server.
@@ -916,9 +916,10 @@ with the emailed code or their password. Steps 3 and 4 are kept for when that is
    Properties, in the admin screens of the app (`https://<domain>/platform`). Do not copy old
    secrets from the spreadsheet: issue new ones (section 8, step 10). Browser push also needs
    step 5.
-3. Turn on Google sign-in (out of scope at go-live, see above). Check that `/etc/basaer.env` has
-   `FIREBASE_PROJECT_ID=coming-soon-basaer` (the Firebase project the sign-in page signs in with),
-   then restart:
+3. Turn on Google sign-in (out of scope at go-live, see above; `FIREBASE_PROJECT_ID` is commented
+   out in `/etc/basaer.env` by default, so the journal says `google sign-in: disabled`). To bring
+   it back, uncomment `FIREBASE_PROJECT_ID=coming-soon-basaer` (the Firebase project the sign-in
+   page signs in with), then restart:
    ```
    # on the server, as ubuntu (ssh)
    cd /
@@ -1107,15 +1108,18 @@ in-memory rate-limit counters (section 9).
    ```
    Expected: `<ip>`; `{"ok":true,...}`.
 2. Freeze the Apps Script: make it read-only, so nobody writes to the old system.
-3. Load the final data. **Needs:** step 2, and the rclone remote (section 4, step 1; set it up now
-   if you used "Copy from the PC").
+3. Load the final data. **Needs:** step 2. Do the refresh **on the development PC**, which has
+   the rclone remote, the Google exports and room for the working copy (the server has neither
+   the space — the pull needs ~16 GB beside the store — nor any Google credentials, and keeps it
+   that way), then ship the result exactly as in section 4, "Copy from the PC".
 
-   Run section 4 ("The Google pull on the server") steps 2, 4 to 7, 9 and 10 again, so that the
-   final sheets, the newest files, the rewritten links and the `emailVerified` flags all match.
-   Step 9 is not optional: freshly imported sheets hold Google links again. Step 10 needs a fresh
-   Firebase export. The long part, the Drive file copy (steps 4 to 7), can be done ahead of the
-   freeze and repeated: it only adds what is missing. Mind the disk space note in section 4 before
-   step 6.
+   On the PC: section 4 steps 2, 4 to 7 and 10 against the PC's `data/basaer.sqlite`, with a fresh
+   Firebase export for step 10, so that the final sheets, the newest files and the `emailVerified`
+   flags all match. The long part, the Drive file copy (steps 4 to 7), can be done ahead of the
+   freeze and repeated: it only adds what is missing. Then "Copy from the PC": the rsync of
+   `data/files/` tops up what the server already has, a fresh consistent copy of the database
+   replaces the server's, and the `--rebase-from http://localhost:3000` run re-points the links
+   (the equivalent of step 9; not optional, freshly imported sheets hold Google links again).
 
    Test accounts made during development disappear with the rebuilt sheets (their rows were only in
    the local copy), but their login rows in the identity store do not. Delete those by hand. The

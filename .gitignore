@@ -3,3 +3,5 @@ data/
 .env
 .claude/
 *.log
+# Private keys (SSH key pairs for the server) must never be committed.
+*.pem
