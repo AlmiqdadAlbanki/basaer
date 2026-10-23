@@ -220,9 +220,11 @@ All of this section is done in the AWS console and at Squarespace, except the ch
    sudo nano /etc/basaer.env
    sudo systemctl restart basaer
    ```
-   Set `BASE_URL=https://<domain>`. It must be the final public address: section 4 writes it into
-   the links in the sheets. The other settings are listed under "Settings in /etc/basaer.env"
-   below.
+   Set `BASE_URL=https://<domain>`: the address the server answers at **now** — `<temp-domain>`
+   while you test under one, `basaerbh.com` once it is live. Section 4 writes this address into
+   the links in the sheets, and "Changing the domain" (below) moves them, and everything else,
+   to the real name later; nothing is locked in. The other settings are listed under "Settings
+   in /etc/basaer.env" below.
 
    Check:
    ```
@@ -799,11 +801,11 @@ Steps 1 to 11 are typed in that shell. If you lose it, open it again with the bl
    node tools/rewrite-drive-links.js --base-url https://<domain> --dry-run --report /tmp/links.json
    node tools/rewrite-drive-links.js --base-url https://<domain> --report /tmp/links.json
    ```
-   **`--base-url` must be the final public URL**, the same address as `BASE_URL` in
-   `/etc/basaer.env`. The links are stored in the sheets as full addresses, because the same cells
-   are also sent in WhatsApp and e-mail messages. To move them to another address later, use
-   "Changing the domain" in section 2. To bring the Google links back, run step 2 again, then this
-   step.
+   **`--base-url` is the same address as `BASE_URL` in `/etc/basaer.env`** — the one the server
+   answers at now, temporary or final. The links are stored in the sheets as full addresses,
+   because the same cells are also sent in WhatsApp and e-mail messages. When the domain changes
+   later, "Changing the domain" in section 2 re-points them (`--rebase-from`). To bring the Google
+   links back, run step 2 again, then this step.
 
    A link to a file becomes `https://<domain>/files/<id>/<name>`, and a link to a folder becomes
    `https://<domain>/files/folder/<id>`; the text around a link is kept. It reads rows and writes
