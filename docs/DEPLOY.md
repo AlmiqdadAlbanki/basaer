@@ -198,8 +198,18 @@ All of this section is done in the AWS console and at Squarespace, except the ch
    systemctl is-active basaer nginx
    ls -ld /var/lib/basaer/files /var/lib/basaer/keys /var/lib/basaer/backups
    ```
-   Expected: `active` twice; the three directories owned by `basaer basaer`. The script ended with
-   `Install finished. Next steps:`.
+   Expected: `active` twice; the three directories owned by `basaer basaer`, with modes
+   `drwxr-x---` (`files`, `backups`) and `drwx------` (`keys`). The script ended with
+   `Install finished. Next steps:`. If a directory is owned by someone else or is `drwxrwxrwx`
+   (it was created by hand, or by an rsync as another user, before the bootstrap), run the
+   bootstrap again: it sets ownership and modes every time. Or by hand:
+   ```
+   # on the server, as ubuntu (ssh)
+   cd /
+   sudo chown -R basaer:basaer /var/lib/basaer
+   sudo chmod 750 /var/lib/basaer /var/lib/basaer/files /var/lib/basaer/backups
+   sudo chmod 700 /var/lib/basaer/keys
+   ```
 3. Set `BASE_URL` in the config. **Needs:** step 2 (it created `/etc/basaer.env`).
    ```
    # on the server, as ubuntu (ssh)

@@ -49,6 +49,10 @@ if ! id "$app_user" >/dev/null 2>&1; then
 fi
 mkdir -p "$data_dir/files" "$data_dir/keys" "$backup_dir"
 chown -R "$app_user:$app_user" "$data_dir" "$backup_dir"
+# Modes as well as ownership (a directory made by hand, or by an rsync as another user, may be
+# left wide open): the data is the app's alone; nginx never reads it, the app serves the files.
+chmod 750 "$data_dir" "$data_dir/files" "$backup_dir"
+chmod 700 "$data_dir/keys"
 chmod 700 "$data_dir/keys"
 
 if [ -d "$app_dir" ]; then
