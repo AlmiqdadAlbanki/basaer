@@ -181,14 +181,17 @@ addresses. The access to Google is read-only, so nothing is ever written to it.
 repeating the Google pull on the server; the pull is only needed again for the final refresh of
 the sheets at cut-over (section 8, step 3). From that machine, with the app stopped on the server:
 ```
-# on the server, once
-sudo mkdir -p /var/lib/basaer/files && sudo chown -R basaer:basaer /var/lib/basaer
-# from the machine that holds the data (WSL; rsync resumes if the connection drops)
-rsync -avz --partial --info=progress2 -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/tmp/basaer-files/
-rsync -avz -e "ssh -i <key.pem>" data/basaer.sqlite ubuntu@<ip>:/tmp/basaer.sqlite
-# on the server
+# on the server: stop the app, and make sure the destination is on the data volume
 sudo systemctl stop basaer
-sudo rsync -a /tmp/basaer-files/ /var/lib/basaer/files/ && sudo mv /tmp/basaer.sqlite /var/lib/basaer/basaer.sqlite
+df -h /var/lib/basaer            # must show the 30 GB data volume, not the 8 GB root
+# from the machine that holds the data (WSL). --rsync-path="sudo rsync" writes as root straight
+# into the data volume: never stage the 16 GB under /tmp, which is on the 8 GB root volume.
+# rsync resumes if the connection drops; run the same command again.
+rsync -av --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
+# the database: a CONSISTENT copy, not the bare file (a running dev server keeps changes in -wal):
+node -e "require('./server/storage.js').Storage && new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
+rsync -av --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
+# on the server
 sudo chown -R basaer:basaer /var/lib/basaer && sudo systemctl start basaer
 ```
 16 GB over a home connection takes hours; run it in `screen`/`tmux`, and re-run the same rsync
