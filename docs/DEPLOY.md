@@ -772,6 +772,20 @@ Steps 1 to 11 are typed in that shell. If you lose it, open it again with the bl
    ```
    A `WARN ... folders share this path` line means two folders of one name sit side by side. The
    files are fine, but the folder page may list them under the wrong one of the two.
+
+   **Certificate templates are a special case.** The `Certificates` and `stages` sheets name
+   their templates by bare id (no link), and the templates are Google Docs: the loop above would
+   export them as PDF, which the certificate generator cannot fill. Fetch those ids with the
+   script below instead; it exports each as `.docx`/`.pptx` and registers it under its id. The
+   ids are the ones in `missing-ids.txt` whose Drive path is under a `000-templates` folder or
+   ends in `-temp` (compare with `data/google-exports/trees/mydrive.lsjson`):
+   ```
+   # on the server, as basaer (the shell from section 4)
+   cd /opt/basaer/app
+   bash tools/fetch-templates-by-id.sh /tmp/template-ids.txt      # one id per line
+   ```
+   Check: it ends with `registered N, failed 0`, and the certificate screen in the app renders
+   one of them. A template that is missing shows up in the app as `File not found: <id>`.
 8. Provide the page images. The pages name a few images by Drive id: the logo, the sidebar
    wordmark, the default avatar, the congratulations banner, the page background and the carousel
    placeholders. The originals belong to a Google account nobody can read from any more (they are

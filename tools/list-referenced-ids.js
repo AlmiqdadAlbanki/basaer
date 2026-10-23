@@ -16,16 +16,26 @@ const { DEFAULT_DB, parseArgs } = require('./xlsx-common.js');
 // Google ids inside the link shapes the sheets use (file/d, folders, docs,
 // thumbnail?id=, uc?id=, open?id=).
 const LINK_ID_RE = /(?:\/(?:file\/d|folders|document\/d|spreadsheets\/d|presentation\/d)\/|[?&;]id=)([-\w]{20,})/g;
+// A Drive id written on its own, without a link — the Certificates and stages sheets
+// name their templates that way (DriveApp.getFileById(id) in the legacy code). Drive
+// ids are 25+ URL-safe characters and in practice start with "1"; a token that is
+// not really an id is harmless downstream (reported as not found, never fetched).
+const BARE_ID_RE = /(?:^|[^-\w])(1[-\w]{24,})(?![-\w])/g;
 
 function referencedIdsFromSheets(storage) {
   const ids = new Set();
   for (const { ss, name } of storage.db.prepare('SELECT ss, name FROM sheets').all()) {
     for (const row of storage.loadGrid(ss, name)) {
       for (const cell of row || []) {
-        if (typeof cell !== 'string' || cell.indexOf('google.com') < 0) continue;
+        if (typeof cell !== 'string') continue;
         let match;
-        LINK_ID_RE.lastIndex = 0;
-        while ((match = LINK_ID_RE.exec(cell))) ids.add(match[1]);
+        if (cell.indexOf('google.com') >= 0) {
+          LINK_ID_RE.lastIndex = 0;
+          while ((match = LINK_ID_RE.exec(cell))) ids.add(match[1]);
+        } else {
+          BARE_ID_RE.lastIndex = 0;
+          while ((match = BARE_ID_RE.exec(cell))) ids.add(match[1]);
+        }
       }
     }
   }
