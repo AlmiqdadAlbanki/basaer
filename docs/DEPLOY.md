@@ -83,6 +83,27 @@ config in `/etc/basaer.env`.
    `journalctl -u basaer -n 20` shows the start-up lines, including `workers: 1 rpc + 1 background`
    and `google sign-in: enabled` or `disabled`.
 
+**Testing under a temporary domain first, moving to the real one later** is fine. The domain
+is in three places only:
+
+1. nginx: `server_name` in `/etc/nginx/sites-available/basaer`, and the certificate. Point the
+   real domain's DNS at the server, set the new `server_name`, then run certbot again for the new
+   names (step 4); the old certificate can be removed with `sudo certbot delete --cert-name
+   <temporary domain>`.
+2. `BASE_URL` in `/etc/basaer.env` (then `sudo systemctl restart basaer`).
+3. Links already stored in the sheets: every link this server wrote while it ran under the
+   temporary domain (links rewritten by step 9 of section 4, certificates and cards it generated,
+   uploads) carries that domain. Re-point them in one run:
+   ```
+   sudo -u basaer node tools/rewrite-drive-links.js --base-url https://basaerbh.com --rebase-from https://<temporary domain> --dry-run
+   sudo -u basaer node tools/rewrite-drive-links.js --base-url https://basaerbh.com --rebase-from https://<temporary domain>
+   ```
+   (The same command, with `--rebase-from http://localhost:3000`, fixes the links in a database
+   copied from the development machine.)
+
+Logins are per domain (the session cookie belongs to the host), so everyone signs in again once
+on the new address; nothing else is tied to the name.
+
 What the server answers. The academy's public website, which used to be on Firebase Hosting, is
 served from here too, at the addresses it had there:
 
@@ -171,9 +192,11 @@ sudo rsync -a /tmp/basaer-files/ /var/lib/basaer/files/ && sudo mv /tmp/basaer.s
 sudo chown -R basaer:basaer /var/lib/basaer && sudo systemctl start basaer
 ```
 16 GB over a home connection takes hours; run it in `screen`/`tmux`, and re-run the same rsync
-to top it up later (it only sends what changed). After the copy, run step 9 of this section with
-the real `--base-url https://basaerbh.com`: the links in the copied sheets still say
-`http://localhost:3000`.
+to top it up later (it only sends what changed). After the copy, re-point the links: the copied
+sheets still say `http://localhost:3000`, the address the development machine used:
+```
+sudo -u basaer node tools/rewrite-drive-links.js --base-url https://<domain> --rebase-from http://localhost:3000 --db /var/lib/basaer/basaer.sqlite
+```
 
 Run the whole section on the server, in `/opt/basaer/app`, as the `basaer` user, so that the
 database and the files end up owned by the service. The service stays stopped while you work.

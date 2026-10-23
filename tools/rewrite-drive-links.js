@@ -5,11 +5,15 @@
 // tools/import-google-exports.js).
 //
 //   node tools/rewrite-drive-links.js --base-url https://app.example.com [--db <path>]
-//                                     [--dry-run] [--report <path.json>]
+//                                     [--rebase-from https://old.example.com] [--dry-run] [--report <path.json>]
 //
-//   --base-url  where the app is served (a trailing slash is fine)
-//   --dry-run   changes nothing in the database; prints and reports the same totals
-//   --report    also writes the totals and the findings below as JSON (with --dry-run too)
+//   --base-url     where the app is served (a trailing slash is fine)
+//   --rebase-from  the address the app was served from before: every link that starts with
+//                  it (links this tool wrote earlier, and links the app itself wrote while it
+//                  ran there — certificates, cards, uploads) is re-pointed at --base-url. Use
+//                  it when the domain changes, e.g. from a test domain to the final one.
+//   --dry-run      changes nothing in the database; prints and reports the same totals
+//   --report       also writes the totals and the findings below as JSON (with --dry-run too)
 //
 // Every cell of every sheet of every spreadsheet in IDS is scanned. A Google link whose id is a
 // row of the `files` table is replaced. A cell may hold several links, or a link inside prose:
@@ -53,7 +57,7 @@ const DOCS_PATH_PATTERN = /^https?:\/\/docs\.google\.com\/(?:document|spreadshee
 const DRIVE_QUERY_PATTERN = /^https?:\/\/drive\.google\.com\/(?:u\/\d+\/)?(?:open|uc|thumbnail)\?([^#]*)/;
 const SAMPLE_LIMIT = 5;
 
-const USAGE = 'Usage: node tools/rewrite-drive-links.js --base-url https://app.example.com [--db <path>] [--dry-run] [--report <path.json>]';
+const USAGE = 'Usage: node tools/rewrite-drive-links.js --base-url https://app.example.com [--db <path>] [--rebase-from https://old.example.com] [--dry-run] [--report <path.json>]';
 
 // The Google id inside a Drive/Docs URL, or null when the URL has none we recognise.
 function googleIdOfUrl_(url) {
@@ -85,12 +89,20 @@ function normalizeBaseUrl_(baseUrl) {
   return trimmed;
 }
 
-// Replaces every resolvable Google link in one string. filesById maps an id to a files-table
-// record ({ id, name, is_folder }); baseUrl has no trailing slash. Returns the new text and what
-// was seen: { text, rewritten, unresolvedIds, unrecognizedUrls }.
-function rewriteLinksInText(text, { filesById, baseUrl }) {
-  const outcome = { text, rewritten: 0, unresolvedIds: [], unrecognizedUrls: [] };
-  outcome.text = text.replace(GOOGLE_URL_PATTERN, (matched) => {
+// Replaces every resolvable Google link in one string, and — with rebaseFrom, the app's
+// previous address without trailing slash — re-points every link starting with that address
+// at baseUrl. filesById maps an id to a files-table record ({ id, name, is_folder }); baseUrl
+// has no trailing slash. Returns the new text and what was seen:
+// { text, rewritten, rebased, unresolvedIds, unrecognizedUrls }.
+function rewriteLinksInText(text, { filesById, baseUrl, rebaseFrom = null }) {
+  const outcome = { text, rewritten: 0, rebased: 0, unresolvedIds: [], unrecognizedUrls: [] };
+  if (rebaseFrom && text.includes(rebaseFrom + '/')) {
+    // Only the origin changes; the path (/files/<id>/<name>, ?download=1, ...) is kept as is.
+    const pieces = text.split(rebaseFrom + '/');
+    outcome.rebased = pieces.length - 1;
+    outcome.text = pieces.join(baseUrl + '/');
+  }
+  outcome.text = outcome.text.replace(GOOGLE_URL_PATTERN, (matched) => {
     // "see <link>." : the sentence's own punctuation is not part of the link.
     const trailing = TRAILING_PUNCTUATION_PATTERN.exec(matched);
     const url = trailing ? matched.slice(0, trailing.index) : matched;
@@ -143,19 +155,23 @@ function scanGrid_(grid, rewriteOptions) {
     cellsScanned: 0,
     cellsChanged: 0,
     linksRewritten: 0,
+    linksRebased: 0,
     changedRows: [],
     unresolvedByColumn: new Map(),
     unrecognizedByColumn: new Map(),
   };
+  const oldAddress = rewriteOptions.rebaseFrom ? rewriteOptions.rebaseFrom + '/' : null;
   for (let rowIndex = 0; rowIndex < grid.length; rowIndex++) {
     const row = grid[rowIndex];
     let rewrittenRow = null;
     for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
       scan.cellsScanned++;
       const cell = row[columnIndex];
-      if (typeof cell !== 'string' || !cell.includes('google.com')) continue;
+      if (typeof cell !== 'string') continue;
+      if (!cell.includes('google.com') && !(oldAddress && cell.includes(oldAddress))) continue;
       const outcome = rewriteLinksInText(cell, rewriteOptions);
       scan.linksRewritten += outcome.rewritten;
+      scan.linksRebased += outcome.rebased;
       for (const id of outcome.unresolvedIds) tally_(scan.unresolvedByColumn, columnIndex, id);
       for (const url of outcome.unrecognizedUrls) tally_(scan.unrecognizedByColumn, columnIndex, url);
       if (outcome.text === cell) continue;
@@ -188,18 +204,20 @@ function sortedFindings_(tallyByColumn, headerRow, location, sampleKey) {
 }
 
 // Library entry point. Returns the report the CLI prints and --report writes:
-// { baseUrl, dryRun, totals, unresolved, unrecognized }.
-function rewriteDriveLinks({ storage, baseUrl, dryRun = false, log = () => {} }) {
+// { baseUrl, rebaseFrom, dryRun, totals, unresolved, unrecognized }.
+function rewriteDriveLinks({ storage, baseUrl, rebaseFrom = null, dryRun = false, log = () => {} }) {
   const normalizedBaseUrl = normalizeBaseUrl_(baseUrl);
+  const normalizedRebaseFrom = rebaseFrom ? normalizeBaseUrl_(rebaseFrom) : null;
+  if (normalizedRebaseFrom === normalizedBaseUrl) throw new Error('--rebase-from is the same address as --base-url: nothing to re-point');
   const filesById = new Map(storage.db.prepare('SELECT id, name, is_folder FROM files').all().map((record) => [record.id, record]));
-  const totals = { cellsScanned: 0, cellsChanged: 0, linksRewritten: 0, linksUnresolved: 0, linksUnrecognized: 0 };
+  const totals = { cellsScanned: 0, cellsChanged: 0, linksRewritten: 0, linksRebased: 0, linksUnresolved: 0, linksUnrecognized: 0 };
   const unresolved = [];
   const unrecognized = [];
 
   for (const [spreadsheetName, spreadsheetId] of Object.entries(IDS)) {
     for (const sheetName of storage.sheetNames(spreadsheetId)) {
       const grid = storage.loadGrid(spreadsheetId, sheetName);
-      const scan = scanGrid_(grid, { filesById, baseUrl: normalizedBaseUrl });
+      const scan = scanGrid_(grid, { filesById, baseUrl: normalizedBaseUrl, rebaseFrom: normalizedRebaseFrom });
       const location = { spreadsheet: spreadsheetName, sheet: sheetName };
       const headerRow = grid[0] || [];
       const sheetUnresolved = sortedFindings_(scan.unresolvedByColumn, headerRow, location, 'sampleIds');
@@ -208,6 +226,7 @@ function rewriteDriveLinks({ storage, baseUrl, dryRun = false, log = () => {} })
       totals.cellsScanned += scan.cellsScanned;
       totals.cellsChanged += scan.cellsChanged;
       totals.linksRewritten += scan.linksRewritten;
+      totals.linksRebased += scan.linksRebased;
       totals.linksUnresolved += sheetUnresolved.reduce((sum, finding) => sum + finding.count, 0);
       totals.linksUnrecognized += sheetUnrecognized.reduce((sum, finding) => sum + finding.count, 0);
       unresolved.push(...sheetUnresolved);
@@ -215,12 +234,13 @@ function rewriteDriveLinks({ storage, baseUrl, dryRun = false, log = () => {} })
 
       if (scan.changedRows.length) {
         if (!dryRun) writeChangedRows_(storage, spreadsheetId, sheetName, scan.changedRows);
-        log(spreadsheetName + ' / ' + sheetName + ': ' + scan.linksRewritten + ' link(s) in ' + scan.cellsChanged + ' cell(s) of '
-          + scan.changedRows.length + ' row(s)' + (dryRun ? ' would be rewritten' : ' rewritten'));
+        log(spreadsheetName + ' / ' + sheetName + ': ' + scan.linksRewritten + ' Google link(s) and ' + scan.linksRebased
+          + ' re-pointed link(s) in ' + scan.cellsChanged + ' cell(s) of ' + scan.changedRows.length + ' row(s)'
+          + (dryRun ? ' would be rewritten' : ' rewritten'));
       }
     }
   }
-  return { baseUrl: normalizedBaseUrl, dryRun, totals, unresolved, unrecognized };
+  return { baseUrl: normalizedBaseUrl, rebaseFrom: normalizedRebaseFrom, dryRun, totals, unresolved, unrecognized };
 }
 
 function summaryLines_(report) {
@@ -230,6 +250,7 @@ function summaryLines_(report) {
   lines.push('cells scanned:      ' + totals.cellsScanned);
   lines.push('cells changed:      ' + totals.cellsChanged);
   lines.push('links rewritten:    ' + totals.linksRewritten);
+  if (report.rebaseFrom) lines.push('links re-pointed:   ' + totals.linksRebased + ' (from ' + report.rebaseFrom + ')');
   lines.push('links unresolved:   ' + totals.linksUnresolved);
   if (totals.linksUnrecognized) lines.push('links unrecognized: ' + totals.linksUnrecognized);
   if (report.unresolved.length) {
@@ -256,6 +277,7 @@ function main() {
       args: process.argv.slice(2),
       options: {
         'base-url': { type: 'string' },
+        'rebase-from': { type: 'string' },
         db: { type: 'string' },
         'dry-run': { type: 'boolean' },
         report: { type: 'string' },
@@ -275,7 +297,9 @@ function main() {
   if (!fs.existsSync(databasePath)) throw new Error('database not found: ' + databasePath);
   const storage = new Storage(databasePath);
   try {
-    const report = rewriteDriveLinks({ storage, baseUrl: options['base-url'], dryRun: Boolean(options['dry-run']), log: console.log });
+    const report = rewriteDriveLinks({
+      storage, baseUrl: options['base-url'], rebaseFrom: options['rebase-from'] || null, dryRun: Boolean(options['dry-run']), log: console.log,
+    });
     if (options.report) fs.writeFileSync(path.resolve(options.report), JSON.stringify(report, null, 2) + '\n');
     for (const line of summaryLines_(report)) console.log(line);
   } finally {
