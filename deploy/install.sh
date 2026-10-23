@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap an Ubuntu 24.04 host for Basaer. Run as root: sudo bash deploy/install.sh
+# Bootstrap an Ubuntu 26.04 (or 24.04) host for Basaer. Run as root: sudo bash deploy/install.sh
 # Safe to run again; each step checks before it changes anything.
 set -euo pipefail
 
