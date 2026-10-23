@@ -938,13 +938,42 @@ with the emailed code or their password. Steps 3 and 4 are kept for when that is
 
 1. Fill in the SMTP block of `/etc/basaer.env`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
    `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `OWNER_EMAIL`.
+
+   There were no SMTP settings before: the Apps Script sent through the Gmail of the Google
+   account that owns it (sender name `بصائر للعلوم الشرعية`, admin notices to
+   `dfekra@gmail.com`). To keep sending from that same account, use Google's SMTP with an
+   **app password** (Google account → Security → 2-Step Verification must be on → App passwords
+   → create one named "Basaer server"; it is 16 characters):
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=<that Google account's address>
+   SMTP_PASS=<the app password>
+   MAIL_FROM=بصائر للعلوم الشرعية <that Google account's address>
+   OWNER_EMAIL=dfekra@gmail.com
+   ```
+   The `MAIL_FROM` address must be the account itself (or an alias it is allowed to send as),
+   or Google rewrites it. Daily limits: about 500 messages for a plain Gmail account, 2,000 for
+   a Google Workspace account; the Workspace SMTP relay (`smtp-relay.gmail.com`, allowed by the
+   server's IP in the Workspace admin console, no password) goes to 10,000 if ever needed. Any
+   other provider works the same way with its own host, port and login.
    ```
    # on the server, as ubuntu (ssh)
    cd /
    sudo nano /etc/basaer.env
    sudo systemctl restart basaer
    ```
-   Check: `sudo grep '^SMTP_HOST=' /etc/basaer.env` shows your mail server.
+   Check: send one real test message with the values in the file; dry-run mode does not matter
+   here, the tool talks to the mail server directly:
+   ```
+   # on the server, as ubuntu (ssh)
+   cd /opt/basaer/app
+   sudo -u basaer node tools/send-test-mail.js --to <your address> --env /etc/basaer.env
+   ```
+   Expected: `login accepted; sending ...` then `sent: <id>`, and the message in your inbox.
+   `Invalid login` means the app password or the address is wrong; a timeout means the
+   provider's port is blocked from the server.
 2. Re-enter the WhatsApp (Fonnte / Meta) and FCM push settings that the Apps Script kept in Script
    Properties, in the admin screens of the app (`https://<domain>/platform`). Do not copy old
    secrets from the spreadsheet: issue new ones (section 8, step 10). Browser push also needs
@@ -991,7 +1020,7 @@ with the emailed code or their password. Steps 3 and 4 are kept for when that is
    old Apps Script, and come back only when FCM is replaced by Web Push (section 11). `/exec` with
    `saveFcmToken` still needs a logged-in session (401 otherwise).
 6. Switch to live sending. **Needs:** steps 1 and 2. Leave `ALLOW_CPR_ONLY_LOGIN` unset
-   (section 2, "Settings"). Send a test to yourself first, then set `OUTBOUND_MODE=live`:
+   (section 2, "Settings"). Step 1's test message must have arrived; then set `OUTBOUND_MODE=live`:
    ```
    # on the server, as ubuntu (ssh)
    cd /
