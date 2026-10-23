@@ -8,13 +8,17 @@ config in `/etc/basaer.env`.
 
 1. An EC2 instance: t3.small, Ubuntu 26.04 LTS (what the port was developed and tested on; 24.04
    works too), with **two volumes** (both gp3):
-   - the root volume, **20 GB**: the operating system, the app, LibreOffice, logs — nothing that
-     cannot be rebuilt;
-   - a second volume, **60 GB**, added on the launch page under "Configure storage" → "Add new
+   - the root volume, **10 GB**: the operating system (~3 GB), LibreOffice (~1 GB), the app, and
+     logs, which are capped (the journal at 200 MB, nginx logs rotated) — nothing that cannot
+     be rebuilt;
+   - a second volume, **30 GB**, added on the launch page under "Configure storage" → "Add new
      volume": the data. It is mounted at `/var/lib/basaer` (section 2, step 2) and holds the
-     database, the ~16 GB file store (~6,000 files), the signing keys and the local backups
-     (section 6). Keeping the data on its own volume means it can be resized on its own,
-     snapshotted on its own, and attached to a replacement instance intact.
+     database (30 MB), the file store (15 GB, ~6,000 files, at 2026-10) and the signing keys.
+     The store grows by about 10 GB a year, mostly audio and video lectures, so 30 GB is a
+     year of headroom; when `df -h /var/lib/basaer` passes 80 %, grow the volume in the EC2
+     console (Volumes → Modify) and then, on the server, `sudo resize2fs /dev/nvme1n1` — both
+     online, no downtime. Keeping the data on its own volume means it can be resized on its
+     own, snapshotted on its own, and attached to a replacement instance intact.
    Turn on a daily snapshot of the data volume (section 6).
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
 3. An Elastic IP attached to the instance.
@@ -37,7 +41,7 @@ config in `/etc/basaer.env`.
    sudo git clone https://github.com/AlmiqdadAlbanki/basaer.git /opt/basaer/app
    ```
 2. Mount the data volume at `/var/lib/basaer` before the bootstrap, so that the user and
-   directories it creates land on it. Find the device (`lsblk` lists the 60 GB disk, usually
+   directories it creates land on it. Find the device (`lsblk` lists the 30 GB disk, usually
    `nvme1n1`), format it once, mount it, and record it in `/etc/fstab` by UUID so it comes back
    after a reboot:
    ```
@@ -470,18 +474,18 @@ Until this step the server records emails, WhatsApp messages and push notificati
 
 ## 6. Backups and restore
 
-Two layers. On the machine, a timer runs `deploy/backup.sh` every night at 03:30 Asia/Qatar and
-writes to `/var/lib/basaer/backups` (on the data volume): `basaer-<stamp>.sqlite.gz` (a consistent
-copy of the database) and `keys-<stamp>.tar.gz`, one per night, kept 14 days, plus
-`files-mirror/`, a single mirror of the file store brought up to date each night by `rsync`
-(only new and changed files are copied; a nightly archive of ~16 GB of pictures and PDFs would
-cost ~200 GB for 14 days). The database copies restore a bad day's edits in minutes.
+Two layers. Off the machine, a daily EBS snapshot of the data volume is the backup: it holds
+the database, the file store and the keys, and survives the loss of the instance or the volume.
+Set it up once in the AWS console: EC2 → Lifecycle Manager → Create lifecycle policy → EBS
+snapshot policy, target the data volume by its tag (give the volume a tag such as
+`Name=basaer-data` when creating it), daily at a quiet hour, retain 14. Snapshots are
+incremental, so they cost roughly the size of the data plus the daily change.
 
-Off the machine, a daily EBS snapshot of the data volume is the backup that survives the loss
-of the instance or the volume. Set it up once in the AWS console: EC2 → Lifecycle Manager →
-Create lifecycle policy → EBS snapshot policy, target the data volume by its tag (give the
-volume a tag such as `Name=basaer-data` when creating it), daily at a quiet hour, retain 14.
-Snapshots are incremental, so they cost roughly the size of the data plus the daily change.
+On the machine, a timer runs `deploy/backup.sh` every night at 03:30 Asia/Qatar and writes to
+`/var/lib/basaer/backups` (on the data volume) a consistent copy of the database,
+`basaer-<stamp>.sqlite.gz` (~5 MB), and the keys, `keys-<stamp>.tar.gz`, one per night, kept
+14 days (~70 MB in all). Their purpose is speed: a bad day's edits are undone in a minute,
+without touching snapshots. The file store is not copied on the machine; the snapshots cover it.
 
 Check and run by hand:
 ```
@@ -497,15 +501,15 @@ sudo -u basaer rm -f /var/lib/basaer/basaer.sqlite-wal /var/lib/basaer/basaer.sq
 gunzip -c /var/lib/basaer/backups/basaer-<stamp>.sqlite.gz | sudo -u basaer tee /var/lib/basaer/basaer.sqlite > /dev/null
 sudo systemctl start basaer
 ```
-Restore files (from the mirror) or keys (only if they were lost):
+Restore the keys (only if they were lost):
 ```
-sudo -u basaer rsync -a /var/lib/basaer/backups/files-mirror/ /var/lib/basaer/files/
 sudo -u basaer tar -xzf /var/lib/basaer/backups/keys-<stamp>.tar.gz -C /var/lib/basaer
 ```
-The local backups live on the data volume with the data they back up: they cover mistakes, not
-the loss of the volume. For that, restore the latest EBS snapshot as a new volume (EC2 →
-Snapshots → Create volume), attach it to the instance in place of the damaged one, and mount it
-at `/var/lib/basaer` (section 2, step 2, without the format step).
+Restore files, or everything after the loss of the volume or the instance: create a volume from
+the latest EBS snapshot (EC2 → Snapshots → Create volume), attach it to the instance in place of
+the damaged one, and mount it at `/var/lib/basaer` (section 2, step 2, without the format step).
+To get single files back, attach the snapshot's volume at another path (say `/mnt/restore`)
+beside the live one and copy what is needed.
 
 ## 7. Updating
 

@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Nightly backup of the Basaer database, keys and uploaded files.
+# Nightly copy of the Basaer database and signing keys.
 # Runs as the basaer user (see basaer-backup.service).
 #
 # What it keeps, under /var/lib/basaer/backups (on the data volume, docs/DEPLOY.md section 1):
-#   basaer-<stamp>.sqlite.gz   a consistent copy of the database, one per night, 14 days
+#   basaer-<stamp>.sqlite.gz   a consistent copy of the database, one per night, 14 days (~5 MB each)
 #   keys-<stamp>.tar.gz        the signing keys, one per night, 14 days (a few KB)
-#   files-mirror/              ONE mirror of the file store, brought up to date each night
-#                              (only new and changed files are copied; deleted files leave
-#                              the mirror too, so a mistaken delete is covered until the
-#                              next night — the daily EBS snapshot covers it after that).
-# The file store is ~16 GB of pictures and PDFs that hardly compress: a nightly archive of it
-# would cost ~200 GB of disk for 14 days and a long job every night, hence the mirror.
+# These undo a bad day's edits in a minute. The file store (15 GB of audio, video and PDFs) is
+# NOT copied here: the daily EBS snapshot of the data volume covers it, and the database copies
+# as well, off the machine (docs/DEPLOY.md section 6).
 set -euo pipefail
 
 env_file=/etc/basaer.env
@@ -24,17 +21,14 @@ read_env_value() {
 
 db_path=$(read_env_value BASAER_DB)
 keys_dir=$(read_env_value BASAER_KEYS)
-files_dir=$(read_env_value BASAER_FILES)
 db_path=${db_path:-/var/lib/basaer/basaer.sqlite}
 keys_dir=${keys_dir:-/var/lib/basaer/keys}
-files_dir=${files_dir:-/var/lib/basaer/files}
 
 stamp=$(date +%Y%m%d-%H%M)
 sqlite_copy="$backup_dir/basaer-$stamp.sqlite"
 keys_archive="$backup_dir/keys-$stamp.tar.gz"
-files_mirror="$backup_dir/files-mirror"
 
-mkdir -p "$backup_dir" "$files_mirror"
+mkdir -p "$backup_dir"
 
 # .backup is safe while the server is writing; a plain cp of a WAL database is not.
 sqlite3 "$db_path" ".backup '$sqlite_copy'"
@@ -43,12 +37,8 @@ gzip -f "$sqlite_copy"
 # -C keeps archive paths relative so a restore can target any location.
 tar -czf "$keys_archive" -C "$(dirname "$keys_dir")" "$(basename "$keys_dir")"
 
-# Bring the mirror up to date. --delete mirrors deletions too; the dated database copies
-# and the EBS snapshots are the history.
-rsync -a --delete "$files_dir/" "$files_mirror/"
-
 find "$backup_dir" -maxdepth 1 -type f \( -name "basaer-*" -o -name "keys-*" \) -mtime +"$retention_days" -delete
 
 echo "Backup written:"
 ls -lh "$sqlite_copy.gz" "$keys_archive"
-du -sh "$files_mirror" "$backup_dir"
+du -sh "$backup_dir"
