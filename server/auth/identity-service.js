@@ -51,8 +51,19 @@ function attemptKey(normalisedEmail, clientIp) {
 function ensureServiceAccount(storage, keyDir) {
   const pubPath = path.join(keyDir, 'sa_rsa.pub.pem');
   const existing = storage.propGet('script', 'FIREBASE_SERVICE_ACCOUNT');
-  if (existing && fs.existsSync(pubPath)) {
-    return { publicKey: fs.readFileSync(pubPath, 'utf8'), clientEmail: SA_CLIENT_EMAIL };
+  // The private key in the database is the truth (the legacy code signs custom tokens with
+  // it); the public file is derived from it, never trusted on its own. A database copied from
+  // another machine therefore replaces the public key this machine generated, instead of
+  // leaving the two sides signing and verifying with different pairs (every login would fail
+  // with "bad custom-token signature").
+  const storedPrivateKey = privateKeyOfServiceAccount_(existing);
+  if (storedPrivateKey) {
+    const publicKey = crypto.createPublicKey(storedPrivateKey).export({ type: 'spki', format: 'pem' });
+    if (!fs.existsSync(pubPath) || fs.readFileSync(pubPath, 'utf8') !== publicKey) {
+      fs.mkdirSync(keyDir, { recursive: true });
+      fs.writeFileSync(pubPath, publicKey);
+    }
+    return { publicKey, clientEmail: SA_CLIENT_EMAIL };
   }
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
@@ -64,6 +75,20 @@ function ensureServiceAccount(storage, keyDir) {
   fs.mkdirSync(keyDir, { recursive: true });
   fs.writeFileSync(pubPath, publicKey);
   return { publicKey, clientEmail: SA_CLIENT_EMAIL };
+}
+
+// The PEM private key inside a stored FIREBASE_SERVICE_ACCOUNT JSON, or null when the property
+// is missing, malformed or holds no usable key (then a fresh pair is generated).
+function privateKeyOfServiceAccount_(storedJson) {
+  if (!storedJson) return null;
+  try {
+    const privateKey = JSON.parse(storedJson).private_key;
+    if (typeof privateKey !== 'string' || !privateKey.includes('PRIVATE KEY')) return null;
+    crypto.createPrivateKey(privateKey);
+    return privateKey;
+  } catch (_) {
+    return null;
+  }
 }
 
 function hashPassword(password, salt) {

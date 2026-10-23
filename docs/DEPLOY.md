@@ -479,7 +479,11 @@ on the 8 GB root volume, and 16 GB does not fit there.
    node -e "new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
    rsync -rltv --chmod=F640 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
    ```
-   This `/tmp` is on your PC, not on the server.
+   The copied database brings the PC's login-signing key with it (a script property); at the next
+   start the server derives `keys/sa_rsa.pub.pem` from it, so logins keep working. (A build older
+   than 2026-10-23 kept its own public key instead and refused every login with "bad custom-token
+   signature"; the remedy then is to stop the service, delete `/var/lib/basaer/keys/sa_rsa.pub.pem`
+   and start it again.) This `/tmp` is on your PC, not on the server.
 
    Check: `node` prints `copy ready`; `rsync` ends without an error.
 4. Hand the data to the service user, re-point the links, and start the service. The copied
