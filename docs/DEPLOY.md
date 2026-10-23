@@ -6,7 +6,8 @@ config in `/etc/basaer.env`.
 
 ## 1. Prerequisites
 
-1. An EC2 instance: t3.small, Ubuntu 24.04, with a root volume of **at least 40 GB** (gp3). The
+1. An EC2 instance in region **`me-south-1` (Middle East — Bahrain)**, the closest to the users:
+   t3.small, Ubuntu 24.04, with a root volume of **at least 40 GB** (gp3). The
    default 8 GB is not enough: the Drive file store alone is about 16 GB (~6,000 files), and
    backups (section 6) and logs need room next to it.
 2. Security group inbound: 22 (your IP only), 80 and 443 (anywhere). Do not open 3000.
