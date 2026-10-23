@@ -7,8 +7,11 @@
  * touching the app's code.
  *
  * It only ever records clicks on the app's pure-navigation elements, which all
- * carry one of four stable markers:
- *   [data-page]                             staff / admin sidebar pages
+ * carry one of these stable markers:
+ *   [data-route]                            staff / admin sidebar buttons (the page level)
+ *   a/button[data-page]                     the older sidebar links, same level; the
+ *                                           <section data-page> page containers are NOT
+ *                                           navigation and are ignored
  *   [data-bs-toggle="tab"][data-bs-target]  student-portal Bootstrap tabs
  *   [data-tab], [data-emp-tab]              sub-tabs inside a page
  * Nothing else is recorded, so a refresh can never replay a save, send, delete
@@ -41,8 +44,11 @@
 (function () {
   'use strict';
 
-  // Precedence: clicking a higher level clears everything below it.
-  var LEVELS = ['data-page', 'data-bs-target', 'data-tab', 'data-emp-tab'];
+  // Precedence: clicking a higher level clears everything below it. data-route and
+  // data-page are the same level (a page): the newer sidebars use data-route, the
+  // older links data-page; a page can carry only one of them.
+  var LEVELS = ['data-route', 'data-page', 'data-bs-target', 'data-tab', 'data-emp-tab'];
+  var PAGE_LEVELS = { 'data-route': 1, 'data-page': 1 };
   var MAIN_VIEWS = { loadPageStudent: 1, loadPageEmp: 1, loadPageAdminDashboard: 1 };
   // Where the server serves the app; it is also the address when nothing is recorded,
   // because "/" is the public website, not the app.
@@ -89,7 +95,10 @@
     // A tab id that cannot be a path ('#' missing or nothing after it) stays in the hash.
     var topLevel = null;
     var topValue = '';
-    if (state['data-page']) {
+    if (state['data-route']) {
+      topLevel = 'data-route';
+      topValue = state['data-route'];
+    } else if (state['data-page']) {
       topLevel = 'data-page';
       topValue = state['data-page'];
     } else if (/^#./.test(state['data-bs-target'] || '')) {
@@ -110,11 +119,20 @@
     }
   }
 
+  // A clickable navigation element: a page link (a/button) or a tab. The page
+  // containers (<section data-page="…">) match the data-page attribute too, so a
+  // click anywhere inside a page must not be taken for a navigation to it.
+  function isNavigationElement(el) {
+    var tag = String(el.tagName || '').toUpperCase();
+    return tag === 'A' || tag === 'BUTTON' || el.getAttribute('role') === 'tab' || el.getAttribute('role') === 'button';
+  }
+
   function markerOf(el) {
     for (var i = 0; i < LEVELS.length; i++) {
       var k = LEVELS[i];
       if (!el.hasAttribute(k)) continue;
       if (k === 'data-bs-target' && el.getAttribute('data-bs-toggle') !== 'tab') continue;
+      if (PAGE_LEVELS[k] && !isNavigationElement(el)) continue;
       return { level: k, value: el.getAttribute(k) };
     }
     return null;
@@ -122,11 +140,13 @@
 
   // Record navigation clicks (capture phase: runs even if the app stops propagation).
   document.addEventListener('click', function (ev) {
-    var el = ev.target && ev.target.closest ? ev.target.closest('[data-page],[data-bs-target],[data-tab],[data-emp-tab]') : null;
+    var el = ev.target && ev.target.closest ? ev.target.closest('[data-route],[data-page],[data-bs-target],[data-tab],[data-emp-tab]') : null;
     if (!el) return;
     var mk = markerOf(el);
     if (!mk) return;
+    // Clicking a page clears every level below it; data-route and data-page share the page level.
     var idx = LEVELS.indexOf(mk.level);
+    if (PAGE_LEVELS[mk.level]) { delete state['data-route']; delete state['data-page']; idx = LEVELS.indexOf('data-page'); }
     for (var i = idx + 1; i < LEVELS.length; i++) delete state[LEVELS[i]];
     state[mk.level] = mk.value;
     writeUrl();
@@ -156,6 +176,7 @@
   function selectorFor(level, value) {
     var sel = '[' + level + '="' + cssEscape(value) + '"]';
     if (level === 'data-bs-target') sel = '[data-bs-toggle="tab"]' + sel;
+    if (level === 'data-page') sel = 'a' + sel + ',button' + sel; // never the <section data-page> container
     return sel;
   }
 
@@ -165,7 +186,8 @@
   async function replay(saved) {
     var steps = []; // each step: candidate selectors, tried in order
     if (saved.path) {
-      steps.push([selectorFor('data-page', saved.path), selectorFor('data-bs-target', '#' + saved.path)]);
+      // The path is a page (data-route, or an older data-page link) or a student tab id.
+      steps.push([selectorFor('data-route', saved.path), selectorFor('data-page', saved.path), selectorFor('data-bs-target', '#' + saved.path)]);
     }
     LEVELS.forEach(function (k) {
       if (saved[k]) steps.push([selectorFor(k, saved[k])]);
