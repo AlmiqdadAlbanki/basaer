@@ -7,7 +7,7 @@ app_user=basaer
 app_home=/opt/basaer
 app_dir=$app_home/app
 data_dir=/var/lib/basaer
-backup_dir=/var/backups/basaer
+backup_dir=/var/lib/basaer/backups   # on the data volume, next to what it backs up (docs/DEPLOY.md section 6)
 env_file=/etc/basaer.env
 site_conf=/etc/nginx/sites-available/basaer
 site_link=/etc/nginx/sites-enabled/basaer
@@ -28,7 +28,7 @@ apt-get update -y
 apt-get install -y \
   ca-certificates curl gnupg nginx certbot python3-certbot-nginx \
   libreoffice-core libreoffice-writer libreoffice-impress \
-  poppler-utils fonts-hosny-amiri fonts-noto-core sqlite3 build-essential python3 git
+  poppler-utils fonts-hosny-amiri fonts-noto-core sqlite3 rsync build-essential python3 git
 # Fonts: the certificate templates embed their own (Cairo, Readex Pro, Markazi Text, IBM Plex
 # Sans Arabic travel inside the .docx), so they render the same on any machine; Amiri and
 # Noto (Kufi/Naskh Arabic) are only the fallback for a template that embeds nothing.

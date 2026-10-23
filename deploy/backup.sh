@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
-# Nightly backup of the Basaer database, uploaded files and keys.
+# Nightly backup of the Basaer database, keys and uploaded files.
 # Runs as the basaer user (see basaer-backup.service).
+#
+# What it keeps, under /var/lib/basaer/backups (on the data volume, docs/DEPLOY.md section 1):
+#   basaer-<stamp>.sqlite.gz   a consistent copy of the database, one per night, 14 days
+#   keys-<stamp>.tar.gz        the signing keys, one per night, 14 days (a few KB)
+#   files-mirror/              ONE mirror of the file store, brought up to date each night
+#                              (only new and changed files are copied; deleted files leave
+#                              the mirror too, so a mistaken delete is covered until the
+#                              next night — the daily EBS snapshot covers it after that).
+# The file store is ~16 GB of pictures and PDFs that hardly compress: a nightly archive of it
+# would cost ~200 GB of disk for 14 days and a long job every night, hence the mirror.
 set -euo pipefail
 
 env_file=/etc/basaer.env
-backup_dir=/var/backups/basaer
+backup_dir=/var/lib/basaer/backups
 retention_days=14
 
 # /etc/basaer.env is not valid shell (unquoted spaces), so read single keys.
@@ -21,21 +31,24 @@ files_dir=${files_dir:-/var/lib/basaer/files}
 
 stamp=$(date +%Y%m%d-%H%M)
 sqlite_copy="$backup_dir/basaer-$stamp.sqlite"
-archive="$backup_dir/basaer-data-$stamp.tar.gz"
+keys_archive="$backup_dir/keys-$stamp.tar.gz"
+files_mirror="$backup_dir/files-mirror"
 
-mkdir -p "$backup_dir"
+mkdir -p "$backup_dir" "$files_mirror"
 
 # .backup is safe while the server is writing; a plain cp of a WAL database is not.
 sqlite3 "$db_path" ".backup '$sqlite_copy'"
 gzip -f "$sqlite_copy"
 
 # -C keeps archive paths relative so a restore can target any location.
-tar -czf "$archive" \
-  -C "$(dirname "$files_dir")" "$(basename "$files_dir")" \
-  -C "$(dirname "$keys_dir")" "$(basename "$keys_dir")"
+tar -czf "$keys_archive" -C "$(dirname "$keys_dir")" "$(basename "$keys_dir")"
 
-find "$backup_dir" -maxdepth 1 -type f -name "basaer-*" -mtime +"$retention_days" -delete
+# Bring the mirror up to date. --delete mirrors deletions too; the dated database copies
+# and the EBS snapshots are the history.
+rsync -a --delete "$files_dir/" "$files_mirror/"
+
+find "$backup_dir" -maxdepth 1 -type f \( -name "basaer-*" -o -name "keys-*" \) -mtime +"$retention_days" -delete
 
 echo "Backup written:"
-ls -lh "$sqlite_copy.gz" "$archive"
-du -sh "$backup_dir"
+ls -lh "$sqlite_copy.gz" "$keys_archive"
+du -sh "$files_mirror" "$backup_dir"
