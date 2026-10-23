@@ -75,9 +75,9 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
     ```
     # on your PC, in WSL (in tmux; re-run to resume or top up)
     cd <repo>
-    rsync -av --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
+    rsync -rltv --chmod=D750,F640 --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
     node -e "new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
-    rsync -av --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
+    rsync -rltv --chmod=F640 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
     ```
     ```
     # on the server, as ubuntu (ssh)

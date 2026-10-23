@@ -49,10 +49,13 @@ if ! id "$app_user" >/dev/null 2>&1; then
 fi
 mkdir -p "$data_dir/files" "$data_dir/keys" "$backup_dir"
 chown -R "$app_user:$app_user" "$data_dir" "$backup_dir"
-# Modes as well as ownership (a directory made by hand, or by an rsync as another user, may be
-# left wide open): the data is the app's alone; nginx never reads it, the app serves the files.
-chmod 750 "$data_dir" "$data_dir/files" "$backup_dir"
+# Modes as well as ownership, contents included: files copied from a Windows-mounted path arrive
+# as 777 unless the copy sets modes, and a directory made by hand may be wide open. The data is
+# the app's alone; nginx never reads it, the app serves the files.
+find "$data_dir" "$backup_dir" -type d -exec chmod 750 {} +
+find "$data_dir" "$backup_dir" -type f -exec chmod 640 {} +
 chmod 700 "$data_dir/keys"
+find "$data_dir/keys" -type f -exec chmod 600 {} +
 chmod 700 "$data_dir/keys"
 
 if [ -d "$app_dir" ]; then

@@ -202,13 +202,16 @@ All of this section is done in the AWS console and at Squarespace, except the ch
    `drwxr-x---` (`files`, `backups`) and `drwx------` (`keys`). The script ended with
    `Install finished. Next steps:`. If a directory is owned by someone else or is `drwxrwxrwx`
    (it was created by hand, or by an rsync as another user, before the bootstrap), run the
-   bootstrap again: it sets ownership and modes every time. Or by hand:
+   bootstrap again: it sets ownership and modes every time, contents included (files copied
+   from the PC's `/mnt/c` arrive as 777 unless the copy sets modes, which the rsync commands in
+   section 4 do). Or by hand:
    ```
    # on the server, as ubuntu (ssh)
    cd /
    sudo chown -R basaer:basaer /var/lib/basaer
-   sudo chmod 750 /var/lib/basaer /var/lib/basaer/files /var/lib/basaer/backups
-   sudo chmod 700 /var/lib/basaer/keys
+   sudo find /var/lib/basaer -type d -exec chmod 750 {} +
+   sudo find /var/lib/basaer -type f -exec chmod 640 {} +
+   sudo chmod 700 /var/lib/basaer/keys && sudo find /var/lib/basaer/keys -type f -exec chmod 600 {} +
    ```
 3. Set `BASE_URL` in the config. **Needs:** step 2 (it created `/etc/basaer.env`).
    ```
@@ -458,7 +461,7 @@ on the 8 GB root volume, and 16 GB does not fit there.
    ```
    # on your PC, in WSL
    cd <repo>
-   rsync -av --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
+   rsync -rltv --chmod=D750,F640 --partial --info=progress2 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" data/files/ ubuntu@<ip>:/var/lib/basaer/files/
    ```
    `--rsync-path="sudo rsync"` writes as root, straight into the data volume. If the connection
    drops, run the same command again: it resumes. Run it again later to top the copy up: it sends
@@ -472,7 +475,7 @@ on the 8 GB root volume, and 16 GB does not fit there.
    # on your PC, in WSL
    cd <repo>
    node -e "new (require('./server/storage.js').Storage)('data/basaer.sqlite').db.backup('/tmp/basaer-copy.sqlite').then(() => console.log('copy ready'))"
-   rsync -av --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
+   rsync -rltv --chmod=F640 --rsync-path="sudo rsync" -e "ssh -i <key.pem>" /tmp/basaer-copy.sqlite ubuntu@<ip>:/var/lib/basaer/basaer.sqlite
    ```
    This `/tmp` is on your PC, not on the server.
 
