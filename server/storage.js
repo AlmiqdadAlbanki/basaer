@@ -140,6 +140,10 @@ class Storage {
         updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS files_parent ON files (parent_id);
+      -- The file store and the properties bump a row of their own in sheet_versions
+      -- (ss '__files__' / '__props__') through triggers, so versionStamp() moves on
+      -- ANY change to the data, whichever code path wrote it (Drive shim, uploads,
+      -- tools). See _ensureVersionTriggers(), run right after this schema.
       -- Time-based triggers (replaces ScriptApp triggers). kind: 'once' | 'every'
       CREATE TABLE IF NOT EXISTS triggers (
         id          TEXT PRIMARY KEY,
@@ -181,6 +185,7 @@ class Storage {
         expires INTEGER NOT NULL
       );
     `);
+    this._ensureVersionTriggers();
 
     // In-memory copy of each sheet grid, keyed "ss\u0000sheet" ->
     // { grid, version, needsVersionCheck }. See the header comment.
@@ -196,6 +201,8 @@ class Storage {
         'INSERT INTO sheet_versions (ss, sheet, version) VALUES (?, ?, 1) '
         + 'ON CONFLICT(ss, sheet) DO UPDATE SET version = version + 1 RETURNING version',
       ).pluck(),
+      // Versions only ever go up, so the count plus the sum move on every change.
+      versionStamp: this.db.prepare("SELECT count(*) || ':' || coalesce(sum(version), 0) FROM sheet_versions").pluck(),
       selectRows: this.db.prepare('SELECT rownum, cells FROM rows WHERE ss = ? AND sheet = ? ORDER BY rownum'),
       upsertRow: this.db.prepare('INSERT OR REPLACE INTO rows (ss, sheet, rownum, cells) VALUES (?, ?, ?, ?)'),
       deleteSheetRows: this.db.prepare('DELETE FROM rows WHERE ss = ? AND sheet = ?'),
@@ -392,6 +399,38 @@ class Storage {
   // Sheets shim does), passing the rows they mutated rather than re-reading
   // this getter (another thread's commit in between can swap the cached array
   // for a reloaded one). Anyone wanting a private copy must clone it.
+  // The triggers that make the files and props tables bump their own row in
+  // sheet_versions. A trigger body cannot rely on its own OR IGNORE (SQLite
+  // replaces it with the conflict policy of the statement that fired the
+  // trigger, so an upsert on files would make the insert fail): the two rows
+  // are created here instead, and the bodies only UPDATE. Each trigger is
+  // written only when the database holds a different text, so in the steady
+  // state opening the database writes nothing — several connections open it
+  // at once (the workers, the tools).
+  _ensureVersionTriggers() {
+    const rowExists = this.db.prepare('SELECT 1 FROM sheet_versions WHERE ss = ? AND sheet = ?').pluck();
+    const insertRow = this.db.prepare('INSERT OR IGNORE INTO sheet_versions (ss, sheet, version) VALUES (?, ?, 0)');
+    const storedSql = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?").pluck();
+    for (const [table, versionRow] of [['files', '__files__'], ['props', '__props__']]) {
+      if (!rowExists.get(versionRow, '*')) insertRow.run(versionRow, '*');
+      for (const event of ['INSERT', 'UPDATE', 'DELETE']) {
+        const name = `${table}_version_${event.toLowerCase()}`;
+        const sql = `CREATE TRIGGER ${name} AFTER ${event} ON ${table} BEGIN UPDATE sheet_versions SET version = version + 1 WHERE ss = '${versionRow}' AND sheet = '*'; END`;
+        if (storedSql.get(name) === sql) continue;
+        this.db.exec(`DROP TRIGGER IF EXISTS ${name}; ${sql};`);
+      }
+    }
+  }
+
+  // A short string that changes whenever anything in this database changes, from
+  // any connection: every write transaction on a sheet bumps that sheet's row in
+  // sheet_versions (never down), and the file store and the properties bump rows
+  // of their own through triggers. One tiny query, cheap enough to run per
+  // request; the RPC read cache validates its entries against it.
+  versionStamp() {
+    return String(this._stmts.versionStamp.get());
+  }
+
   loadGrid(ss, name) {
     return this._entry(ss, name).grid;
   }

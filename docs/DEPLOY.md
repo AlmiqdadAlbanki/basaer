@@ -617,6 +617,23 @@ How the server runs. It is one Node process on one machine, started by systemd. 
 The Apps Script `LockService` is a real lock shared by all workers, so code the legacy source
 guards with a lock stays exclusive even between an interactive call and a background job.
 
+The pages load whole tables (the legacy code was written that way: the admin page's reads are
+about 5 MB of JSON, the browser then pages them on screen). Three things keep that cheap, for
+every page and every role:
+
+- Responses are gzip-compressed (JSON shrinks 8-10x). nginx does this too; the server does it
+  itself so every path is covered.
+- Read-only calls (policy kind `read`) are computed once and shared by every caller
+  (`server/rpc-read-cache.js`): the same function with the same arguments is answered from
+  memory until any sheet, file or property changes — the database carries a version stamp that
+  moves on every write, from any connection, tools included — and for at most
+  `RPC_READ_CACHE_TTL_MS` (default 60000; `0` switches the cache off) so clock-dependent
+  replies cannot go stale. Memory is capped by `RPC_READ_CACHE_MAX_MB` (default 32, least
+  recently used entries go first). `/healthz` shows `readCache` hits, misses, entries and bytes.
+- The browser keeps every read reply (IndexedDB, per signed-in user) with the ETag the server
+  sent and revalidates it on the next page load with `If-None-Match`; unchanged data is a
+  bodiless `304`, so a reload downloads only what changed since the last visit.
+
 `BASAER_RPC_WORKERS` sets how many threads run interactive calls (default 1). Keep it at 1: the
 legacy code has many check-then-write steps (look for a duplicate scan, then append a row;
 remember a row number, then delete rows) that are only safe when interactive calls run one at a

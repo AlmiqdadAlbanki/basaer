@@ -38,6 +38,8 @@ const { Identity, TOKEN_KINDS } = require('./auth/identity.js');
 const { ensureServiceAccount } = require('./auth/identity-service.js');
 const { GoogleTokenVerifier } = require('./auth/google-token.js');
 const { enforce, scopeResult, rpcKinds } = require('./policy.js');
+const compression = require('compression');
+const { RpcReadCache } = require('./rpc-read-cache.js');
 const { storeStudentWork, isOwnFolder, MAX_UPLOAD_BYTES } = require('./uploads.js');
 const { makeDriveShims } = require('./shims/drive.js');
 const { convertWithSoffice } = require('./docgen/convert.js');
@@ -81,6 +83,13 @@ const TRUST_PROXY = process.env.TRUST_PROXY || 'loopback';
 // This Storage is used only for non-grid tables (files, outbox, triggers,
 // props); every sheet read or write happens inside a worker.
 const storage = new Storage(DB_PATH);
+
+// Read-only RPC replies are computed once and shared by every caller while the
+// data is unchanged (rpc-read-cache.js). RPC_READ_CACHE_TTL_MS=0 switches that
+// off; RPC_READ_CACHE_MAX_MB caps the memory it may hold (default 32 MB).
+const READ_CACHE_TTL_MS = process.env.RPC_READ_CACHE_TTL_MS === undefined ? 60 * 1000 : Math.max(0, parseInt(process.env.RPC_READ_CACHE_TTL_MS, 10) || 0);
+const READ_CACHE_MAX_BYTES = Math.max(1, parseInt(process.env.RPC_READ_CACHE_MAX_MB, 10) || 32) * 1024 * 1024;
+const rpcReadCache = new RpcReadCache({ versionStamp: () => storage.versionStamp(), ttlMs: READ_CACHE_TTL_MS, maxBytes: READ_CACHE_MAX_BYTES });
 const driveShims = makeDriveShims({ storage, filesDir: FILES_DIR, baseUrl: BASE_URL });
 
 // Key material must exist before the workers start: ensureServiceAccount seeds
@@ -327,7 +336,8 @@ function buildPartials() {
 }
 
 let { served: PARTIALS, ref: PARTIAL_REF } = buildPartials();
-const RPC_KINDS_SCRIPT = `<script>window.__basaerRpcKinds = ${JSON.stringify(rpcKinds())};</script>`;
+const RPC_KIND_BY_NAME = rpcKinds(); // function -> 'read' | 'live' | 'write'
+const RPC_KINDS_SCRIPT = `<script>window.__basaerRpcKinds = ${JSON.stringify(RPC_KIND_BY_NAME)};</script>`;
 
 function buildIndexHtml() {
   if (process.env.BASAER_REBUILD) ({ served: PARTIALS, ref: PARTIAL_REF } = buildPartials());
@@ -370,6 +380,16 @@ const INDEX_HTML = buildIndexHtml();
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', TRUST_PROXY);
+// No automatic (weak) ETag on res.json/res.send: it would hash every reply, including
+// multi-megabyte ones, for a POST a browser never revalidates anyway. The only ETags
+// sent are the strong ones of the RPC read cache (below), which the client does use.
+app.set('etag', false);
+
+// Compress text responses (JSON, HTML, CSS, JS) above 1 KB: the admin page's reads
+// are megabytes of JSON that gzip 8-10x. nginx gzips too in production; this
+// covers every other way of reaching the server and costs nothing for a response
+// that is already encoded or not compressible (images, PDFs).
+app.use(compression({ threshold: 1024 }));
 
 // Security headers on every response. nginx adds the same in production; the
 // app sets them too so it is safe on its own. The content-security-policy is
@@ -749,10 +769,29 @@ app.post('/api/rpc/:fn', jsonBody, async (req, res) => {
   if (fn === 'newStuReg') dispatchArgs = gateRegistrationArguments(dispatchArgs);
 
   try {
-    const result = scopeResult(decision, await rpcPool.call('call', { fn, args: dispatchArgs, context: { clientIp: req.ip } }));
+    const runCall = async () => {
+      const result = scopeResult(decision, await rpcPool.call('call', { fn, args: dispatchArgs, context: { clientIp: req.ip } }));
+      return result === undefined ? null : result;
+    };
+    // Pure reads are computed once per (function, arguments, scope) and shared by
+    // every caller while the data is unchanged (rpc-read-cache.js). The scope is
+    // part of the key because scopeResult trims a few user-level replies to the
+    // caller's own rows. The reply carries an ETag: a browser holding a copy sends
+    // it back as If-None-Match and gets a bodiless 304 when nothing changed.
+    if (RPC_KIND_BY_NAME[fn] === 'read' && rpcReadCache.enabled) {
+      const cacheKey = fn + '\0' + JSON.stringify(dispatchArgs) + (decision.scopeSelf ? '\0self:' + decision.cpr : '');
+      const { entry, hit } = await rpcReadCache.fetch(cacheKey, async () => JSON.stringify({ ok: true, result: await runCall() }));
+      res.set('ETag', entry.etag).set('Cache-Control', 'private, no-store').set('X-Basaer-Cache', hit ? 'hit' : 'miss');
+      if (req.get('If-None-Match') === entry.etag) {
+        rpcReadCache.counts.notModified++;
+        return res.status(304).end();
+      }
+      return res.type('application/json').send(entry.bodyText);
+    }
+    const result = await runCall();
     if (googleEmailToConsume && result && result.ok) verifiedGoogleEmails.delete(googleEmailToConsume);
     noteRegistrationProgress(fn, dispatchArgs, result);
-    res.json({ ok: true, result: result === undefined ? null : result });
+    res.json({ ok: true, result });
   } catch (err) {
     const reference = crypto.randomBytes(4).toString('hex');
     res.locals.errorReference = reference;
@@ -945,7 +984,7 @@ app.get('/doc/:id/:mode', async (req, res) => {
 });
 
 app.get('/healthz', (_req, res) => {
-  res.set('Cache-Control', 'no-store').json({ ok: true, mode: OUTBOUND_MODE, rpc: rpcPool.stats(), background: backgroundPool.stats() });
+  res.set('Cache-Control', 'no-store').json({ ok: true, mode: OUTBOUND_MODE, rpc: rpcPool.stats(), background: backgroundPool.stats(), readCache: rpcReadCache.stats() });
 });
 
 // --- Dev-only inspection (never in production): what would have been sent ---

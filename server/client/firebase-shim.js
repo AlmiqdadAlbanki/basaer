@@ -91,8 +91,13 @@
     try { localStorage.removeItem(LEGACY_SESSION_KEY); sessionStorage.removeItem(LEGACY_SESSION_KEY); } catch (e) { /* ignore */ }
   }
 
+  // Sign-in and sign-out: drop the in-memory results and the copies kept across
+  // reloads (they belong to the previous user); an older shim only has clear().
   function clearRpcCache() {
-    try { if (window.__basaerRpcCache) window.__basaerRpcCache.clear(); } catch (e) { /* ignore */ }
+    try {
+      var cache = window.__basaerRpcCache;
+      if (cache) (cache.forget || cache.clear).call(cache);
+    } catch (e) { /* ignore */ }
   }
 
   function decodeJwt(token) {
