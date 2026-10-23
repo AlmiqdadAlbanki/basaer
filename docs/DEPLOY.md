@@ -8,9 +8,9 @@ config in `/etc/basaer.env`.
 
 1. An EC2 instance: t3.small, Ubuntu 26.04 LTS (what the port was developed and tested on; 24.04
    works too), with **two volumes** (both gp3):
-   - the root volume, **10 GB**: the operating system (~3 GB), LibreOffice (~1 GB), the app, and
-     logs, which are capped (the journal at 200 MB, nginx logs rotated) — nothing that cannot
-     be rebuilt;
+   - the root volume, **8 GB** (the smallest the Ubuntu image allows, and enough): the
+     operating system (~3 GB), LibreOffice (~1 GB), the app, and logs, which are capped (the
+     journal at 200 MB, nginx logs rotated) — nothing that cannot be rebuilt;
    - a second volume, **30 GB**, added on the launch page under "Configure storage" → "Add new
      volume": the data. It is mounted at `/var/lib/basaer` (section 2, step 2) and holds the
      database (30 MB), the file store (15 GB, ~6,000 files, at 2026-10) and the signing keys.

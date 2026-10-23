@@ -69,7 +69,7 @@ install -m 0644 "$script_dir/basaer-backup.timer" /etc/systemd/system/basaer-bac
 chmod +x "$script_dir/backup.sh"
 
 echo "==> Log limits"
-# The app logs every request to the journal; cap it so the 10 GB root volume never fills
+# The app logs every request to the journal; cap it so the 8 GB root volume never fills
 # (journald's default is 10% of the disk). nginx's logs are rotated by logrotate (14 days).
 mkdir -p /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=200M\nMaxRetentionSec=1month\n' > /etc/systemd/journald.conf.d/basaer.conf
