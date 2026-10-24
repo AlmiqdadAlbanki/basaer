@@ -1112,6 +1112,22 @@ another path (say `/mnt/restore`), and copy what you need. Both volumes carry th
 
 ## 7. Updating
 
+**Never run `npm install`, `npm update`, `npm audit fix` or `npm install -g npm` on the server.**
+The lockfile is the truth: dependency changes are made on the development PC, tested, committed,
+and reach the server through `git pull` + `npm ci --omit=dev` below. `npm audit fix` swaps
+packages for untested versions, and a newer npm (12+) refuses to run install scripts, so the
+SQLite driver (`better-sqlite3`, a native module) gets no binary and the service dies at start
+with `activating (auto-restart)`. Recovery, if it happened anyway:
+```
+# on the server, as ubuntu (ssh)
+sudo npm install -g npm@10                      # the npm Node 22 ships with
+sudo chown -R basaer:basaer /opt/basaer/app
+cd /opt/basaer/app && sudo -u basaer npm ci --omit=dev
+sudo systemctl restart basaer
+```
+The `npm ci` output must not contain a line about blocked install scripts. The `xlsx` advisory
+`npm audit` reports is about an import tool, not the server; there is nothing to fix.
+
 **Needs:** the new commits pushed to GitHub. The server pulls from there.
 
 ```
