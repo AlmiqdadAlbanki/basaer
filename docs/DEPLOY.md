@@ -1175,13 +1175,50 @@ in-memory rate-limit counters (section 9).
    the space — the pull needs ~16 GB beside the store — nor any Google credentials, and keeps it
    that way), then ship the result exactly as in section 4, "Copy from the PC".
 
-   On the PC: section 4 steps 2, 4 to 7 and 10 against the PC's `data/basaer.sqlite`, with a fresh
-   Firebase export for step 10, so that the final sheets, the newest files and the `emailVerified`
-   flags all match. The long part, the Drive file copy (steps 4 to 7), can be done ahead of the
-   freeze and repeated: it only adds what is missing. Then "Copy from the PC": the rsync of
-   `data/files/` tops up what the server already has, a fresh consistent copy of the database
-   replaces the server's, and the `--rebase-from http://localhost:3000` run re-points the links
-   (the equivalent of step 9; not optional, freshly imported sheets hold Google links again).
+   The whole refresh, on the PC. It is section 4 steps 2, 4 to 7 and 10 with the PC's paths: the
+   repo at `/mnt/c/Users/igopaah/Claude/Basaer`, the rclone remote `gdrive` that already exists
+   there (read-only scope), and the Drive copies under `/home/igopaah/basaer-exports/` (a native
+   Linux path: never copy thousands of files under `/mnt/c`). Every command only adds what is
+   missing, so the long parts (the two copies) can be run ahead of the freeze and again after
+   it. Never run two rclone commands at the same time. Stop the PC's dev server first
+   (`fuser -k 3000/tcp`), so the database is not being written.
+   ```
+   # on your PC, in WSL
+   cd /mnt/c/Users/igopaah/Claude/Basaer
+   # 1. the sheets, the five templates and the seven named folders (replaces every sheet)
+   bash tools/google-exports.sh pull
+   TZ=Asia/Qatar node tools/import-google-exports.js
+   # 2. fresh listings of the two Drive trees, one after the other
+   rclone lsjson -R --drive-export-formats pdf --tpslimit 4 --retries 20 --low-level-retries 40 gdrive: > data/google-exports/trees/mydrive.lsjson
+   rclone lsjson -R --drive-shared-with-me --drive-export-formats pdf --tpslimit 4 --retries 20 --low-level-retries 40 gdrive: > data/google-exports/trees/shared.lsjson
+   # 3. every id the data refers to (links and bare ids)
+   node tools/import-code-assets.js --list
+   node tools/list-referenced-ids.js --out data/google-exports/referenced-ids.json
+   # 4. copy the referenced files (rclone skips the ones already copied)
+   node tools/import-drive-tree.js --listing data/google-exports/trees/mydrive.lsjson --only-ids data/google-exports/referenced-ids.json --list-paths /tmp/mydrive-paths.txt --unfound-ids /tmp/mydrive-unfound.txt
+   rclone copy gdrive: /home/igopaah/basaer-exports/trees/mydrive --files-from /tmp/mydrive-paths.txt --drive-export-formats pdf --tpslimit 4 --retries 20 --low-level-retries 40
+   node tools/import-drive-tree.js --listing data/google-exports/trees/shared.lsjson --only-ids data/google-exports/referenced-ids.json --list-paths /tmp/shared-paths.txt --unfound-ids /tmp/shared-unfound.txt
+   rclone copy gdrive: /home/igopaah/basaer-exports/trees/shared --files-from /tmp/shared-paths.txt --drive-export-formats pdf --drive-shared-with-me --tpslimit 4 --retries 20 --low-level-retries 40
+   # 5. import (adds what is missing), fetch same-named files by id, import again
+   node tools/import-drive-tree.js --listing data/google-exports/trees/mydrive.lsjson --dir /home/igopaah/basaer-exports/trees/mydrive --root-id mydrive-root --root-name "My Drive" --only-ids data/google-exports/referenced-ids.json --by-id-dir /home/igopaah/basaer-exports/by-id
+   node tools/import-drive-tree.js --listing data/google-exports/trees/shared.lsjson --dir /home/igopaah/basaer-exports/trees/shared --root-id shared-root --root-name "Shared with me" --only-ids data/google-exports/referenced-ids.json --by-id-dir /home/igopaah/basaer-exports/by-id
+   cat /home/igopaah/basaer-exports/trees/mydrive/missing-ids.txt /home/igopaah/basaer-exports/trees/shared/missing-ids.txt 2>/dev/null | sort -u | while read -r id; do
+     [ -s /home/igopaah/basaer-exports/by-id/"$id" ] || rclone backend copyid gdrive: "$id" /home/igopaah/basaer-exports/by-id/"$id" --drive-export-formats pdf --tpslimit 3
+   done
+   node tools/import-drive-tree.js --listing data/google-exports/trees/mydrive.lsjson --dir /home/igopaah/basaer-exports/trees/mydrive --root-id mydrive-root --root-name "My Drive" --only-ids data/google-exports/referenced-ids.json --by-id-dir /home/igopaah/basaer-exports/by-id
+   node tools/import-drive-tree.js --listing data/google-exports/trees/shared.lsjson --dir /home/igopaah/basaer-exports/trees/shared --root-id shared-root --root-name "Shared with me" --only-ids data/google-exports/referenced-ids.json --by-id-dir /home/igopaah/basaer-exports/by-id
+   # 6. templates named by bare id that are still missing (section 4, step 7): one id per line
+   bash tools/fetch-templates-by-id.sh /tmp/template-ids.txt
+   # 7. the passwords and the emailVerified flags, from a fresh Firebase export (section 4, step 10)
+   node tools/import-firebase-users.js --users data/firebase-users.json --hash-params data/firebase-hash-params.txt --mark-verified
+   ```
+   Check: the imports report `missing: 0`; `comm -12 <(sort /tmp/mydrive-unfound.txt) <(sort /tmp/shared-unfound.txt)`
+   lists only the ids known to be unreachable (the 2024-25 season's files, owned by another account).
+
+   Then ship the result with "Copy from the PC" (section 4): the rsync of `data/files/` tops up what
+   the server already has, a fresh consistent copy of the database replaces the server's, and the
+   `--rebase-from http://localhost:3000` run re-points the links (the equivalent of step 9; not
+   optional, freshly imported sheets hold Google links again).
 
    Test accounts made during development disappear with the rebuilt sheets (their rows were only in
    the local copy), but their login rows in the identity store do not. Delete those by hand. The

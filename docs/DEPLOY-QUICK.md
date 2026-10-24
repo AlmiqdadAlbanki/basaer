@@ -98,8 +98,9 @@ Placeholders: `<ip>` Elastic IP · `<domain>` public name (`basaerbh.com`, or a 
 13. **Cut-over** (§8). In order:
     - DNS at the real domain; if a temporary domain was used, do the three places (Need to know).
     - Freeze the Apps Script (read-only).
-    - Final refresh **on the PC** (it has the Google pull set up; the server never touches Google):
-      §4 steps 2, 4–7 and 10 there, then ship again exactly as step 10 above (rsync top-up, fresh DB copy,
+    - Final refresh **on the PC** (it has the Google pull set up; the server never touches Google): the
+      command block in §8.3 (pull sheets → list trees → referenced ids → copy → import → templates →
+      passwords), then ship again exactly as step 10 above (rsync top-up, fresh DB copy,
       `--rebase-from http://localhost:3000`).
     - Delete the test admin:
       ```
