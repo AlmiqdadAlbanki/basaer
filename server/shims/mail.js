@@ -23,6 +23,11 @@ function decodeRawMime(rawB64Url) {
   }
 }
 
+// The bytes of a gas Blob (a Drive/UrlFetch blob keeps a Buffer; others expose getBytes()).
+function blobBuffer(b) {
+  return b._buffer ? b._buffer() : Buffer.from(b.getBytes());
+}
+
 function blobMeta(b) {
   try {
     return { name: b.getName ? b.getName() : '', type: b.getContentType ? b.getContentType() : '', bytes: b._buffer ? b._buffer().length : (b.getBytes ? b.getBytes().length : 0) };
@@ -66,7 +71,12 @@ class Mailer {
       return id;
     }
     // Deliver asynchronously; the synchronous gas caller does not wait.
-    this.transport.sendMail({ from: this.from, to, subject, text, html, attachments: (meta && meta._attachments) || [] })
+    const headers = meta || {};
+    this.transport.sendMail({
+      from: this.from, to, subject, text, html,
+      cc: headers.cc || undefined, bcc: headers.bcc || undefined, replyTo: headers.replyTo || undefined,
+      attachments: headers._attachments || [],
+    })
       .then(() => this.storage.db.prepare('UPDATE outbox SET status = ? WHERE id = ?').run('sent', id))
       .catch((err) => {
         this.storage.db.prepare('UPDATE outbox SET status = ?, error = ? WHERE id = ?').run('failed', String(err && err.message || err), id);
@@ -86,13 +96,26 @@ function makeMailShims(mailer) {
         inlineImages: Object.keys(options.inlineImages || {}),
         attachments: (options.attachments || []).map(blobMeta),
       };
-      // Carry attachment bytes for live delivery (not persisted in the outbox).
-      if (mailer.mode === 'live' && options.attachments && options.attachments.length) {
-        meta._attachments = options.attachments.map((b) => ({
+      // Carry attachment bytes for live delivery (not persisted in the outbox). Inline
+      // images are attachments too, referenced from the HTML as <img src="cid:<key>">:
+      // the legacy code sends the logo in every message that way (inlineImages:
+      // { basairLogo: blob }), so without this part the message shows a broken image.
+      if (mailer.mode === 'live') {
+        const parts = (options.attachments || []).map((b) => ({
           filename: b.getName ? b.getName() : 'attachment',
-          content: b._buffer ? b._buffer() : Buffer.from(b.getBytes()),
+          content: blobBuffer(b),
           contentType: b.getContentType ? b.getContentType() : undefined,
         }));
+        for (const [contentId, b] of Object.entries(options.inlineImages || {})) {
+          parts.push({
+            filename: (b.getName && b.getName()) || contentId,
+            content: blobBuffer(b),
+            contentType: b.getContentType ? b.getContentType() : undefined,
+            cid: contentId,
+            contentDisposition: 'inline',
+          });
+        }
+        if (parts.length) meta._attachments = parts;
       }
       mailer.send({ to: recipient, subject, text: body, html: options.htmlBody || '', meta });
       return GmailApp;
