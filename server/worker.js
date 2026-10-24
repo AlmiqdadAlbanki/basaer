@@ -33,7 +33,7 @@ function buildMailer(storage, config) {
       auth: config.smtp.user ? { user: config.smtp.user, pass: config.smtp.pass } : undefined,
     });
   }
-  return new Mailer({ storage, mode: config.outboundMode, transport: smtpTransport, from: config.mailFrom });
+  return new Mailer({ storage, mode: config.outboundMode, transport: smtpTransport, from: config.mailFrom, baseUrl: config.baseUrl });
 }
 
 function serialiseError(err) {

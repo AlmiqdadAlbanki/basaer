@@ -7,6 +7,8 @@
 // testing. In live mode the Mailer delivers through SMTP (nodemailer) when
 // configured.
 
+const { rewriteLegacyDriveUrlsAbsolute } = require('../page-rewrites.js');
+
 function decodeRawMime(rawB64Url) {
   try {
     const raw = Buffer.from(String(rawB64Url).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -28,16 +30,23 @@ function blobMeta(b) {
 }
 
 class Mailer {
-  constructor({ storage, mode, log, transport, from }) {
+  constructor({ storage, mode, log, transport, from, baseUrl }) {
     this.storage = storage;
     this.mode = mode || 'dry-run';
     this.log = log || ((...a) => console.log('[mail]', ...a));
     this.transport = transport || null; // nodemailer transport in live mode
     this.from = from || 'no-reply@localhost';
+    // Where this server is reachable from outside: the legacy code writes Drive links (the
+    // logo, files) into message bodies, and a mail client cannot follow a relative path.
+    this.baseUrl = baseUrl || '';
   }
 
   // Record and (in live mode) deliver. Returns the outbox id.
   send({ to, subject, text, html, meta }) {
+    if (this.baseUrl) {
+      if (html) html = rewriteLegacyDriveUrlsAbsolute(html, this.baseUrl);
+      if (text) text = rewriteLegacyDriveUrlsAbsolute(text, this.baseUrl);
+    }
     const status = this.mode === 'live' ? 'queued' : 'dry-run';
     const info = this.storage.db
       .prepare('INSERT INTO outbox (created_at, to_addr, subject, body_text, body_html, meta, status) VALUES (?, ?, ?, ?, ?, ?, ?)')

@@ -71,6 +71,18 @@ function rewriteLegacyDriveUrls(text) {
   return rewritten;
 }
 
+// The same, but to absolute URLs on this server — for text that leaves the site, such as
+// e-mail bodies (the legacy code puts the Drive logo and Drive file links into every
+// message), where a relative /thumb?id= would point nowhere. Safe to apply twice.
+function rewriteLegacyDriveUrlsAbsolute(text, baseUrl) {
+  const origin = String(baseUrl || '').replace(/\/+$/, '');
+  let rewritten = text;
+  for (const [legacyPrefix, ownPrefix] of LEGACY_DRIVE_URL_PREFIXES) {
+    rewritten = rewritten.split(legacyPrefix).join(origin + ownPrefix);
+  }
+  return rewritten;
+}
+
 // ---- Google Fonts ---------------------------------------------------------------------
 //
 // The pages name web fonts on Google Fonts. A stylesheet URL there (fonts.googleapis.com)
@@ -258,7 +270,7 @@ function legacyShellMeta(codeSource) {
 }
 
 module.exports = {
-  rewriteLegacyRelayUrls, rewriteLegacyDriveUrls, rewriteGoogleFontsUrls, rewriteOldSiteAssetUrls,
+  rewriteLegacyRelayUrls, rewriteLegacyDriveUrls, rewriteLegacyDriveUrlsAbsolute, rewriteGoogleFontsUrls, rewriteOldSiteAssetUrls,
   rewriteLegacyShell, rewriteLegacyPartial, rewriteLogoutRedirect, legacyShellMeta,
   LEGACY_RELAY_URL_REWRITES, LEGACY_DRIVE_URL_PREFIXES,
   GOOGLE_FONTS_STYLESHEET_REWRITES, UNUSED_ICON_FONT_STYLESHEET_URLS, OLD_SITE_ASSET_URL_PREFIXES,
