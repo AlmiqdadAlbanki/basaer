@@ -61,6 +61,13 @@ test('every client-called function has an explicit policy entry', () => {
   assert.deepStrictEqual(missing, [], 'missing policy entries: ' + missing.join(', '));
 });
 
+test('a plain student can open every page of the exam flow (Iqrar, exam page) and get the questions', () => {
+  const student = { cpr: '001234567', isStudent: true, isStaff: false, isAdmin: false, perms: {} };
+  for (const fn of ['loadPageIqrar', 'loadPageQuestions', 'getExams', 'getQuestions', 'submitAnswerData', 'saveExamSessionProgress']) {
+    assert.strictEqual(enforce(fn, ['001234567', '', ''], student).allow, true, fn);
+  }
+});
+
 test('an unlisted function is denied', () => {
   const r = enforce('totallyUnknownFn', [], ADMIN);
   assert.strictEqual(r.allow, false);

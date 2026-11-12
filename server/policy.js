@@ -52,7 +52,10 @@ const POLICY = {
   loadPageEmpManag: { level: 'admin', kind: 'read' },
   loadPagellAttend: { level: 'staff', kind: 'read' },
   loadPageIqrar: { level: 'user', kind: 'read' },
-  loadPageQuestions: { level: 'perm', perm: 'exam', kind: 'read' },
+  // The exam-taking page a student opens after the pre-exam survey (js.html loadQuestions),
+  // not the question editor: it returns the page template only, the questions come from
+  // getQuestions, which is scoped to the caller.
+  loadPageQuestions: { level: 'user', kind: 'read' },
   loadPageAdminDashboard: { level: 'admin', kind: 'read' },
   loadPageSendMsg: { level: 'admin', kind: 'read' },
 
