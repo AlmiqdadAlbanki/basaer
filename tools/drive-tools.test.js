@@ -922,6 +922,7 @@ test('rewrite-drive-links: rewrites resolvable links only, keeps every other cel
     cellsScanned: cellCount,
     cellsChanged: 8, // row 2: 3, row 3: 4, row 4: 1
     linksRewritten: 9, // row 2: 3, row 3: 3 + 2 inside the notes, row 4: 1
+    linksRebased: 0, // no --rebase-from in this run
     linksUnresolved: 8,
     linksUnrecognized: 1,
   });

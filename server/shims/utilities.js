@@ -45,6 +45,15 @@ function formatDate(date, tz, pattern) {
   const hourNum = parseInt(HH, 10);
   const minNum = parseInt(mm, 10);
   const secNum = parseInt(ss, 10);
+  // The zone's UTC offset at that instant, in minutes: the zone's wall-clock time read as
+  // if it were UTC, minus the real instant. Java's 'Z' prints it as "+0300", 'XXX' as
+  // "+03:00". The exam code builds its date boundaries from 'Z' (utcOffsetString_ in
+  // gas/dataGet.js); without it every exam with dates parsed as NaN and stayed "draft".
+  const wallClockAsUtc = Date.UTC(parseInt(yyyy, 10), monthNum - 1, dayNum, hourNum, minNum, secNum);
+  const offsetMinutes = Math.round((wallClockAsUtc - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+  const offsetSign = offsetMinutes < 0 ? '-' : '+';
+  const offsetHours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, '0');
+  const offsetRest = String(Math.abs(offsetMinutes) % 60).padStart(2, '0');
 
   // Replace longest tokens first. Order matters: yyyy before yy, EEEE before EEE, etc.
   const tokens = [
@@ -67,11 +76,26 @@ function formatDate(date, tz, pattern) {
     ['EEEE', p.weekday],
     ['EEE', WEEKDAY_SHORT[p.weekday] || p.weekday.slice(0, 3)],
     ['a', hourNum < 12 ? 'AM' : 'PM'],
+    ['XXX', offsetSign + offsetHours + ':' + offsetRest],
+    ['Z', offsetSign + offsetHours + offsetRest],
   ];
-  // Tokenise so literal characters are not themselves rewritten.
+  // Tokenise so literal characters are not themselves rewritten. As in Java, text inside
+  // single quotes is literal ("yyyyMMdd'T'HHmmss'Z'" keeps its T and Z) and '' is one quote.
   let out = '';
   let i = 0;
   while (i < pattern.length) {
+    if (pattern[i] === "'") {
+      if (pattern[i + 1] === "'") { out += "'"; i += 2; continue; }
+      // A quoted run: copy until the closing quote; '' inside it is one quote.
+      i += 1;
+      while (i < pattern.length) {
+        if (pattern[i] === "'" && pattern[i + 1] === "'") { out += "'"; i += 2; continue; }
+        if (pattern[i] === "'") { i += 1; break; }
+        out += pattern[i];
+        i += 1;
+      }
+      continue;
+    }
     let matched = false;
     for (const [tok, val] of tokens) {
       if (pattern.startsWith(tok, i)) { out += val; i += tok.length; matched = true; break; }
