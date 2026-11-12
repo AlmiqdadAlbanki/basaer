@@ -9,6 +9,8 @@
 // (setBackground, setFontWeight, setNumberFormat, setNote, ...) are accepted
 // and ignored: they do not affect values, which is all the logic reads back.
 
+const { computedColumnsFor } = require('./sheet-formulas.js');
+
 const COL_A = 'A'.charCodeAt(0);
 
 function colToLetter(col) {
@@ -71,13 +73,25 @@ class Range {
     // Read the grid once per call: `_grid` is a live, version-checked view of
     // the storage master, and the check is per access.
     const grid = this.sheet._grid;
+    // Columns that were live formulas in Google Sheets are recomputed on read
+    // (sheet-formulas.js); the stored value is only what the export froze.
+    const computed = computedColumnsFor(this.sheet.spreadsheet.id, this.sheet.name, grid[0]);
+    const timeZone = computed ? this.sheet.spreadsheet.getSpreadsheetTimeZone() : null;
+    const nowMs = computed ? Date.now() : 0;
     const out = [];
     for (let r = 0; r < this.numRows; r++) {
-      const gridRow = grid[this.row - 1 + r] || [];
+      const gridRowIndex = this.row - 1 + r;
+      const gridRow = grid[gridRowIndex] || [];
       const line = [];
       for (let c = 0; c < this.numCols; c++) {
         const v = gridRow[this.col - 1 + c];
         line.push(isEmpty(v) ? '' : v);
+      }
+      if (computed && gridRowIndex > 0) {
+        for (const { columnIndex, compute } of computed) {
+          const c = columnIndex - (this.col - 1);
+          if (c >= 0 && c < this.numCols) line[c] = compute(gridRow, grid[0], timeZone, nowMs);
+        }
       }
       out.push(line);
     }
